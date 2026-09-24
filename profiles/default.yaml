@@ -12,8 +12,8 @@ name: Мастерская
 terms:
   box: Коробка
   boxes: Коробки
-  item: Компонент
-  items: Компоненты
+  item: Предмет
+  items: Предметы
   place: Место
   places: Места
   unit: шт
@@ -41,7 +41,7 @@ item_fields:
 
 categories:
   - key: electronics
-    label: Электроника
+    label: Компоненты
     fields:
       - key: datasheet
         label: Даташит
@@ -129,3 +129,49 @@ categories:
             type: number
       - key: electronics_other
         label: Другое
+
+  - key: tools
+    label: Инструменты
+    types:
+      - key: hand_tool
+        label: Ручной инструмент
+        hint: отвёртки, клещи, кусачки, пинцеты
+      - key: power_tool
+        label: Электроинструмент
+        hint: паяльник, фен, дрель, гравёр
+      - key: meter
+        label: Измерительный прибор
+        hint: мультиметр, осциллограф, штангенциркуль
+      - key: tools_other
+        label: Другое
+
+  - key: consumables
+    label: Расходники
+    fields:
+      - key: photo
+        required: false
+    types:
+      - key: solder
+        label: Для пайки
+        hint: припой, флюс, оплётка
+      - key: wire
+        label: Провод
+        hint: МГТФ, силиконовый, витая пара, термоусадка
+        fields:
+          - key: gauge
+            label: Сечение
+            type: text
+            search: 2
+            hint: 0.5 мм², 22 AWG
+      - key: fasteners
+        label: Крепёж
+        hint: винты, гайки, стойки, стяжки
+        fields:
+          - key: size
+            label: Размер
+            type: text
+            search: 3
+            hint: M3×8
+      - key: consumables_other
+        label: Другое
+        hint: изолента, клей, скотч

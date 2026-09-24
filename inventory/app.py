@@ -221,12 +221,16 @@ async def read_fields(req, old, fields):
 
 
 @app.get("/items")
-def items(req: Request, type: str = ""):
+def items(req: Request, type: str = "", cat: str = ""):
+    if type in core.TYPES:
+        cat = core.TYPES[type]["category"]["key"]
     with db() as c:
         rows = [dict(r, fields=json.loads(r["fields"])) for r in c.execute(
             "SELECT i.*, COALESCE(SUM(s.qty), 0) AS total FROM items i LEFT JOIN stock s ON s.item_id=i.id "
             "WHERE ?='' OR i.type=? GROUP BY i.id ORDER BY i.name", (type, type))]
-    return page(req, "items.html", items=rows, type=type)
+    if cat:
+        rows = [r for r in rows if r["type"] in core.TYPES and core.TYPES[r["type"]]["category"]["key"] == cat]
+    return page(req, "items.html", items=rows, type=type, cat=cat)
 
 
 def card_form(req, status=200, it=None, type="", name="", vals=None, errors=(), box="", qty=0):
