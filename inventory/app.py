@@ -39,7 +39,7 @@ T.env.globals.update(
 def all_boxes():  # for box fields: named first, by name; each with its place — the top box's (№39: filter, grey hint)
     with db() as c:
         rows = {r["id"]: dict(r) for r in c.execute(
-            "SELECT b.id, b.name, b.parent_id, b.place_id, p.name AS place FROM boxes b LEFT JOIN places p ON p.id=b.place_id")}
+            "SELECT b.id, b.name, b.parent_id, b.place_id, p.name AS place FROM boxes b LEFT JOIN places p ON p.id=b.place_id WHERE b.kind!='hands'")}
     for r in rows.values():
         t, seen = r, {r["id"]}
         while t["parent_id"] in rows and t["parent_id"] not in seen:
@@ -110,12 +110,14 @@ def index(req: Request, q: str = "", put: str = ""):
 # --- boxes ---
 
 @app.get("/boxes")
-def boxes(req: Request, new: str = ""):
+def boxes(req: Request, new: str = "", loose: str = ""):
     with db() as c:
         rows = [dict(b, where=core.box_where(c, b["id"])) for b in c.execute(
             "SELECT b.*, COUNT(s.item_id) AS n FROM boxes b LEFT JOIN stock s ON s.box_id=b.id "
             "WHERE b.kind='box' GROUP BY b.id ORDER BY b.created_at DESC, b.id")]
-    return page(req, "boxes.html", boxes=rows, new=[x for x in new.split(",") if x])
+    if loose:  # №28: boxes standing nowhere — no place, theirs or their outer box's
+        rows = [r for r in rows if not r["where"]]
+    return page(req, "boxes.html", boxes=rows, new=[x for x in new.split(",") if x], loose=loose)
 
 
 @app.post("/boxes")
@@ -140,7 +142,10 @@ def valid_box_id(s):
 @app.get("/B/{box_id}")  # QR codes carry upper-case URLs
 def box(req: Request, box_id: str):
     with db() as c:
-        return box_page(req, get_box(c, box_id))
+        b = get_box(c, box_id)
+    if b["kind"] == "hands":  # no label, place or delete for it: the list of what is in hand
+        return go("/items?hands=1")
+    return box_page(req, b)
 
 
 def box_page(req, b, draft=False):
@@ -162,6 +167,8 @@ def box_save(box_id: str, name: str = Form(""), place: str = Form(""), parent_id
              x_autosave: str = Header("")):
     bid = valid_box_id(box_id)
     parent = core.find_box(parent_id) if parent_id.strip() else None
+    if parent == core.HANDS:  # «на руках» holds things, not boxes (№28)
+        raise ValueError(f"«{PROFILE['terms'].get('hands', 'На руках')}» — не коробка")
     with db() as c:  # an error rolls the insert back: a draft stays a draft
         c.execute("INSERT OR IGNORE INTO boxes(id) VALUES (?)", (bid,))
         b = get_box(c, bid)
@@ -260,19 +267,21 @@ async def read_fields(req, old, fields):
 
 
 @app.get("/items")
-def items(req: Request, type: str = "", cat: str = "", q: str = ""):
+def items(req: Request, type: str = "", cat: str = "", q: str = "", hands: str = ""):
     if type in core.TYPES:
         cat = core.TYPES[type]["category"]["key"]
     with db() as c:
         rows = [dict(r, fields=json.loads(r["fields"])) for r in c.execute(
-            "SELECT i.*, COALESCE(SUM(s.qty), 0) AS total, MAX(s.box_id IS NOT NULL AND s.qty IS NULL) AS uncounted FROM items i LEFT JOIN stock s ON s.item_id=i.id "
-            "WHERE ?='' OR i.type=? GROUP BY i.id ORDER BY i.name", (type, type))]
+            "SELECT i.*, COALESCE(SUM(s.qty), 0) AS total, MAX(s.box_id IS NOT NULL AND s.qty IS NULL) AS uncounted, MAX(s.box_id=?) AS hands FROM items i LEFT JOIN stock s ON s.item_id=i.id "
+            "WHERE ?='' OR i.type=? GROUP BY i.id ORDER BY i.name", (core.HANDS, type, type))]
+    if hands:  # №28: taken and not put back, or not put away yet
+        rows = [r for r in rows if r["hands"]]
     if cat:
         rows = [r for r in rows if r["type"] in core.TYPES and core.TYPES[r["type"]]["category"]["key"] == cat]
     if q.strip():  # same search as the main page, kept in its rank order
         rank = {i["id"]: n for n, i in enumerate(core.search(q)[0])}
         rows = sorted((r for r in rows if r["id"] in rank), key=lambda r: rank[r["id"]])
-    return page(req, "items.html", items=rows, type=type, cat=cat, q=q)
+    return page(req, "items.html", items=rows, type=type, cat=cat, q=q, hands=hands)
 
 
 def card_form(req, status=200, it=None, type="", name="", vals=None, errors=(), box="", qty="", dups=()):
@@ -311,6 +320,8 @@ async def item_create(req: Request, type: str):
     iid = core.save_item(None, name, type, f)
     if box_id and (not qty or int(qty) > 0):  # empty: «есть, не считал»
         core.move(iid, box_id, int(qty) if qty else None, "put", AUTHOR)
+    elif not box_id and qty and int(qty) > 0:  # no box yet: brought home, in hand until put away (№28)
+        core.move(iid, core.HANDS, int(qty), "buy", AUTHOR)
     return go(f"/b/{box_id}" if box_id else f"/i/{iid}")  # filling a box: back to it for the next item
 
 
@@ -321,7 +332,7 @@ def item(req: Request, item_id: int):
         return page(req, "item.html", it=it, f=json.loads(it["fields"]), fields=core.fields_for(it["type"]),
                     stock=core.stock_of_item(c, item_id), projects=core.projects(c),
                     nfc=f"{public_base(req)}/i/{item_id}".lower(),  # №37: the tag opens this card
-                    history=c.execute(MOVES + " WHERE m.item_id=? ORDER BY m.id DESC LIMIT 50", (item_id,)).fetchall())
+                    history=c.execute(MOVES + " AND m.item_id=? ORDER BY m.id DESC LIMIT 50", (item_id,)).fetchall())
 
 
 @app.post("/i/{item_id}/delete")

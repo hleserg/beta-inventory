@@ -60,7 +60,8 @@ def search(query: str) -> dict[str, Any]:
 
 @server.tool(annotations=READ)
 def get_item(item_id: int) -> dict[str, Any]:
-    """Full card of an item: fields (keys as in card_template), stock per box, last 10 movements."""
+    """Full card of an item: fields (keys as in card_template), stock per box, last 10 movements.
+    Box HANDS in stock: in hand, not put away; its where says the box it was taken from, if any."""
     return card(item_id)
 
 
@@ -69,7 +70,7 @@ def card(item_id):
         it = c.execute("SELECT * FROM items WHERE id=?", (item_id,)).fetchone()
         if not it:
             raise ToolError(f"No item {item_id}. Find item ids with search.")
-        moves = c.execute(core.MOVES + " WHERE m.item_id=? ORDER BY m.id DESC LIMIT 10", (item_id,))
+        moves = c.execute(core.MOVES + " AND m.item_id=? ORDER BY m.id DESC LIMIT 10", (item_id,))
         return dict(id=it["id"], name=it["name"], type=it["type"], type_label=core.type_label(it["type"]),
                     fields=with_links(core.item_fields(it), it["type"]), stock=core.stock_of_item(c, item_id),
                     history=[dict(m) for m in moves], url=link(f"/i/{item_id}"))
@@ -129,6 +130,8 @@ def change_stock(box_id: str, item_id: int, action: Literal["put", "return", "bu
     count: the box holds exactly qty now (stocktaking). agent: your name as the user knows you.
     put / return / buy with qty null: some went in, not counted (loose resistors and the like); the box then
     holds qty null, «есть, не считал», left out of totals. take and count need a number.
+    box_id "" or HANDS is «на руках»: a take from a box lands there, a put or return into a box takes from there
+    first, a take from HANDS writes it off (used up, gone), put/buy on HANDS: brought home, not put away yet.
     Returns the new qty in the box.
     """
     if project_id is not None:
@@ -139,7 +142,7 @@ def change_stock(box_id: str, item_id: int, action: Literal["put", "return", "bu
         qty = core.change_stock(box_id, item_id, action, qty, author(agent), project_id)
     except ValueError as e:
         raise ToolError(f"{e}. Check the box with get_box, the item with get_item.") from None
-    return {"box_id": box_id.strip().upper(), "item_id": item_id, "qty": qty}
+    return {"box_id": box_id.strip().upper() or core.HANDS, "item_id": item_id, "qty": qty}
 
 
 def fetch(url):
@@ -205,7 +208,8 @@ async def create_item(type: str, name: str, fields: dict[str, Any], agent: str, 
                       qty: int | None = 0) -> dict[str, Any]:
     """New card. Fields by card_template(type), keys as there; photo: a list of direct image URLs (one string is fine), the server downloads them;
     files: [{name, url}]. With box_id and qty, puts qty into that box (history author: agent, your name);
-    qty null puts some in uncounted, «есть, не считал».
+    qty null puts some in uncounted, «есть, не считал». With qty and no box_id, the qty is in hand (box HANDS),
+    not put away yet.
 
     Search first: the item may already exist. Returns the card as get_item does.
     """
@@ -221,6 +225,8 @@ async def create_item(type: str, name: str, fields: dict[str, Any], agent: str, 
     iid = core.save_item(None, name.strip(), type, f)
     if box_id and (qty is None or qty > 0):
         core.move(iid, box_id, qty, "put", agent)
+    elif not box_id and qty:  # no box yet: in hand until put away
+        core.move(iid, core.HANDS, qty, "buy", agent)
     return card(iid)
 
 

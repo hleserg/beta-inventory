@@ -17,6 +17,9 @@ ROOT = Path(__file__).resolve().parent.parent
 DATA = Path(os.environ.get("DATA_DIR", ROOT / "data"))
 UPLOADS = DATA / "uploads"
 ID_ALPHABET = "23456789ABCDEFGHJKLMNPQRSTUVWXYZ"  # no 0/O/1/I
+# №28: things taken and not put back, or brought home and not put away yet, lie «на руках» — a box of kind
+# 'hands' that no box list shows; stock and history work on it as on any box
+HANDS = "HANDS"
 
 # qty NULL: «есть, не считал» (manifesto 4) — loose parts nobody counts; found and taken, left out of sums
 STOCK = """CREATE TABLE IF NOT EXISTS stock(
@@ -52,9 +55,11 @@ CREATE TABLE IF NOT EXISTS trash(
 """
 
 MOVES = ("SELECT m.*, i.name AS item, p.name AS project, b.name AS box FROM movements m JOIN items i ON i.id=m.item_id "
-         "LEFT JOIN projects p ON p.id=m.project_id LEFT JOIN boxes b ON b.id=m.box_id")
+         "LEFT JOIN projects p ON p.id=m.project_id LEFT JOIN boxes b ON b.id=m.box_id "
+         # the hand's leg of a take/put/return mirrors the box's: history shows the box's only (№28)
+         "WHERE NOT (m.box_id='HANDS' AND m.kind IN ('take', 'put', 'return'))")
 KINDS = {"put": "положил", "take": "забрал", "return": "вернул", "buy": "докупил",
-         "count": "инвентаризация", "clear": "освободил", "move": "переложил"}
+         "count": "инвентаризация", "clear": "освободил", "move": "переложил", "spend": "списал"}
 
 
 def load_profile():
@@ -121,6 +126,8 @@ def init():
                             "INSERT INTO stock SELECT * FROM stock_v0; DROP TABLE stock_v0; COMMIT;")
         if "kind" not in [r["name"] for r in c.execute("PRAGMA table_info(boxes)")]:  # boxes from before shelves
             c.execute("ALTER TABLE boxes ADD COLUMN kind TEXT NOT NULL DEFAULT 'box'")
+        c.execute("INSERT INTO boxes(id, name, kind) VALUES (?, ?, 'hands') ON CONFLICT(id) DO UPDATE SET name=excluded.name",
+                  (HANDS, PROFILE["terms"].get("hands", "На руках")))
         pics = {fd["key"] for t in [*TYPES, ""] for fd in fields_for(t) if fd["type"] == "photo"}
         for r in c.execute("SELECT id, fields FROM items").fetchall():  # one photo per card before: a name, not a list
             f = item_fields(r)
@@ -216,6 +223,8 @@ def box_where(c, box_id):
 def find_box(text):
     """Box ID from what a person typed or picked: the ID in any case, «Name (ID)» from the list, a unique part of a name."""
     t = text.strip()
+    if not t:  # no box: in hand (№28)
+        return HANDS
     with db() as c:
         boxes = c.execute("SELECT id, name FROM boxes ORDER BY name").fetchall()
     ids = {b["id"] for b in boxes}
@@ -274,6 +283,8 @@ def change_stock(box_id, item_id, action, qty, author, project_id=None):
     """A stock change as people say it: put/return/buy/take qty, or count: the box holds qty now.
 
     qty None on put/return/buy: some went in, not counted.
+    No box, or HANDS, is «на руках» (№28): a take from a box lands there, a put or return into a box takes from
+    there first, and a take from there is written off («списал»).
     """
     box_id = find_box(box_id)
     if action not in ("put", "return", "buy", "take", "count"):
@@ -286,7 +297,22 @@ def change_stock(box_id, item_id, action, qty, author, project_id=None):
         return move(item_id, box_id, max(qty, 0) - ((row["qty"] or 0) if row else 0), "count", author)
     if qty is not None and qty < 1:
         raise ValueError("Количество должно быть больше нуля")
-    return move(item_id, box_id, -qty if action == "take" else qty, action, author, project_id)
+    if box_id == HANDS:
+        if qty is None:
+            raise ValueError("Сколько на руках? Нужно число")
+        return move(item_id, HANDS, -qty if action == "take" else qty, "spend" if action == "take" else action,
+                    author, project_id)
+    if action == "take":  # the box first: only it can refuse («в коробке только N»)
+        left = move(item_id, box_id, -qty, "take", author, project_id)
+        move(item_id, HANDS, qty, "take", author, project_id)
+        return left
+    if action in ("put", "return"):  # put away what is in hand: not a second lot
+        with db() as c:
+            row = c.execute("SELECT qty FROM stock WHERE box_id=? AND item_id=?", (HANDS, item_id)).fetchone()
+        if row:
+            qty = qty or row["qty"]  # «не считал» from hand: all of it, and that many
+            move(item_id, HANDS, -min(qty, row["qty"]), action, author)
+    return move(item_id, box_id, qty, action, author, project_id)
 
 
 def transfer(item_id, src, dst, author):
@@ -398,6 +424,8 @@ def trash(kind, key):
         r = c.execute(f"SELECT * FROM {table} WHERE id=?", (key,)).fetchone()
         if not r:
             raise ValueError("Уже удалено")
+        if kind == "box" and r["kind"] == "hands":
+            raise ValueError("«На руках» не удаляется")
         if kind == "item":
             s["items"].append(dict(r))
             s["stock"] = _rows(c, "SELECT * FROM stock WHERE item_id=?", key)
@@ -475,9 +503,28 @@ def trash_list():
 
 
 def stock_of_item(c, item_id):
+    """Where it lies: [{box_id, qty, name, where}]; in hand last, its where «взят из …» when a take put it there."""
     rows = c.execute("SELECT s.box_id, s.qty, b.name FROM stock s JOIN boxes b ON b.id=s.box_id "
-                     "WHERE s.item_id=? ORDER BY s.box_id", (item_id,)).fetchall()
-    return [dict(r, where=box_where(c, r["box_id"])) for r in rows]
+                     "WHERE s.item_id=? ORDER BY s.box_id=?, s.box_id", (item_id, HANDS)).fetchall()
+    out = [dict(r, where=box_where(c, r["box_id"])) for r in rows]
+    if out and out[-1]["box_id"] == HANDS:
+        out[-1]["src"] = taken_from(c, item_id)
+        if out[-1]["src"]:
+            b = c.execute("SELECT name FROM boxes WHERE id=?", (out[-1]["src"],)).fetchone()
+            where = box_where(c, out[-1]["src"])
+            out[-1]["where"] = "взят из " + ((b["name"] if b else "") or out[-1]["src"]) + (f" · {where}" if where else "")
+    return out
+
+
+def taken_from(c, item_id):
+    """The box the last lot in hand came from, if a take brought it (a take logs the box, then the hand)."""
+    last = c.execute("SELECT id, kind FROM movements WHERE item_id=? AND box_id=? AND delta>0 ORDER BY id DESC LIMIT 1",
+                     (item_id, HANDS)).fetchone()
+    if not last or last["kind"] != "take":
+        return ""
+    r = c.execute("SELECT box_id FROM movements WHERE item_id=? AND id<? AND kind='take' AND box_id!=? "
+                  "ORDER BY id DESC LIMIT 1", (item_id, last["id"], HANDS)).fetchone()
+    return r["box_id"] if r else ""
 
 
 def lookalikes(name):
@@ -532,7 +579,7 @@ def search(q):
         items = [i for i in items if not i["similar"]] + [i for i in items if i["similar"]][:SEM_TOP]
         for i in items:
             i["stock"] = stock_of_item(c, i["id"])
-        for b in c.execute("SELECT b.*, p.name AS place FROM boxes b LEFT JOIN places p ON p.id=b.place_id"):
+        for b in c.execute("SELECT b.*, p.name AS place FROM boxes b LEFT JOIN places p ON p.id=b.place_id WHERE b.kind!='hands'"):
             text = norm(f"{b['id']} {b['name']} {b['place'] or ''}")
             if all(w in text for w in words):
                 boxes.append(dict(id=b["id"], name=b["name"], where=box_where(c, b["id"])))

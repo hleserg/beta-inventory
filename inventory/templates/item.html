@@ -24,16 +24,25 @@ addEventListener("keydown", e => { if (e.key == "Escape" && full()) history.back
     ~ " дней из «Корзины».")|tojson }})'><button class="ghost">Удалить</button></form></div>
 
 <h2>Где лежит</h2>
+{% set h = stock|selectattr("box_id", "equalto", "HANDS")|first %}{# №28: in hand — put it away (back where it was taken from) or write it off #}
 {% for s in stock %}
 <div class="card">
+  {% if s.box_id == "HANDS" %}
+  <div class="row"><b>{{ s.name }}</b> <span class="mut">{{ s.where }}</span><span class="qty right">{{ s.qty|qty }}</span></div>
+  <form method="post" action="/stock" class="row" onsubmit="return confirm('Списать? Из учёта уйдёт, в истории останется.')">
+    <input type="hidden" name="box" value="HANDS"><input type="hidden" name="item" value="{{ it.id }}"><input type="hidden" name="action" value="take"><input type="hidden" name="back" value="/i/{{ it.id }}">
+    <input type="number" name="qty" min="1" max="{{ s.qty }}" value="{{ s.qty }}" required><button class="bad">Списать</button>
+  </form>
+  {% else %}
   <div class="row">{{ box_link(s.box_id, s.name) }} <span class="mut">{{ s.where }}</span><span class="qty right">{{ s.qty|qty }}</span></div>
   {{ stock_forms(s.box_id, it.id, s.qty, projects, "/i/" ~ it.id) }}
+  {% endif %}
 </div>
 {% else %}<p class="mut">Нигде нет.</p>{% endfor %}
-<details><summary>Куда положить</summary>
-<form method="post" action="/stock" class="row" data-put{% if stock|length == 1 %} data-from="{{ stock[0].box_id }}"{% endif %}>
-  <input type="hidden" name="item" value="{{ it.id }}"><input type="hidden" name="action" value="add"><input type="hidden" name="kind" value="put"><input type="hidden" name="back" value="/i/{{ it.id }}"><input type="hidden" name="src">
-  {{ box_input(required=True) }}<input type="number" name="qty" min="1" placeholder="не считал"><button>Положить</button>
+<details{% if h %} open{% endif %}><summary>{{ "Положить на место" if h else "Куда положить" }}</summary>
+<form method="post" action="/stock" class="row" data-put{% if stock|length == 1 and not h %} data-from="{{ stock[0].box_id }}"{% endif %}>
+  <input type="hidden" name="item" value="{{ it.id }}"><input type="hidden" name="action" value="add"><input type="hidden" name="kind" value="{{ 'return' if h and h.src else 'put' }}"><input type="hidden" name="back" value="/i/{{ it.id }}"><input type="hidden" name="src">
+  {{ box_input(value=h.src if h else "", required=True) }}<input type="number" name="qty" min="1" placeholder="не считал"{% if h %} value="{{ h.qty }}"{% endif %}><button>Положить</button>
 </form></details>
 <details><summary>NFC-метка</summary>{{ nfc_tag(nfc) }}</details>
 

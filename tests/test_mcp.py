@@ -61,8 +61,10 @@ def test_stock_tools():
     assert err.is_error and "только 5" in err.content[0].text  # core's own words reach the agent
     err = call("change_stock", box_id=box, item_id=iid, action="take", qty=1, agent="Мара", project_id=9999)
     assert err.is_error and "list_projects" in err.content[0].text
+    back = call("change_stock", box_id=box, item_id=iid, action="put", qty=None, agent="Мара")
+    assert back.structured_content["qty"] == 7  # no number, the 2 taken are in hand (№28): they go back
     loose = call("change_stock", box_id=box, item_id=iid, action="put", qty=None, agent="Мара")
-    assert loose.structured_content["qty"] is None  # a handful more, uncounted: «есть, не считал»
+    assert loose.structured_content["qty"] is None  # nothing in hand: a handful more, uncounted: «есть, не считал»
     assert call("change_stock", box_id=box, item_id=iid, action="count", qty=10, agent="Мара"
                 ).structured_content["qty"] == 10
 

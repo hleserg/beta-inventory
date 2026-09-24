@@ -127,7 +127,9 @@ def test_uncounted():
     c.post("/stock", data={"box": box, "item": rid, "action": "set", "qty": 40})
     assert "40 шт" in c.get(f"/b/{box}").text  # counted: a number again
     c.post("/stock", data={"box": box, "item": rid, "action": "add", "kind": "put", "qty": ""})
-    assert "есть, не считал" in c.get(f"/b/{box}").text  # a handful more, uncounted
+    assert "43 шт" in c.get(f"/b/{box}").text  # no number, 3 in hand (№28): those 3 go back
+    c.post("/stock", data={"box": box, "item": rid, "action": "add", "kind": "put", "qty": ""})
+    assert "есть, не считал" in c.get(f"/b/{box}").text  # nothing in hand: a handful more, uncounted
     c.post("/stock", data={"box": box, "item": rid, "action": "add", "kind": "return", "qty": 2})
     assert "2 шт" in c.get(f"/b/{box}").text  # «вернул 2» to an uncounted pair: now there are 2 (№34)
     c.post(f"/b/{box}/clear")
@@ -295,3 +297,29 @@ def test_item_tag():
     assert f'data-nfcw="http://testserver/i/{iid}"' in c.get(f"/i/{iid}").text
     box = core.new_boxes(1)[0]
     assert f'data-nfcw="http://testserver/b/{box.lower()}"' in c.get(f"/b/{box}").text
+
+
+def test_hands():
+    """№28: a thing with a count and no box is «на руках»; a take puts it there, a put or return takes it back out."""
+    def stock(iid):
+        with core.db() as db:
+            return {r[0]: r[1] for r in db.execute("SELECT box_id, qty FROM stock WHERE item_id=?", (iid,))}
+    box, placed = core.new_boxes(2)
+    with core.db() as db:
+        pid = db.execute("INSERT INTO places(name) VALUES ('стол')").lastrowid
+        db.execute("UPDATE boxes SET place_id=? WHERE id=?", (pid, placed))
+    c.post("/items/new?type=resistor", data={"name": "модуль с ПВЗ", "value": "x", "qty": 3})
+    iid = newest()
+    assert stock(iid) == {core.HANDS: 3} and "На руках" in c.get(f"/i/{iid}").text
+    assert "модуль с ПВЗ" in c.get("/items?hands=1").text
+    c.post("/stock", data={"box": box, "item": iid, "action": "add", "kind": "put", "qty": 2})
+    assert stock(iid) == {core.HANDS: 1, box: 2}
+    c.post("/stock", data={"box": box, "item": iid, "action": "take", "qty": 1})
+    assert stock(iid) == {core.HANDS: 2, box: 1} and f"взят из {box}" in c.get(f"/i/{iid}").text
+    c.post("/stock", data={"box": core.HANDS, "item": iid, "action": "take", "qty": 2})
+    assert stock(iid) == {box: 1} and "списал" in c.get(f"/i/{iid}").text
+    assert "модуль с ПВЗ" not in c.get("/items?hands=1").text
+    loose = c.get("/boxes?loose=1").text
+    assert box in loose and placed not in loose and core.HANDS not in loose
+    assert c.get(f"/b/{core.HANDS}", follow_redirects=False).headers["location"] == "/items?hands=1"
+    assert f"({core.HANDS})" not in c.get(f"/i/{iid}").text  # not offered as a box to put into

@@ -9,5 +9,6 @@
 <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:8px;margin-top:8px">
 {% for id in new %}<a href="/b/{{ id }}/label.png" download="{{ id }}.png"><img src="/b/{{ id }}/label.png" alt="{{ id }}" style="width:100%;background:#fff;border:1px solid var(--line)"></a>{% endfor %}
 </div></div>{% endif %}
-<table>{% for b in boxes %}<tr><td>{{ box_link(b.id, b.name) }}<div class="mut">{{ b.where }}</div></td><td class="mut">{{ b.n or "—" }}</td></tr>{% endfor %}</table>
+<div class="chips seg"><a href="/boxes" class="{{ 'on' if not loose }}">все</a><a href="/boxes?loose=1" class="{{ 'on' if loose }}">без места</a></div>
+<table>{% for b in boxes %}<tr><td>{{ box_link(b.id, b.name) }}<div class="mut">{{ b.where }}</div></td><td class="mut">{{ b.n or "—" }}</td></tr>{% else %}<tr><td class="mut">{{ "Все стоят на местах." if loose else "Пока пусто." }}</td></tr>{% endfor %}</table>
 {% endblock %}
