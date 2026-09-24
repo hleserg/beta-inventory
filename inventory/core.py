@@ -17,6 +17,12 @@ DATA = Path(os.environ.get("DATA_DIR", ROOT / "data"))
 UPLOADS = DATA / "uploads"
 ID_ALPHABET = "23456789ABCDEFGHJKLMNPQRSTUVWXYZ"  # no 0/O/1/I
 
+# qty NULL: «есть, не считал» (manifesto 4) — loose parts nobody counts; found and taken, left out of sums
+STOCK = """CREATE TABLE IF NOT EXISTS stock(
+  box_id TEXT NOT NULL REFERENCES boxes(id), item_id INTEGER NOT NULL REFERENCES items(id),
+  qty INTEGER CHECK (qty IS NULL OR qty > 0),
+  updated_at TEXT NOT NULL DEFAULT (datetime('now','localtime')),
+  PRIMARY KEY (box_id, item_id));"""
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS places(
   id INTEGER PRIMARY KEY, name TEXT NOT NULL UNIQUE, note TEXT NOT NULL DEFAULT '');
@@ -29,11 +35,7 @@ CREATE TABLE IF NOT EXISTS items(
   id INTEGER PRIMARY KEY, name TEXT NOT NULL, type TEXT NOT NULL DEFAULT '', fields TEXT NOT NULL DEFAULT '{}',
   created_at TEXT NOT NULL DEFAULT (datetime('now','localtime')),
   updated_at TEXT NOT NULL DEFAULT (datetime('now','localtime')));
-CREATE TABLE IF NOT EXISTS stock(
-  box_id TEXT NOT NULL REFERENCES boxes(id), item_id INTEGER NOT NULL REFERENCES items(id),
-  qty INTEGER NOT NULL CHECK (qty > 0),
-  updated_at TEXT NOT NULL DEFAULT (datetime('now','localtime')),
-  PRIMARY KEY (box_id, item_id));
+""" + STOCK + """
 CREATE TABLE IF NOT EXISTS projects(
   id INTEGER PRIMARY KEY, name TEXT NOT NULL, description TEXT NOT NULL DEFAULT '',
   git_url TEXT NOT NULL DEFAULT '', status TEXT NOT NULL DEFAULT 'active');
@@ -103,6 +105,10 @@ def init():
     UPLOADS.mkdir(parents=True, exist_ok=True)
     with db() as c:
         c.executescript(SCHEMA)
+        if "IS NULL" not in c.execute("SELECT sql FROM sqlite_master WHERE name='stock'").fetchone()["sql"]:
+            # stock from before «не считал»: SQLite changes a CHECK only by rebuilding the table
+            c.executescript("BEGIN; ALTER TABLE stock RENAME TO stock_v0;" + STOCK +
+                            "INSERT INTO stock SELECT * FROM stock_v0; DROP TABLE stock_v0; COMMIT;")
     if SEM_MODEL:
         threading.Thread(target=_load_model, daemon=True).start()
 
@@ -173,7 +179,11 @@ def box_where(c, box_id):
 
 
 def move(item_id, box_id, delta, kind, author, project_id=None, note=""):
-    """The only way stock changes: updates the box×item quantity and logs a movement."""
+    """The only way stock changes: updates the box×item quantity and logs a movement.
+
+    delta None puts some in without counting: the pair's qty becomes None, «есть, не считал». Puts and takes
+    keep such a pair uncounted (the movement still logs their delta); count and clear give it a number again.
+    """
     if kind not in KINDS:
         raise ValueError(f"unknown kind {kind}")
     with db() as c:
@@ -182,10 +192,14 @@ def move(item_id, box_id, delta, kind, author, project_id=None, note=""):
         if not c.execute("SELECT 1 FROM items WHERE id=?", (item_id,)).fetchone():
             raise ValueError(f"нет позиции {item_id}")
         row = c.execute("SELECT qty FROM stock WHERE box_id=? AND item_id=?", (box_id, item_id)).fetchone()
-        qty = (row["qty"] if row else 0) + delta
-        if qty < 0:
-            raise ValueError(f"в коробке только {row['qty'] if row else 0}")
-        if delta == 0:
+        old = row["qty"] if row else 0
+        if delta is None or old is None and kind not in ("count", "clear"):
+            qty, note = None, note or "не считал"
+        else:
+            qty = (old or 0) + delta
+            if qty < 0:
+                raise ValueError(f"в коробке только {old}")
+        if delta == 0 and qty == old:
             return qty
         if qty == 0:
             c.execute("DELETE FROM stock WHERE box_id=? AND item_id=?", (box_id, item_id))
@@ -193,20 +207,25 @@ def move(item_id, box_id, delta, kind, author, project_id=None, note=""):
             c.execute("INSERT INTO stock(box_id, item_id, qty) VALUES (?,?,?) ON CONFLICT DO UPDATE "
                       "SET qty=excluded.qty, updated_at=datetime('now','localtime')", (box_id, item_id, qty))
         c.execute("INSERT INTO movements(item_id, box_id, delta, kind, project_id, author, note) "
-                  "VALUES (?,?,?,?,?,?,?)", (item_id, box_id, delta, kind, project_id, author, note))
+                  "VALUES (?,?,?,?,?,?,?)", (item_id, box_id, delta or 0, kind, project_id, author, note))
     return qty
 
 
 def change_stock(box_id, item_id, action, qty, author, project_id=None):
-    """A stock change as people say it: put/return/buy/take qty, or count: the box holds qty now."""
+    """A stock change as people say it: put/return/buy/take qty, or count: the box holds qty now.
+
+    qty None on put/return/buy: some went in, not counted.
+    """
     box_id = box_id.strip().upper()
+    if action not in ("put", "return", "buy", "take", "count"):
+        raise ValueError(f"нет действия {action}: put, return, buy, take, count")
+    if qty is None and action in ("take", "count"):
+        raise ValueError("Сколько? Нужно число")
     if action == "count":
         with db() as c:
             row = c.execute("SELECT qty FROM stock WHERE box_id=? AND item_id=?", (box_id, item_id)).fetchone()
-        return move(item_id, box_id, max(qty, 0) - (row["qty"] if row else 0), "count", author)
-    if action not in ("put", "return", "buy", "take"):
-        raise ValueError(f"нет действия {action}: put, return, buy, take, count")
-    if qty < 1:
+        return move(item_id, box_id, max(qty, 0) - ((row["qty"] or 0) if row else 0), "count", author)
+    if qty is not None and qty < 1:
         raise ValueError("Количество должно быть больше нуля")
     return move(item_id, box_id, -qty if action == "take" else qty, action, author, project_id)
 
@@ -263,7 +282,7 @@ def clear_box(box_id, author):
         rows = c.execute("SELECT item_id, qty FROM stock WHERE box_id=?", (box_id,)).fetchall()
         b = c.execute("SELECT * FROM boxes WHERE id=?", (box_id,)).fetchone()
     for r in rows:
-        move(r["item_id"], box_id, -r["qty"], "clear", author)
+        move(r["item_id"], box_id, -(r["qty"] or 0), "clear", author)
     with db() as c:
         c.execute("UPDATE boxes SET parent_id=?, place_id=COALESCE(place_id, ?) WHERE parent_id=?",
                   (b["parent_id"], b["place_id"], box_id))

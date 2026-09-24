@@ -3,18 +3,18 @@
 {% set hidden %}<input type="hidden" name="box" value="{{ box_id }}"><input type="hidden" name="item" value="{{ item_id }}"><input type="hidden" name="back" value="{{ back }}">{% endset %}
 {% if folded %}<details><summary>забрать / добавить</summary>{% endif %}
 <form method="post" action="/stock" class="row">{{ hidden }}<input type="hidden" name="action" value="take">
-  <input type="number" name="qty" value="1" min="1" max="{{ qty }}">
+  <input type="number" name="qty" value="1" min="1"{% if qty %} max="{{ qty }}"{% endif %} required>
   <select name="project"><option value="">без проекта</option>{% for p in projects %}<option value="{{ p.id }}">{{ p.name }}</option>{% endfor %}</select>
   <button>Забрать</button>
 </form>
 {% if not folded %}<details><summary>добавить / исправить</summary>{% endif %}
 <form method="post" action="/stock" class="row" style="margin-top:8px">{{ hidden }}<input type="hidden" name="action" value="add">
-  <input type="number" name="qty" value="1" min="1">
+  <input type="number" name="qty" value="{{ 1 if qty }}" min="1" placeholder="не считал">
   <select name="kind"><option value="return">вернул</option><option value="buy">докупил</option><option value="put">положил</option></select>
   <button class="ghost">Добавить</button>
 </form>
 <form method="post" action="/stock" class="row" style="margin-top:8px">{{ hidden }}<input type="hidden" name="action" value="set">
-  <input type="number" name="qty" value="{{ qty }}" min="0">
+  <input type="number" name="qty" value="{{ qty if qty is not none }}" min="0" required>
   <button class="ghost">Пересчитал — теперь столько</button>
 </form>
 </details>
@@ -25,6 +25,6 @@
 <tr><td class="mut">{{ m.at[5:16] }}</td>
 <td><a href="/i/{{ m.item_id }}">{{ m.item }}</a> · <a href="/b/{{ m.box_id }}">{{ m.box_id }}</a><br>
 <span class="mut">{{ kinds[m.kind] }}{% if m.project %} → {{ m.project }}{% endif %} · {{ m.author }}</span></td>
-<td class="qty">{{ "%+d"|format(m.delta) }}</td></tr>
+<td class="qty">{{ "%+d"|format(m.delta) if m.delta else "?" }}</td></tr>
 {% else %}<tr><td class="mut">Пока пусто.</td></tr>{% endfor %}</table>
 {% endmacro %}

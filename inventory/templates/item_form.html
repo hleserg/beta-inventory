@@ -23,7 +23,7 @@
   {% endfor %}
   {% if not it %}
   <label>Куда положить <span class="mut" id="boxname"></span></label>
-  <div class="row"><input name="box" value="{{ box }}" list="boxlist" placeholder="ID или название, можно пусто" style="text-transform:uppercase"><input type="number" name="qty" value="{{ qty }}" min="0"></div>
+  <div class="row"><input name="box" value="{{ box }}" list="boxlist" placeholder="ID или название, можно пусто" style="text-transform:uppercase"><input type="number" name="qty" value="{{ qty }}" min="0" placeholder="не считал"></div>
   <datalist id="boxlist">{% for b in boxes %}<option value="{{ b.id }}">{{ b.name or "" }}</option>{% endfor %}</datalist>
   {% endif %}
   <p><button>Сохранить</button></p>

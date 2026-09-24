@@ -35,6 +35,16 @@ T.env.globals.update(
     pk=next((f["key"] for f in PROFILE["item_fields"] if f["type"] == "photo"), None))
 _md = MarkdownIt("commonmark", {"html": False}).enable("table")  # raw HTML off: cards come from agents too
 T.env.filters["md"] = lambda s: Markup(_md.render(s or ""))
+
+
+def qty_text(q, uncounted=False):
+    """Stock as people read it. None is «есть, не считал»; uncounted: the sum left some piles out."""
+    if q is None or uncounted and not q:
+        return "есть, не считал"
+    return f"{q} {PROFILE['terms']['unit']}" + (" + не считал" if uncounted else "")
+
+
+T.env.filters["qty"] = qty_text
 AUTHOR = "человек"  # ponytail: no accounts; MCP calls will pass the agent's name
 
 
@@ -204,14 +214,14 @@ def items(req: Request, type: str = "", cat: str = ""):
         cat = core.TYPES[type]["category"]["key"]
     with db() as c:
         rows = [dict(r, fields=json.loads(r["fields"])) for r in c.execute(
-            "SELECT i.*, COALESCE(SUM(s.qty), 0) AS total FROM items i LEFT JOIN stock s ON s.item_id=i.id "
+            "SELECT i.*, COALESCE(SUM(s.qty), 0) AS total, MAX(s.box_id IS NOT NULL AND s.qty IS NULL) AS uncounted FROM items i LEFT JOIN stock s ON s.item_id=i.id "
             "WHERE ?='' OR i.type=? GROUP BY i.id ORDER BY i.name", (type, type))]
     if cat:
         rows = [r for r in rows if r["type"] in core.TYPES and core.TYPES[r["type"]]["category"]["key"] == cat]
     return page(req, "items.html", items=rows, type=type, cat=cat)
 
 
-def card_form(req, status=200, it=None, type="", name="", vals=None, errors=(), box="", qty=0):
+def card_form(req, status=200, it=None, type="", name="", vals=None, errors=(), box="", qty=""):
     with db() as c:
         boxes = c.execute("SELECT id, name FROM boxes ORDER BY id").fetchall() if not it else []
     return page(req, "item_form.html", status, it=it, type=type, fields=core.fields_for(type), name=name,
@@ -228,23 +238,25 @@ def check_type(type):
 def item_new(req: Request, box: str = "", type: str = ""):
     if not type:
         return page(req, "type_pick.html", box=box.upper())
-    return card_form(req, type=check_type(type), box=box.upper(), qty=1)
+    return card_form(req, type=check_type(type), box=box.upper())
 
 
 @app.post("/items/new")
 async def item_create(req: Request, type: str):
     fields = core.fields_for(check_type(type))
     name, f, errors, form = await read_fields(req, {}, fields)
-    box_id, qty = str(form.get("box", "")).strip().upper(), int(form.get("qty") or 0)
+    box_id, qty = str(form.get("box", "")).strip().upper(), str(form.get("qty", "")).strip()
     if box_id:
         with db() as c:
             if not c.execute("SELECT 1 FROM boxes WHERE id=?", (box_id,)).fetchone():
                 errors.append(f"Нет коробки {box_id}")
+    if qty and not qty.isdigit():
+        errors.append("Количество — целое число; пусто — «не считал»")
     if errors:
         return card_form(req, 400, type=type, name=name, vals=f, errors=errors, box=box_id, qty=qty)
     iid = core.save_item(None, name, type, f)
-    if box_id and qty > 0:
-        core.move(iid, box_id, qty, "put", AUTHOR)
+    if box_id and (not qty or int(qty) > 0):  # empty: «есть, не считал»
+        core.move(iid, box_id, int(qty) if qty else None, "put", AUTHOR)
     return go(f"/i/{iid}")
 
 
@@ -280,7 +292,7 @@ async def item_update(req: Request, item_id: int, type: str):
 # --- stock ---
 
 @app.post("/stock")
-def stock(box: str = Form(), item: int = Form(), action: str = Form(), qty: int = Form(1),
+def stock(box: str = Form(), item: int = Form(), action: str = Form(), qty: int | None = Form(None),
           kind: str = Form("put"), project: str = Form(""), back: str = Form("/")):
     if action != "take":
         action = "count" if action == "set" else kind if kind in ("put", "return", "buy") else "put"

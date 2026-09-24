@@ -49,7 +49,7 @@ def with_links(fields, type_key):
 def search(query: str) -> dict[str, Any]:
     """Find items and boxes by words (name, other names, description, searchable card fields) and by meaning.
 
-    Items come with where they lie: box id, place path, qty. Word matches rank first; `similar: true`
+    Items come with where they lie: box id, place path, qty (null: «есть, не считал»). Word matches rank first; `similar: true`
     marks items found only by meaning. Take an item id to get_item for the full card.
     """
     items, boxes = core.search(query)
@@ -77,7 +77,10 @@ def card(item_id):
 
 @server.tool(annotations=READ)
 def get_box(box_id: str) -> dict[str, Any]:
-    """What lies in a box: items with qty, boxes inside it, where it stands. box_id is the label id, any case."""
+    """What lies in a box: items with qty, boxes inside it, where it stands. box_id is the label id, any case.
+
+    qty null: some are there, nobody counted them (loose small parts).
+    """
     with db() as c:
         b = c.execute("SELECT * FROM boxes WHERE id=?", (box_id.strip().upper(),)).fetchone()
         if not b:
@@ -118,12 +121,14 @@ def list_projects() -> dict[str, Any]:
 
 
 @server.tool(annotations=LOGGED)
-def change_stock(box_id: str, item_id: int, action: Literal["put", "return", "buy", "take", "count"], qty: int,
+def change_stock(box_id: str, item_id: int, action: Literal["put", "return", "buy", "take", "count"], qty: int | None,
                  agent: str, project_id: int | None = None) -> dict[str, Any]:
     """Change how many of an item lie in a box. Every change goes to history with agent as the author.
 
     put / return / buy: qty more in the box; take: qty out, project_id says what for (list_projects);
     count: the box holds exactly qty now (stocktaking). agent: your name as the user knows you.
+    put / return / buy with qty null: some went in, not counted (loose resistors and the like); the box then
+    holds qty null, «есть, не считал», left out of totals. take and count need a number.
     Returns the new qty in the box.
     """
     if project_id is not None:
@@ -202,9 +207,10 @@ def check(name, type_key, f):
 
 @server.tool(annotations=LOGGED)
 async def create_item(type: str, name: str, fields: dict[str, Any], agent: str, box_id: str = "",
-                      qty: int = 0) -> dict[str, Any]:
+                      qty: int | None = 0) -> dict[str, Any]:
     """New card. Fields by card_template(type), keys as there; photo: a direct image URL, the server downloads it;
-    files: [{name, url}]. With box_id and qty, puts qty into that box (history author: agent, your name).
+    files: [{name, url}]. With box_id and qty, puts qty into that box (history author: agent, your name);
+    qty null puts some in uncounted, «есть, не считал».
 
     Search first: the item may already exist. Returns the card as get_item does.
     """
@@ -218,7 +224,7 @@ async def create_item(type: str, name: str, fields: dict[str, Any], agent: str, 
     agent, f = author(agent), await fill(type, {}, fields)
     check(name, type, f)
     iid = core.save_item(None, name.strip(), type, f)
-    if box_id and qty > 0:
+    if box_id and (qty is None or qty > 0):
         core.move(iid, box_id, qty, "put", agent)
     return card(iid)
 

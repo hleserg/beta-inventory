@@ -98,3 +98,36 @@ def test_address_by_ip(monkeypatch):
     box = core.new_boxes(1)[0]
     assert f"http://192.168.1.5:8000/b/{box.lower()}" in c.get(f"/b/{box}").text
     assert 'value="http://192.168.1.5:8000"' in c.get("/phone").text
+
+
+def test_uncounted():
+    """«Есть, не считал» (manifesto 4): loose parts go in without a number, stay out of sums, can still be taken."""
+    box = core.new_boxes(1)[0]
+    r = c.post("/items/new?type=resistor", data={"name": "1k россыпь", "value": "1 кОм", "box": box, "qty": ""},
+               follow_redirects=False)
+    rid = r.headers["location"].rsplit("/", 1)[1]
+    assert "есть, не считал" in c.get(f"/b/{box}").text and "есть, не считал" in c.get("/items").text
+    assert c.post("/stock", data={"box": box, "item": rid, "action": "take", "qty": 3}).status_code == 200
+    assert "есть, не считал" in c.get(f"/i/{rid}").text  # taking some leaves the pile uncounted
+    c.post("/stock", data={"box": box, "item": rid, "action": "set", "qty": 40})
+    assert "40 шт" in c.get(f"/b/{box}").text  # counted: a number again
+    c.post("/stock", data={"box": box, "item": rid, "action": "add", "kind": "put", "qty": ""})
+    assert "есть, не считал" in c.get(f"/b/{box}").text  # a handful more, uncounted
+    c.post(f"/b/{box}/clear")
+    assert "Что кладём" in c.get(f"/b/{box}").text
+
+
+def test_old_stock_table_migrates(tmp_path, monkeypatch):
+    """A database from before «не считал» keeps its stock and takes qty NULL after a restart."""
+    monkeypatch.setattr(core, "DATA", tmp_path)
+    old = core.SCHEMA.replace("qty INTEGER CHECK (qty IS NULL OR qty > 0)", "qty INTEGER NOT NULL CHECK (qty > 0)")
+    assert old != core.SCHEMA
+    with core.db() as d:
+        d.executescript(old)
+        d.execute("INSERT INTO boxes(id) VALUES ('OLD01')")
+        d.executemany("INSERT INTO items(id, name) VALUES (?, ?)", [(1, "a"), (2, "b")])
+        d.execute("INSERT INTO stock(box_id, item_id, qty) VALUES ('OLD01', 1, 7)")
+    core.init()
+    with core.db() as d:
+        d.execute("INSERT INTO stock(box_id, item_id, qty) VALUES ('OLD01', 2, NULL)")
+        assert [tuple(r) for r in d.execute("SELECT item_id, qty FROM stock ORDER BY item_id")] == [(1, 7), (2, None)]

@@ -14,11 +14,11 @@
   {% if i.similar and not ns.sim %}{% set ns.sim = true %}<h2>Похоже по смыслу</h2>{% endif %}
   <div class="card">
     <a class="row" href="/i/{{ i.id }}" style="text-decoration:none;color:inherit">{% if pk and i.fields[pk] %}<img class="thumb" src="/u/{{ i.fields[pk] }}" alt="">{% endif %}<span><b>{{ i.name }}</b><br><span class="mut">{{ type_label(i.type) }}</span></span></a>
-    {% for s in i.stock %}<div><a href="/b/{{ s.box_id }}"><b>{{ s.box_id }}</b></a> {{ s.name }} <span class="mut">{{ s.where }}</span> — <span class="qty">{{ s.qty }} {{ t.unit }}</span></div>
+    {% for s in i.stock %}<div><a href="/b/{{ s.box_id }}"><b>{{ s.box_id }}</b></a> {{ s.name }} <span class="mut">{{ s.where }}</span> — <span class="qty">{{ s.qty|qty }}</span></div>
     {% else %}<div class="mut">Нигде нет</div>{% endfor %}
     {% if put %}<form method="post" action="/stock" class="row" style="margin-top:8px">
       <input type="hidden" name="box" value="{{ put }}"><input type="hidden" name="item" value="{{ i.id }}"><input type="hidden" name="action" value="add"><input type="hidden" name="kind" value="put"><input type="hidden" name="back" value="/b/{{ put }}">
-      <input type="number" name="qty" value="1" min="1"><button>Положить в {{ put }}</button></form>{% endif %}
+      <input type="number" name="qty" min="1" placeholder="не считал"><button>Положить в {{ put }}</button></form>{% endif %}
   </div>
   {% else %}<p class="mut">Ничего не нашлось. <a href="/items/new{% if put %}?box={{ put }}{% endif %}">+ {{ t.item }}</a></p>{% endfor %}
 {% else %}
