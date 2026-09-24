@@ -41,6 +41,8 @@ CREATE TABLE IF NOT EXISTS movements(
   at TEXT NOT NULL DEFAULT (datetime('now','localtime')));
 """
 
+MOVES = ("SELECT m.*, i.name AS item, p.name AS project FROM movements m "
+         "JOIN items i ON i.id=m.item_id LEFT JOIN projects p ON p.id=m.project_id")
 KINDS = {"put": "положил", "take": "забрал", "return": "вернул", "buy": "докупил",
          "count": "инвентаризация", "clear": "освободил"}
 
@@ -208,6 +210,11 @@ def stock_of_item(c, item_id):
     rows = c.execute("SELECT s.box_id, s.qty, b.name FROM stock s JOIN boxes b ON b.id=s.box_id "
                      "WHERE s.item_id=? ORDER BY s.box_id", (item_id,)).fetchall()
     return [dict(r, where=box_where(c, r["box_id"])) for r in rows]
+
+
+def box_contents(c, box_id):
+    return [dict(r, fields=item_fields(r)) for r in c.execute(
+        "SELECT s.qty, i.* FROM stock s JOIN items i ON i.id=s.item_id WHERE s.box_id=? ORDER BY i.name", (box_id,))]
 
 
 def search(q):

@@ -1,16 +1,11 @@
 """One walk through the main path: box → card → search → take → clear."""
 import io
-import os
-import tempfile
 
-os.environ["DATA_DIR"] = tempfile.mkdtemp()  # before the app import: it opens the DB on import
-os.environ["SEMANTIC_MODEL"] = ""  # no 240 MB download in tests; test_meaning stubs the model
+from fastapi.testclient import TestClient
+from PIL import Image
 
-from fastapi.testclient import TestClient  # noqa: E402
-from PIL import Image  # noqa: E402
-
-from inventory import core  # noqa: E402
-from inventory.app import app  # noqa: E402
+from inventory import core
+from inventory.app import app
 
 c = TestClient(app)
 

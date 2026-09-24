@@ -17,10 +17,14 @@ from PIL import Image, ImageDraw, ImageFont, ImageOps
 from starlette.exceptions import HTTPException
 
 from . import core
-from .core import PROFILE, db
+from .core import MOVES, PROFILE, db
+from .mcp_server import server as mcp_server
 
 core.init()
-app = FastAPI(title="beta-inventory")
+app = FastAPI(title="beta-inventory", lifespan=lambda _: mcp_server.session_manager.run())
+# Agents: MCP at /mcp, same port and data as the site. Host 0.0.0.0 turns the localhost-only Host check
+# off: agents come by LAN name, and the site has no auth by design (LAN only).
+app.router.routes.extend(mcp_server.streamable_http_app(stateless_http=True, json_response=True, host="0.0.0.0").routes)
 app.mount("/u", StaticFiles(directory=core.UPLOADS), name="uploads")
 T = Jinja2Templates(directory=Path(__file__).parent / "templates")
 T.env.globals.update(
@@ -30,8 +34,6 @@ T.env.globals.update(
 _md = MarkdownIt("commonmark", {"html": False}).enable("table")  # raw HTML off: cards come from agents too
 T.env.filters["md"] = lambda s: Markup(_md.render(s or ""))
 AUTHOR = "человек"  # ponytail: no accounts; MCP calls will pass the agent's name
-MOVES = ("SELECT m.*, i.name AS item, p.name AS project FROM movements m "
-         "JOIN items i ON i.id=m.item_id LEFT JOIN projects p ON p.id=m.project_id")
 
 
 def page(req, tpl, status=200, **ctx):
@@ -101,9 +103,7 @@ def boxes_create(n: int = Form(1)):
 def box(req: Request, box_id: str):
     with db() as c:
         b = get_box(c, box_id)
-        contents = [dict(r, fields=json.loads(r["fields"])) for r in c.execute(
-            "SELECT s.qty, i.* FROM stock s JOIN items i ON i.id=s.item_id WHERE s.box_id=? ORDER BY i.name",
-            (b["id"],))]
+        contents = core.box_contents(c, b["id"])
         children = c.execute("SELECT * FROM boxes WHERE parent_id=? ORDER BY id", (b["id"],)).fetchall()
         places = c.execute("SELECT * FROM places ORDER BY name").fetchall()
         return page(req, "box.html", b=b, where=core.box_where(c, b["id"]), contents=contents,

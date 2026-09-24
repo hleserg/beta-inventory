@@ -11,8 +11,8 @@ AI agents (Claude Code, Codex, any MCP client) can check stock, run an
 inventory and write new part cards for you.
 
 > **Status: v0 prototype.** Boxes, labels, cards, stock moves, search by
-> words and by meaning, and projects work. The UI is Russian for now. The MCP
-> server and GitHub sync are next.
+> words and by meaning, and projects work. The UI is Russian for now. Agents
+> can read over MCP; writing cards and GitHub sync are next.
 
 ## Run
 
@@ -54,11 +54,12 @@ weight.
   relevance; box IDs and places too. Below the word matches, a small local
   model adds items close in meaning, so "step-down" finds a buck converter.
 - **Projects** with a git link, to charge takes against.
+- **MCP for agents** at `http://<host>/mcp` (streamable HTTP, same port and
+  data as the site): `search`, `get_item`, `get_box`, `card_template`.
 
 ## Planned
 
-- **MCP server** so agents can read stock and write cards, plus a card-writing
-  skill.
+- **MCP writes** (new card, take, put) and a card-writing skill.
 - Projects synced from a GitHub account into an inbox.
 - Markdown editor with toolbar, batch label printing, English UI.
 
