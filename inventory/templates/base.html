@@ -86,16 +86,18 @@ document.documentElement.classList.toggle("nfc", "NDEFReader" in window);
 document.documentElement.classList.toggle("qr", "BarcodeDetector" in window && !!navigator.mediaDevices);
 let armed = null, scanning = null;  // armed: the field whose NFC/QR button was pressed
 const boxField = () => armed || [...document.querySelectorAll("[data-box]:not([data-box=armed])")]
-  .find(e => e.checkVisibility ? e.checkVisibility() : e.offsetParent);
+  .find(e => e.checkVisibility ? e.checkVisibility() : e.offsetParent) || document.querySelector("form[data-put] [data-box]");
 function gotBox(id) {
   const f = boxField();
   if (!f) { if (location.pathname.toLowerCase() !== "/b/" + id.toLowerCase()) location.href = "/b/" + id; return; }  // this origin: labels may name the host differently
   const o = [...document.querySelectorAll("#boxlist option")].find(o => o.value === id || o.value.endsWith(` (${id})`)), label = o ? o.value : id;
+  const put = f.form?.hasAttribute("data-put");  // the item card: a scanned box is where the item goes, no button
   // empty, being typed in or asked for by its button: fill; a box already chosen: ask first
-  if (f.value !== label && (f === armed || !f.value || f === document.activeElement || confirm(`Изменить коробку на ${label}?`))) {
+  if (f.value !== label && (put || f === armed || !f.value || f === document.activeElement || confirm(`Изменить коробку на ${label}?`))) {
     f.value = label; f.dispatchEvent(new Event("input", {bubbles: true})); f.dispatchEvent(new Event("change", {bubbles: true}));
   }
   armed = null; document.querySelectorAll(".mini.on").forEach(b => b.classList.remove("on"));
+  if (put) f.form.requestSubmit();
 }
 function nfcScan() {  // one reader per page: two would both fire and the second would miss the armed field
   return scanning ||= (() => { const r = new NDEFReader();

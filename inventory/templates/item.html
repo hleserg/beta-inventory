@@ -28,7 +28,7 @@ addEventListener("keydown", e => { if (e.key == "Escape" && full()) history.back
 </div>
 {% else %}<p class="mut">Нигде нет.</p>{% endfor %}
 <details><summary>Куда положить</summary>
-<form method="post" action="/stock" class="row">
+<form method="post" action="/stock" class="row" data-put>
   <input type="hidden" name="item" value="{{ it.id }}"><input type="hidden" name="action" value="add"><input type="hidden" name="kind" value="put"><input type="hidden" name="back" value="/i/{{ it.id }}">
   {{ box_input(required=True) }}<input type="number" name="qty" min="1" placeholder="не считал"><button>Положить</button>
 </form></details>
