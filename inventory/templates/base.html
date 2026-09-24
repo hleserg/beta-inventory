@@ -114,21 +114,21 @@ async function gotBox(id) {
   const asked = f === armed; armed = null; document.querySelectorAll(".mini.on").forEach(b => b.classList.remove("on"));
   if (from === id || f.value === label && !put) return;  // already there
   // empty, being typed in or asked for by its button: fill; lying in another box or a box already chosen: ask first
-  if (!(put ? !from : asked || !f.value || f === document.activeElement) && !await askMove(label)) return;
+  if (!(put ? !from : asked || !f.value || f === document.activeElement) && !await askMove(label, put)) return;
   f.value = label; f.dispatchEvent(new Event("input", {bubbles: true})); f.dispatchEvent(new Event("change", {bubbles: true}));
   if (from) { f.form.elements.kind.value = "move"; f.form.elements.src.value = from; }
   if (put) f.form.requestSubmit();
 }
-function askMove(label) {  // «больше не спрашивать» stays on this phone; /phone turns asking back on
-  try { if (localStorage.askMove === "no") return true; } catch {}
+function askMove(label, card) {  // «больше не спрашивать» is for a thing's card only (№30), stays on this phone; /phone turns it back on
+  try { if (card && localStorage.askMove === "no") return true; } catch {}
   const d = document.createElement("dialog");
-  d.innerHTML = `<form method="dialog"><p></p><label class="chk"><input type="checkbox"> больше не спрашивать</label>
+  d.innerHTML = `<form method="dialog"><p></p>${card ? `<label class="chk"><input type="checkbox"> больше не спрашивать</label>` : ""}
     <p class="row"><button value="y">Переложить</button><button value="" class="ghost">Отмена</button></p></form>`;
   d.querySelector("p").textContent = `Переложить в ${label}?`;
   document.body.append(d); d.showModal();
   return new Promise(done => d.onclose = () => {
     const yes = d.returnValue === "y";
-    if (yes && d.querySelector("input").checked) try { localStorage.askMove = "no"; } catch {}
+    if (yes && d.querySelector("input")?.checked) try { localStorage.askMove = "no"; } catch {}
     d.remove(); done(yes);
   });
 }
