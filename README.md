@@ -12,7 +12,7 @@ inventory and write new part cards for you.
 
 > **Status: v0 prototype.** Boxes, labels, cards, stock moves, search by
 > words and by meaning, and projects work. The UI is Russian for now. Agents
-> read and write over MCP; a card-writing skill and GitHub sync are next.
+> read and write over MCP; GitHub sync is next.
 
 ## Install
 
@@ -63,10 +63,13 @@ weight.
   data as the site): `search`, `get_item`, `get_box`, `card_template`,
   `list_projects`; `create_item`, `update_item` (photos and files by URL, the
   server downloads them), `change_stock` (history names the agent as author).
+  Each field's `hint` in the profile tells agents what goes in it, so any MCP
+  client writes a full card. Claude Code and Codex also get a skill:
+  `ln -s "$PWD/skills/inventory-new-card" ~/.agents/skills/` (Claude Code:
+  `~/.claude/skills/`).
 
 ## Planned
 
-- A card-writing skill for agents.
 - Projects synced from a GitHub account into an inbox.
 - Markdown editor with toolbar, batch label printing, English UI.
 

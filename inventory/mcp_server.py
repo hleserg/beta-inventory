@@ -25,7 +25,7 @@ server = MCPServer("inventory", instructions=(
     f"Home inventory «{PROFILE['name']}». {T['items']} (items) lie in {T['boxes']} (boxes); a box has a 5-char id "
     f"printed on its label, may sit in another box and stands in a {T['place']} (place). Quantity belongs to the "
     "box×item pair. Start with search; card fields are defined by the profile, see card_template. "
-    "Search before create_item: the item may exist. Stock changes go through change_stock under your name. "
+    "Search before create_item: the item may exist. Each card_template field's hint says what goes in it. Stock changes go through change_stock under your name. "
     "Data is in the profile's language: answer the user in it."))
 
 
