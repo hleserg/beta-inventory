@@ -22,8 +22,9 @@
   {% endif %}
   {% endfor %}
   {% if not it %}
-  <label>Положить в {{ t.box|lower }}</label>
-  <div class="row"><input name="box" value="{{ box }}" placeholder="ID, можно пусто" style="text-transform:uppercase"><input type="number" name="qty" value="{{ qty }}" min="0"></div>
+  <label>Куда положить <span class="mut" id="boxname"></span></label>
+  <div class="row"><input name="box" value="{{ box }}" list="boxlist" placeholder="ID или название, можно пусто" style="text-transform:uppercase"><input type="number" name="qty" value="{{ qty }}" min="0"></div>
+  <datalist id="boxlist">{% for b in boxes %}<option value="{{ b.id }}">{{ b.name or "" }}</option>{% endfor %}</datalist>
   {% endif %}
   <p><button>Сохранить</button></p>
 </form>
@@ -37,7 +38,7 @@ const store = () => { const v = vals();
   else localStorage[key] = JSON.stringify({t: Date.now(), name: v.name, url: location.pathname + location.search, v}); };
 const d = JSON.parse(localStorage[key] || "null");
 if (d && JSON.stringify(d.v) !== shown) {
-  for (const e of f.elements) if (e.name in d.v && e.type != "file" && e.type != "hidden") e.value = d.v[e.name];
+  for (const e of f.elements) if (e.name in d.v && e.type != "file" && e.type != "hidden" && !(e.name == "box" && e.value)) e.value = d.v[e.name];  // opened from a box: that box wins
   store();
   document.getElementById("drafts").insertAdjacentHTML("afterbegin", `<div class="card"><b>Есть несохранённый черновик от ${when(d.t)}</b> — он уже в форме. Фото и файлы в черновик не попадают: выберите их заново.
     <p class="row"><button type="button" id="dsave">Сохранить</button><button type="button" class="ghost" id="dcancel">Отменить</button></p></div>`);
@@ -45,6 +46,9 @@ if (d && JSON.stringify(d.v) !== shown) {
   dcancel.onclick = () => { localStorage.removeItem(key); location.replace(location.pathname + location.search); };
 } else if (d || unsaved) store();
 f.addEventListener("input", store);
+const box = f.elements.box, boxName = () => { const o = [...boxlist.options].find(o => o.value == box.value.trim().toUpperCase());
+  boxname.textContent = o ? `${o.value} «${o.textContent || "без названия"}»` : ""; };
+if (box) { box.addEventListener("input", boxName); boxName(); }
 f.addEventListener("submit", () => { if (localStorage[key]) localStorage[key] = JSON.stringify({...JSON.parse(localStorage[key]), sent: 1}); });
 }</script>
 {% endblock %}

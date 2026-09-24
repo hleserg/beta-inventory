@@ -12,7 +12,7 @@
   {{ stock_forms(s.box_id, it.id, s.qty, projects, "/i/" ~ it.id) }}
 </div>
 {% else %}<p class="mut">Нигде нет.</p>{% endfor %}
-<details><summary>Положить в {{ t.box|lower }}</summary>
+<details><summary>Куда положить</summary>
 <form method="post" action="/stock" class="row">
   <input type="hidden" name="item" value="{{ it.id }}"><input type="hidden" name="action" value="add"><input type="hidden" name="kind" value="put"><input type="hidden" name="back" value="/i/{{ it.id }}">
   <input name="box" placeholder="ID" required style="text-transform:uppercase"><input type="number" name="qty" value="1" min="1"><button>Положить</button>

@@ -209,8 +209,10 @@ def items(req: Request, type: str = "", cat: str = ""):
 
 
 def card_form(req, status=200, it=None, type="", name="", vals=None, errors=(), box="", qty=0):
+    with db() as c:
+        boxes = c.execute("SELECT id, name FROM boxes ORDER BY id").fetchall() if not it else []
     return page(req, "item_form.html", status, it=it, type=type, fields=core.fields_for(type), name=name,
-                vals=vals or {}, errors=errors, box=box, qty=qty)
+                vals=vals or {}, errors=errors, box=box, qty=qty, boxes=boxes)
 
 
 def check_type(type):
