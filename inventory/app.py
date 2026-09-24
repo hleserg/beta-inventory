@@ -59,7 +59,7 @@ AUTHOR = "человек"  # ponytail: no accounts; MCP calls will pass the agen
 
 
 def page(req, tpl, status=200, **ctx):
-    return T.TemplateResponse(req, tpl, ctx, status_code=status)
+    return T.TemplateResponse(req, tpl, ctx, status_code=status, headers={"Cache-Control": "no-store"})  # back button refetches: counts change
 
 
 def go(url):

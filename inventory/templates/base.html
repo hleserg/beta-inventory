@@ -265,7 +265,7 @@ document.addEventListener("submit", e => {
   if (f.dataset.sent) return e.preventDefault();
   f.dataset.sent = 1;
 });
-addEventListener("pageshow", () => document.querySelectorAll("form[data-sent]").forEach(f => delete f.dataset.sent));  // back button
+addEventListener("pageshow", e => { if (e.persisted) location.reload(); });  // back button: the page from memory has old counts
 </script>
 {% block main %}{% endblock %}</main>
 </body>
