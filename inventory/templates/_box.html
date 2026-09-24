@@ -5,7 +5,7 @@
 {%- set boxes = all_boxes()|rejectattr("id", "equalto", exclude)|list %}{% set hit = boxes|selectattr("id", "equalto", value)|first %}
 <input name="{{ name }}" value="{{ label(hit) if hit else value }}" list="boxlist" data-box placeholder="{{ placeholder }}" autocomplete="off"{% if required %} required{% endif %}>
 <button type="button" class="ghost mini" data-qr title="Навести камеру на QR коробки">QR</button>
-<datalist id="boxlist">{% for b in boxes %}<option value="{{ label(b) }}">{% endfor %}</datalist>
+<datalist id="boxlist">{% for b in boxes %}<option value="{{ label(b) }}" data-place="{{ b.top or '' }}" data-where="{{ b.where or '' }}">{% endfor %}</datalist>
 {%- endmacro %}
 
 {% macro nfc_tag(url) %}{# writing it: base.html #}

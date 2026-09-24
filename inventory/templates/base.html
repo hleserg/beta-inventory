@@ -194,7 +194,7 @@ if ("NDEFReader" in window) navigator.permissions.query({name: "nfc"})
 // «Выбрать…» opens them all. Leaving without a choice puts the old value back. The real field changes only on a choice.
 let pk = null;  // the open picker: its .pick span
 const pickOpts = s => {
-  const f = s.f, o = f.tagName == "SELECT" ? [...f.options].map(o => ({v: o.value, t: o.text})) : [...s.dl.options].map(o => ({v: o.value, t: o.value}));
+  const f = s.f, o = f.tagName == "SELECT" ? [...f.options].map(o => ({v: o.value, t: o.text})) : [...s.dl.options].filter(o => !o.hidden).map(o => ({v: o.value, t: o.value, w: o.dataset.where}));
   return f.tagName == "SELECT" || f.required || o.some(o => !o.v) ? o : [{v: "", t: "—"}, ...o];
 };
 const pickRecent = f => { try { return JSON.parse(localStorage["recent:" + f.dataset.pk] || "[]"); } catch { return []; } };
@@ -203,6 +203,7 @@ function pickBtn(o, fn) {
   b.type = "button"; b.onclick = fn;
   if (m) b.append(m[1] + " ", Object.assign(document.createElement("span"), {className: "mut", textContent: m[2]}));
   else b.textContent = o.t;
+  if (o.w) b.append(Object.assign(document.createElement("span"), {className: "mut", textContent: " · " + o.w}));  // its place: shelves share names across cabinets
   return b;
 }
 function pickFill(s, q) {

@@ -96,7 +96,7 @@ def test_phone_app():
     assert "data-draft" in c.get("/items/new?type=module").text  # unsaved card edits survive leaving the page
     box = core.new_boxes(1)[0]
     new = c.get(f"/items/new?type=module&box={box}").text
-    assert f'value="{box}"' in new and f'<option value="{box}">' in new  # opened from a box: that box, its name shown
+    assert f'value="{box}"' in new and f'<option value="{box}" ' in new  # opened from a box: that box, its name shown
     assert "serviceWorker" in c.get("/").text and "/offline" in c.get("/sw.js").text
     assert c.get("/offline").status_code == 200
     box = core.new_boxes(1)[0]
@@ -165,8 +165,8 @@ def test_box_by_name():
 
     page = c.get(f"/b/{d}").text  # names first, the ID last; QR next to the field, NFC needs no button (№29)
     assert f'value="Клеммники WAGO ({b})"' in page and "data-nfc>" not in page and "data-nfc " not in page and "data-qr" in page
-    assert f'<option value="Клеммники Phoenix ({a})">' in c.get("/items/new?type=module").text
-    assert f'<option value="Клеммники Phoenix ({a})">' in c.get(f"/i/{newest()}").text
+    assert f'<option value="Клеммники Phoenix ({a})" ' in c.get("/items/new?type=module").text
+    assert f'<option value="Клеммники Phoenix ({a})" ' in c.get(f"/i/{newest()}").text
 
     named = f'<b>Клеммники WAGO</b> <span class="mut">{b}</span>'  # the name first, the ID grey at the end
     for url in (f"/i/{newest()}", "/boxes", "/history", "/?q=wago"):
@@ -195,15 +195,20 @@ def test_new_box_and_shelves():
     r = c.post(f"/places/{pid}/shelves", data={"label": "1"}, follow_redirects=False)
     shelf = r.headers["location"].split("/")[-1]  # with a label: its page, to print and write the tag
     page = c.get(f"/b/{shelf}").text
-    assert "Полка 2" in page and "label.png" in page and "Стоит внутри другой" not in page  # shelves do not move
+    assert "Полка 2" in page and "label.png" in page and "Где лежит" not in page  # shelves do not move
     boxes = c.get("/boxes").text
     assert "Верхняя" not in boxes and "Полка 2" not in boxes  # shelves live in places, not among boxes
 
-    c.post(f"/b/{bid}", data={"name": "Макетки", "parent_id": shelf}, headers={"X-Autosave": "1"})
+    j = c.post(f"/b/{bid}", data={"name": "Макетки", "parent_id": shelf}, headers={"X-Autosave": "1"}).json()
+    assert j["parent"] == shelf and j["place"] == pid  # №39: on a shelf, the place is the cabinet's
     places = c.get("/places").text
     assert places.index("Стеллаж") < places.index("Верхняя") < places.index("Полка 2") and "Макетки" not in places  # №38
     assert "Макетки" in c.get(f"/b/{shelf}").text  # a box on a shelf is on the shelf's page
-    assert f'<option value="Стеллаж › Полка 2 ({shelf})">' in c.get(f"/b/{bid}").text  # «Полка 2» is in every cabinet
+    page = c.get(f"/b/{bid}").text
+    assert f'<option value="Полка 2 ({shelf})" data-place="{pid}" data-where="Стеллаж">' in page  # «Полка 2» is in every cabinet
+    assert '<div id="placeview">Стеллаж</div>' in page and '<div id="placesel" hidden>' in page  # №39: the place is text
+    j = c.post(f"/b/{bid}", data={"name": "Макетки", "place": str(pid)}, headers={"X-Autosave": "1"}).json()
+    assert j["parent"] is None and j["place"] == pid  # out of the shelf, it stays in the cabinet
 
 
 def test_old_stock_table_migrates(tmp_path, monkeypatch):

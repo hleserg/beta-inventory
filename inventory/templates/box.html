@@ -24,10 +24,12 @@
     <label>Название</label><input name="name" value="{{ b.name }}" placeholder="например: разъёмы JST">
     {% if b.kind != "shelf" %}{# a shelf stays in its cabinet #}
     <label>{{ t.place }}</label>
-    <select name="place" data-pick><option value="">—</option>{% for p in places %}<option value="{{ p.id }}"{% if p.id == b.place_id %} selected{% endif %}>{{ p.name }}</option>{% endfor %}</select>
+    <div id="placesel"{% if b.parent_id %} hidden{% endif %}><select name="place" data-pick><option value="">—</option>{% for p in places %}<option value="{{ p.id }}"{% if p.id == top %} selected{% endif %}>{{ p.name }}</option>{% endfor %}</select></div>
+    <div id="placeview"{% if not b.parent_id %} hidden{% endif %}>{{ (places|selectattr("id", "equalto", top)|first or {}).name or "—" }}</div>{# in a box: the box's place, not chosen here #}
     {% if not places %}<div class="mut">Мест ещё нет — <a href="/places">добавить</a></div>{% endif %}
-    <label>Стоит внутри другой</label>
+    <label>Где лежит</label>
     <div class="row">{{ box_input("parent_id", b.parent_id or "", "пусто — стоит сама", exclude=b.id) }}</div>
+    <label class="chk" id="onlyrow"{% if not top %} hidden{% endif %}><input type="checkbox" id="onlyplace" checked> только из этого места</label>
     {% endif %}
     <p id="savest" class="mut">Изменения сохраняются сами.</p>
   </form>
@@ -50,11 +52,27 @@
         if (j.name) h.insertAdjacentHTML("beforeend", ` <span class="mut">${j.id}</span>`);
         document.title = j.name || j.id;
         document.getElementById("where").textContent = j.where || "место не указано";
+        if (sel) {  // in a box the place is the box's; out of it, the list keeps that place
+          sel.value = j.place ?? ""; sel.closest(".pick").vis.value = sel.selectedOptions[0].text;
+          document.getElementById("placeview").textContent = sel.selectedOptions[0].text;
+          document.getElementById("placesel").hidden = !!j.parent; document.getElementById("placeview").hidden = !j.parent;
+          filt();
+        }
         st.className = "mut"; st.textContent = "Сохранено ✓";
         if (draft) { draft = false; history.replaceState(null, "", "/b/" + j.id); }
         return true;
       }, () => false);
     };
+    const sel = f.elements.place, only = document.getElementById("onlyplace");
+    const filt = () => {  // boxes of the chosen place only, unless unticked
+      document.getElementById("onlyrow").hidden = !sel.value;
+      for (const o of document.getElementById("boxlist").options) o.hidden = only.checked && !!sel.value && o.dataset.place !== sel.value;
+    };
+    if (sel) {
+      for (const t of ["input", "change"]) only.addEventListener(t, e => { e.stopPropagation(); filt(); });  // a filter, not a field: no save
+      sel.addEventListener("change", filt);
+      filt();
+    }
     f.addEventListener("input", e => {
       dirty = true;
       if (e.target.name == "name") { clearTimeout(timer); timer = setTimeout(save, 700); }  // other fields: on change

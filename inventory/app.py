@@ -36,11 +36,17 @@ T.env.globals.update(
     pk=next((f["key"] for f in PROFILE["item_fields"] if f["type"] == "photo"), None))
 
 
-def all_boxes():  # for box fields: named first, by name; a shelf carries its cabinet, «Полка 2» is in every one
+def all_boxes():  # for box fields: named first, by name; each with its place — the top box's (№39: filter, grey hint)
     with db() as c:
-        return c.execute("SELECT * FROM (SELECT b.id, CASE WHEN b.kind='shelf' AND p.name IS NOT NULL "
-                         "THEN p.name || ' › ' || b.name ELSE b.name END AS name "
-                         "FROM boxes b LEFT JOIN places p ON p.id=b.place_id) ORDER BY name IS NULL OR name='', name, id").fetchall()
+        rows = {r["id"]: dict(r) for r in c.execute(
+            "SELECT b.id, b.name, b.parent_id, b.place_id, p.name AS place FROM boxes b LEFT JOIN places p ON p.id=b.place_id")}
+    for r in rows.values():
+        t, seen = r, {r["id"]}
+        while t["parent_id"] in rows and t["parent_id"] not in seen:
+            seen.add(t["parent_id"])
+            t = rows[t["parent_id"]]
+        r["top"], r["where"] = t["place_id"], t["place"]
+    return sorted(rows.values(), key=lambda r: (not r["name"], r["name"] or "", r["id"]))
 
 
 T.env.globals["all_boxes"] = all_boxes
@@ -142,9 +148,13 @@ def box_page(req, b, draft=False):
         contents = core.box_contents(c, b["id"])
         children = c.execute("SELECT * FROM boxes WHERE parent_id=? ORDER BY id", (b["id"],)).fetchall()
         places = c.execute("SELECT * FROM places ORDER BY name").fetchall()
-        return page(req, "box.html", b=b, where=core.box_where(c, b["id"]), contents=contents,
+        return page(req, "box.html", b=b, where=core.box_where(c, b["id"]), contents=contents, top=box_top(b["id"]),
                     children=children, places=places, projects=core.projects(c), draft=draft,
                     nfc=f"{public_base(req)}/b/{b['id']}".lower())  # NFC Tools writes it as typed
+
+
+def box_top(box_id):  # the place a box stands in: its own, or its top box's
+    return next((x["top"] for x in all_boxes() if x["id"] == box_id), None)
 
 
 @app.post("/b/{box_id}")
@@ -171,7 +181,7 @@ def box_save(box_id: str, name: str = Form(""), place: str = Form(""), parent_id
             c.execute("UPDATE boxes SET name=?, place_id=?, parent_id=? WHERE id=?", (name.strip(), place_id, parent, bid))
         where = core.box_where(c, bid)
     if x_autosave:  # box.html saves as you type and redraws the heading
-        return {"id": bid, "name": name.strip(), "where": where}
+        return {"id": bid, "name": name.strip(), "where": where, "parent": parent, "place": box_top(bid)}
     return go(f"/b/{bid}")
 
 
