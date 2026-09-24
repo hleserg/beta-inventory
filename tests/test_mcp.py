@@ -22,7 +22,7 @@ def test_read_tools():
     c = TestClient(app)
     box = core.new_boxes(1)[0]
     c.post("/items/new?type=resistor", follow_redirects=False,
-           data={"name": "220R", "aliases": "токоограничительный", "value": "220 Ом", "box": box, "qty": "7"})
+           data={"dup_ok": "1", "name": "220R", "aliases": "токоограничительный", "value": "220 Ом", "box": box, "qty": "7"})
     iid = newest()
 
     hit = call("search", query="токоограничительный").structured_content["items"][0]
@@ -48,7 +48,7 @@ def test_http():
 def test_stock_tools():
     c = TestClient(app)
     box = core.new_boxes(1)[0]
-    c.post("/items/new?type=resistor", follow_redirects=False, data={"name": "1k", "value": "1 кОм", "box": box, "qty": "7"})
+    c.post("/items/new?type=resistor", follow_redirects=False, data={"dup_ok": "1", "name": "1k", "value": "1 кОм", "box": box, "qty": "7"})
     iid = newest()
     c.post("/projects", data={"name": "Часы"})
     pid = next(p["id"] for p in call("list_projects").structured_content["projects"] if p["name"] == "Часы")

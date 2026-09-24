@@ -354,6 +354,14 @@ def stock_of_item(c, item_id):
     return [dict(r, where=box_where(c, r["box_id"])) for r in rows]
 
 
+def lookalikes(name):
+    """Items named with the same words, or with all of this name's words, or with only some of them: likely a double (№32)."""
+    new = set(norm(name).split())
+    with db() as c:
+        return [dict(r, fields=item_fields(r), stock=stock_of_item(c, r["id"])) for r in c.execute("SELECT * FROM items ORDER BY name")
+                if new and (old := set(norm(r["name"]).split())) and (old <= new or new <= old)][:5]
+
+
 def box_contents(c, box_id):
     return [dict(r, fields=item_fields(r)) for r in c.execute(
         "SELECT s.qty, i.* FROM stock s JOIN items i ON i.id=s.item_id WHERE s.box_id=? ORDER BY i.name", (box_id,))]

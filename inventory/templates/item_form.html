@@ -8,7 +8,10 @@
   <button class="ghost">Сменить</button></form>
   <p class="mut">Поля, которых у нового типа нет, не удаляются — просто прячутся.</p></details>{% endif %}
 {% for e in errors %}<p class="err">{{ e }}</p>{% endfor %}
-<form data-draft method="post" enctype="multipart/form-data" action="{% if it %}/i/{{ it.id }}/edit{% else %}/items/new{% endif %}?type={{ type }}">
+{% if dups %}<div class="card"><b class="err">Похоже, такой уже есть:</b>
+  {% for i in dups %}<a class="line" href="/i/{{ i.id }}">{% if pk and i.fields[pk] %}<img class="thumb" src="/u/{{ i.fields[pk][0] }}" alt="">{% else %}<span class="thumb"></span>{% endif %}<span>{{ i.name }}<br><span class="mut">{% for s in i.stock %}{{ s.name or s.box_id }} — {{ s.qty|qty }}{% if not loop.last %}; {% endif %}{% else %}ни в одной коробке{% endfor %}</span></span></a>{% endfor %}
+  <p class="row"><button form="cardf" name="dup_ok" value="1">Всё равно создать</button></p></div>{% endif %}
+<form id="cardf" data-draft method="post" enctype="multipart/form-data" action="{% if it %}/i/{{ it.id }}/edit{% else %}/items/new{% endif %}?type={{ type }}">
   <label>Название *</label><input name="name" value="{{ name }}" required>
   {% for fd in fields %}{% set v = vals[fd.key] %}
   <label>{{ fd.label }}{% if fd.required %} *{% endif %}</label>

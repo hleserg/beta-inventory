@@ -253,9 +253,9 @@ def items(req: Request, type: str = "", cat: str = ""):
     return page(req, "items.html", items=rows, type=type, cat=cat)
 
 
-def card_form(req, status=200, it=None, type="", name="", vals=None, errors=(), box="", qty=""):
+def card_form(req, status=200, it=None, type="", name="", vals=None, errors=(), box="", qty="", dups=()):
     return page(req, "item_form.html", status, it=it, type=type, fields=core.fields_for(type), name=name,
-                vals=vals or {}, errors=errors, box=box, qty=qty)
+                vals=vals or {}, errors=errors, box=box, qty=qty, dups=dups)
 
 
 def check_type(type):
@@ -284,6 +284,8 @@ async def item_create(req: Request, type: str):
         errors.append("Количество — целое число; пусто — «не считал»")
     if errors:
         return card_form(req, 400, type=type, name=name, vals=f, errors=errors, box=box, qty=qty)
+    if not form.get("dup_ok") and (dups := core.lookalikes(name)):  # asked, not refused: two alike things are real too
+        return card_form(req, 409, type=type, name=name, vals=f, box=box, qty=qty, dups=dups)
     iid = core.save_item(None, name, type, f)
     if box_id and (not qty or int(qty) > 0):  # empty: «есть, не считал»
         core.move(iid, box_id, int(qty) if qty else None, "put", AUTHOR)

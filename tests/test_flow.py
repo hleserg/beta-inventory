@@ -131,6 +131,17 @@ def test_uncounted():
     assert "Что кладём" in c.get(f"/b/{box}").text
 
 
+def test_lookalike_asks():
+    """№32: a second card with the same name is asked about, not refused."""
+    data = {"name": "Клещи для зачистки", "value": "1", "box": "", "qty": ""}
+    c.post("/items/new?type=resistor", data=data, follow_redirects=False)
+    first = newest()
+    r = c.post("/items/new?type=resistor", data={**data, "name": "клещи  для ЗАЧИСТКИ"}, follow_redirects=False)
+    assert r.status_code == 409 and f'href="/i/{first}"' in r.text and newest() == first
+    r = c.post("/items/new?type=resistor", data={**data, "dup_ok": "1"}, follow_redirects=False)
+    assert r.status_code == 303 and newest() != first
+
+
 def test_box_by_name():
     """A box field takes what people know: part of the name in any case, «Name (ID)» from the list, or the ID."""
     a, b, d = core.new_boxes(3)
@@ -138,7 +149,7 @@ def test_box_by_name():
     c.post(f"/b/{b}", data={"name": "Клеммники WAGO"})
     for typed in ("phoenix", "КЛЕММНИКИ phoenix", f"Клеммники Phoenix ({a})", a.lower()):
         r = c.post("/items/new?type=resistor", follow_redirects=False,
-                   data={"name": "220R", "value": "220 Ом", "box": typed, "qty": "1"})
+                   data={"dup_ok": "1", "name": "220R", "value": "220 Ом", "box": typed, "qty": "1"})
         assert r.headers["location"] == f"/b/{a}", typed
     r = c.post("/items/new?type=resistor", data={"name": "220R", "value": "220 Ом", "box": "клеммники", "qty": "1"})
     assert r.status_code == 400 and "Клеммники WAGO" in r.text and 'value="клеммники"' in r.text  # which one? typed text kept
