@@ -14,20 +14,25 @@ inventory and write new part cards for you.
 > words and by meaning, and projects work. The UI is Russian for now. Agents
 > can read over MCP; writing cards and GitHub sync are next.
 
-## Run
+## Install
+
+On a Linux box in your home network, with Docker:
 
 ```sh
-git clone https://github.com/hleserg/beta-inventory && cd beta-inventory
-cp .env.example .env             # settings, all in one file
-docker compose up -d --build     # http://localhost:8000
+git clone https://github.com/hleserg/beta-inventory && cd beta-inventory && ./install.sh
 ```
 
-Settings: `cp .env.example .env` and edit. Every setting is listed there with
-a comment; the code only holds defaults.
+It asks whether labels carry an IP or a name (like `inv.lan`) and which port,
+writes `.env` and starts the site. Both ways work; a name survives the server
+changing its IP. Update: `git pull && ./install.sh`.
 
-Data (SQLite, photos, files, the search model) lives in `./data`. On first
-start the search model (~240 MB) downloads there; until it is ready, search
-works by words only.
+**[docs/setup.md](docs/setup.md)**: name or IP, a DNS record in the router,
+the Android phone (app + writing NFC tags), iPhone, labels.
+
+Every setting is in `.env`, described in `.env.example`; the code only holds
+defaults. Data (SQLite, photos, files, the search model) lives in `./data`. On
+first start the search model (~240 MB) downloads there; until it is ready,
+search works by words only.
 
 ## Profiles: what a card looks like
 

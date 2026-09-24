@@ -76,3 +76,11 @@ def test_phone_app():
     phone = c.get("/phone").text
     assert "chrome://flags/#unsafely-treat-insecure-origin-as-secure" in phone and "http://testserver" in phone
     assert "apps.apple.com/app/nfc-tools/id1252962749" in phone
+
+
+def test_address_by_ip(monkeypatch):
+    """NFC link and the Chrome flag origin follow PUBLIC_BASE_URL, IP and port included."""
+    monkeypatch.setenv("PUBLIC_BASE_URL", "http://192.168.1.5:8000")
+    box = core.new_boxes(1)[0]
+    assert f"http://192.168.1.5:8000/b/{box.lower()}" in c.get(f"/b/{box}").text
+    assert 'value="http://192.168.1.5:8000"' in c.get("/phone").text
