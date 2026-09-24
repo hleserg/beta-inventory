@@ -39,7 +39,7 @@ def with_links(fields, type_key):
     for fd in core.fields_for(type_key):
         v = f.get(fd["key"])
         if v and fd["type"] == "photo":
-            f[fd["key"]] = link(f"/u/{v}")
+            f[fd["key"]] = [link(f"/u/{x}") for x in v]
         elif v and fd["type"] == "files":
             f[fd["key"]] = [{"name": x["name"], "url": link(f"/u/{x['file']}")} for x in v]
     return f
@@ -155,12 +155,6 @@ def fetch(url):
     return data
 
 
-def own_upload(v):
-    """Name of our own upload, given as get_item's /u/ link or bare, or None."""
-    name = str(v).rsplit("/u/", 1)[-1]
-    return name if name and Path(name).name == name and (core.UPLOADS / name).is_file() else None
-
-
 async def upload(url, photo):
     if not str(url).lower().startswith(("http://", "https://")):
         raise ToolError(f"{url!r} is not a link: photos and files are given as http(s) URLs.")
@@ -184,16 +178,17 @@ async def fill(type_key, old, given):
                 continue  # a field of the card's former type, kept but hidden: get_item returns it too
             raise ToolError(f"No field {k!r} for type {type_key!r}. See card_template({type_key!r}).")
         if fd["type"] == "photo":
-            f[k] = "" if not v else own_upload(v) or await upload(v, photo=True)
+            pics = [v] if isinstance(v, str) else v or []  # one photo as a plain string is fine too
+            f[k] = [core.own_upload(x) or await upload(x, photo=True) for x in pics if x]
         elif fd["type"] == "files":
             have = [x["file"] for x in f.get(k, [])]
             for x in v or []:
                 src = x.get("url") or x.get("file", "") if isinstance(x, dict) else x
-                if own_upload(src) in have:
+                if core.own_upload(src) in have:
                     continue  # already on the card
                 name = x.get("name") if isinstance(x, dict) else ""
                 f.setdefault(k, []).append({"name": name or Path(urlparse(src).path).name or "file",
-                                            "file": own_upload(src) or await upload(src, photo=False)})
+                                            "file": core.own_upload(src) or await upload(src, photo=False)})
         else:
             f[k] = v if isinstance(v, (int, float)) else str(v or "").strip()
     return f
@@ -208,7 +203,7 @@ def check(name, type_key, f):
 @server.tool(annotations=LOGGED)
 async def create_item(type: str, name: str, fields: dict[str, Any], agent: str, box_id: str = "",
                       qty: int | None = 0) -> dict[str, Any]:
-    """New card. Fields by card_template(type), keys as there; photo: a direct image URL, the server downloads it;
+    """New card. Fields by card_template(type), keys as there; photo: a list of direct image URLs (one string is fine), the server downloads them;
     files: [{name, url}]. With box_id and qty, puts qty into that box (history author: agent, your name);
     qty null puts some in uncounted, «есть, не считал».
 
@@ -231,8 +226,8 @@ async def create_item(type: str, name: str, fields: dict[str, Any], agent: str, 
 
 @server.tool(annotations=ToolAnnotations(readOnlyHint=False, destructiveHint=True, openWorldHint=False))
 async def update_item(item_id: int, fields: dict[str, Any], name: str = "") -> dict[str, Any]:
-    """Change card fields: only the keys given change, "" clears one. photo: new image URL or the link get_item
-    gave; files: new [{name, url}] are added, ones already on the card are kept. Returns the card.
+    """Change card fields: only the keys given change, "" clears one. photo: the whole list, get_item's links keep a photo,
+    new image URLs add one; files: new [{name, url}] are added, ones already on the card are kept. Returns the card.
     """
     with db() as c:
         it = c.execute("SELECT * FROM items WHERE id=?", (item_id,)).fetchone()

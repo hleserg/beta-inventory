@@ -72,11 +72,11 @@ def test_card_tools(monkeypatch):
     monkeypatch.setattr(mcp_server, "fetch", lambda url: got.append(url) or photo()["photo"][1])
     box = core.new_boxes(1)[0]
     card = call("create_item", type="module", name="INA219", agent="Claude", box_id=box, qty=2, fields={
-        "photo": "https://example.com/ina.png", "pinout": "VCC GND SCL SDA", "aliases": "датчик тока",
+        "photo": ["https://example.com/ina.png"], "pinout": "VCC GND SCL SDA", "aliases": "датчик тока",
         "reorder_at": "1,5", "files": [{"name": "datasheet.pdf", "url": "https://example.com/ina.pdf"}]}
     ).structured_content
     assert card["stock"][0]["qty"] == 2 and card["history"][0]["author"] == "Claude"
-    assert card["fields"]["photo"].endswith(".jpg") and card["fields"]["reorder_at"] == 1.5
+    assert card["fields"]["photo"][0].endswith(".jpg") and card["fields"]["reorder_at"] == 1.5
     assert "INA219" in call("search", query="датчик тока").structured_content["items"][0]["name"]
 
     n = len(os.listdir(core.UPLOADS))  # the card goes back as get_item gave it: own /u/ links are not fetched again

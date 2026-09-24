@@ -93,7 +93,11 @@ SEM_MODEL = os.environ.get("SEMANTIC_MODEL", "sentence-transformers/paraphrase-m
 SEM_MIN = float(os.environ.get("SEMANTIC_MIN", "0.35"))  # cosine floor; tune on real data
 SEM_MARGIN = float(os.environ.get("SEMANTIC_MARGIN", "0.08"))  # and no further than this below the best match: cut noise 4x on 22 test queries
 SEM_TOP = int(os.environ.get("SEMANTIC_TOP", "5"))
-_sem = {"model": None, "vecs": {}}  # vecs: item_id -> (embedded text, unit vector)
+_sem = {"model": None, "vecs": {}}
+
+# Photos: phones shoot 5-10 MB. Shrunk to this long side and JPEG quality: screw sizes on a box photo stay readable.
+PHOTO_MAX_PX = int(os.environ.get("PHOTO_MAX_PX", "2560"))
+PHOTO_QUALITY = int(os.environ.get("PHOTO_QUALITY", "90"))  # vecs: item_id -> (embedded text, unit vector)
 
 
 def db():
@@ -113,6 +117,13 @@ def init():
                             "INSERT INTO stock SELECT * FROM stock_v0; DROP TABLE stock_v0; COMMIT;")
         if "kind" not in [r["name"] for r in c.execute("PRAGMA table_info(boxes)")]:  # boxes from before shelves
             c.execute("ALTER TABLE boxes ADD COLUMN kind TEXT NOT NULL DEFAULT 'box'")
+        pics = {fd["key"] for t in [*TYPES, ""] for fd in fields_for(t) if fd["type"] == "photo"}
+        for r in c.execute("SELECT id, fields FROM items").fetchall():  # one photo per card before: a name, not a list
+            f = item_fields(r)
+            old = {k: f[k] for k in pics if isinstance(f.get(k), str)}
+            if old:
+                f.update({k: [v] if v else [] for k, v in old.items()})
+                c.execute("UPDATE items SET fields=? WHERE id=?", (json.dumps(f, ensure_ascii=False), r["id"]))
     if SEM_MODEL:
         threading.Thread(target=_load_model, daemon=True).start()
 
@@ -301,14 +312,20 @@ def save_item(item_id, name, type_key, f):
                   (name, type_key, json.dumps(f, ensure_ascii=False), item_id))
         return item_id
 
+def own_upload(v):
+    """Name of our own upload, given as a /u/ link or bare, or None: a form or an agent can't point at other files."""
+    name = str(v).rsplit("/u/", 1)[-1]
+    return name if name and Path(name).name == name and (UPLOADS / name).is_file() else None
+
+
 def save_bytes(data, ext, photo=False):
-    """Store an upload, return its name under /u/. Photos: phones shoot 5-10 MB, shrink so pages stay fast."""
+    """Store an upload, return its name under /u/. Photos are shrunk: see PHOTO_MAX_PX."""
     if photo:
         try:
             im = ImageOps.exif_transpose(Image.open(io.BytesIO(data)))
-            im.thumbnail((1600, 1600))
+            im.thumbnail((PHOTO_MAX_PX, PHOTO_MAX_PX))
             buf = io.BytesIO()
-            im.convert("RGB").save(buf, "JPEG", quality=85)
+            im.convert("RGB").save(buf, "JPEG", quality=PHOTO_QUALITY, optimize=True)
             data, ext = buf.getvalue(), ".jpg"
         except OSError:
             pass  # Pillow can't read it (HEIC…) — keep the original

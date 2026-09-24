@@ -227,11 +227,8 @@ async def read_fields(req, old, fields):
     for fd in fields:
         k, typ = fd["key"], fd["type"]
         if typ == "photo":
-            up = form.get(k)
-            if getattr(up, "filename", ""):
-                f[k] = save_upload(up, photo=True)
-            elif form.get(k + "__keep"):
-                f[k] = str(form.get(k + "__keep"))
+            keep = [x for x in map(core.own_upload, form.getlist(k + "__keep")) if x]  # the ones not ✕-ed, in order
+            f[k] = keep + [save_upload(up, photo=True) for up in form.getlist(k) if getattr(up, "filename", "")]
         elif typ == "files":
             for up in form.getlist(k):
                 if getattr(up, "filename", ""):

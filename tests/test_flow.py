@@ -35,16 +35,18 @@ def test_main_path():
     assert c.post("/items/new?type=module", data={"name": "MP1584"}).status_code == 400
     assert c.post("/items/new?type=resistor", data={"name": "10k", "value": "10 кОм"},
                   follow_redirects=False).status_code == 303
-    r = c.post("/items/new?type=module", files=photo(), follow_redirects=False,
+    r = c.post("/items/new?type=module", files=[*photo().items(), *photo().items()], follow_redirects=False,
                data={"name": "MP1584 mini buck", "aliases": "понижайка", "pinout": "IN+ IN- OUT+ OUT-",
                      "box": box, "qty": "5"})
     assert r.headers["location"] == f"/b/{box}"  # put in a box: back to the box, the next item goes in
     iid = newest()
-    pic = json.loads(core.db().execute("SELECT fields FROM items WHERE id=?", (iid,)).fetchone()["fields"])["photo"]
-    r = c.post(f"/i/{iid}/edit?type=module", follow_redirects=False, data={
-        "name": "MP1584 mini buck", "aliases": "понижайка", "pinout": "IN+ IN- OUT+ OUT-", "photo__keep": pic,
-        "description": "до 3 А"})
-    assert r.status_code == 303 and "до 3 А" in c.get(f"/i/{iid}").text and pic in c.get(f"/i/{iid}").text
+    pics = lambda: json.loads(core.db().execute("SELECT fields FROM items WHERE id=?", (iid,)).fetchone()["fields"])["photo"]
+    a, b = pics()  # several photos on one card
+    r = c.post(f"/i/{iid}/edit?type=module", follow_redirects=False, files=photo(), data={
+        "name": "MP1584 mini buck", "aliases": "понижайка", "pinout": "IN+ IN- OUT+ OUT-",
+        "photo__keep": [b, "../inventory.db"], "description": "до 3 А"})  # a removed, one added; only own uploads kept
+    assert r.status_code == 303 and "до 3 А" in c.get(f"/i/{iid}").text
+    assert pics()[0] == b and len(pics()) == 2 and a not in c.get(f"/i/{iid}").text
     assert "MP1584" in c.get("/?q=ПОНИЖАЙКА").text
     assert "10k" in c.get("/?q=резистор").text  # type label is searchable
     assert "10k" in c.get("/items?cat=electronics").text and "10k" not in c.get("/items?cat=tools").text
@@ -198,3 +200,10 @@ def test_old_stock_table_migrates(tmp_path, monkeypatch):
         d.execute("INSERT INTO stock(box_id, item_id, qty) VALUES ('OLD01', 2, NULL)")
         assert [tuple(r) for r in d.execute("SELECT item_id, qty FROM stock ORDER BY item_id")] == [(1, 7), (2, None)]
         assert d.execute("SELECT kind FROM boxes").fetchone()[0] == "box"
+
+
+def test_old_single_photo():
+    """Cards from before several photos held one name, not a list."""
+    iid = core.save_item(None, "старое", "module", {"photo": "x.jpg", "pinout": "A"})
+    core.init()
+    assert core.item_fields(core.db().execute("SELECT * FROM items WHERE id=?", (iid,)).fetchone())["photo"] == ["x.jpg"]

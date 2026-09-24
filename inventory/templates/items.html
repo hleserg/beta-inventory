@@ -4,6 +4,6 @@
 <p><a class="btn" href="/items/new">+ {{ t.item }}</a></p>
 <div class="chips seg"><a href="/items" class="{{ 'on' if not cat }}">все</a>{% for c in categories %}<a href="/items?cat={{ c.key }}" class="{{ 'on' if c.key == cat }}">{{ c.label }}</a>{% endfor %}</div>
 {% for c in categories if c.key == cat %}<div class="chips" style="margin-top:8px">{% for ty in c.types %}<a href="{{ '/items?cat=' ~ c.key if ty.key == type else '/items?type=' ~ ty.key }}" class="{{ 'on' if ty.key == type }}">{{ ty.label }}</a>{% endfor %}</div>{% endfor %}
-{% for i in items %}<a class="line" href="/i/{{ i.id }}">{% if pk and i.fields[pk] %}<img class="thumb" src="/u/{{ i.fields[pk] }}" alt="" loading="lazy">{% else %}<span class="thumb"></span>{% endif %}<span>{{ i.name }}<br><span class="mut">{{ type_label(i.type) }}</span></span><span class="qty right">{{ i.total|qty(i.uncounted) }}</span></a>
+{% for i in items %}<a class="line" href="/i/{{ i.id }}">{% if pk and i.fields[pk] %}<img class="thumb" src="/u/{{ i.fields[pk][0] }}" alt="" loading="lazy">{% else %}<span class="thumb"></span>{% endif %}<span>{{ i.name }}<br><span class="mut">{{ type_label(i.type) }}</span></span><span class="qty right">{{ i.total|qty(i.uncounted) }}</span></a>
 {% else %}<p class="mut">Пока пусто.</p>{% endfor %}
 {% endblock %}

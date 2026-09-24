@@ -3,7 +3,7 @@
 #
 # A card = item_fields + its category's fields + its type's fields.
 # The same key at a deeper level overrides the upper one (e.g. photo optional for resistors).
-# Field types: text, markdown, number, link, choice (needs `options`), photo, files.
+# Field types: text, markdown, number, link, choice (needs `options`), photo (one or more pictures), files.
 # `search`: weight in text search (name always weighs 3). `required`: must be filled.
 # Type keys are stored in the database: rename labels freely, keep keys.
 

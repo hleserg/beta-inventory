@@ -14,8 +14,8 @@
   <label>{{ fd.label }}{% if fd.required %} *{% endif %}</label>
   {% if fd.hint %}<div class="mut">{{ fd.hint }}</div>{% endif %}
   {% if fd.type == "photo" %}
-    {% if v %}<img class="thumb" src="/u/{{ v }}" alt=""><input type="hidden" name="{{ fd.key }}__keep" value="{{ v }}">{% endif %}
-    <input type="file" name="{{ fd.key }}" accept="image/*" {% if fd.required and not v %}required{% endif %}>
+    <div class="row">{% for x in v or [] %}<span class="pic"><img class="thumb" src="/u/{{ x }}" alt=""><input type="hidden" name="{{ fd.key }}__keep" value="{{ x }}"><button type="button" class="mini" aria-label="Убрать фото">✕</button></span>{% endfor %}</div>
+    <input type="file" name="{{ fd.key }}" accept="image/*" multiple data-pics{% if fd.required %} data-req{% endif %}{% if fd.required and not v %} required{% endif %}>
   {% elif fd.type == "markdown" %}<textarea name="{{ fd.key }}" {% if fd.required %}required{% endif %}>{{ v or "" }}</textarea>
   {% elif fd.type == "files" %}{% for x in v or [] %}<div class="mut">{{ x.name }}</div>{% endfor %}<input type="file" name="{{ fd.key }}" multiple>
   {% elif fd.type == "choice" %}<select name="{{ fd.key }}" {% if fd.required %}required{% endif %}><option value="">—</option>{% for o in fd.options %}<option {% if o == v %}selected{% endif %}>{{ o }}</option>{% endfor %}</select>
@@ -29,6 +29,27 @@
   <p><button>Сохранить</button></p>
 </form>
 <script>{
+// Photos: each pick adds to the ones before (a phone camera gives one shot per pick), ✕ drops one.
+for (const inp of document.querySelectorAll("input[data-pics]")) {
+  const dt = new DataTransfer(), row = inp.previousElementSibling;
+  const sync = () => {
+    inp.files = dt.files;
+    row.querySelectorAll(".pic.new").forEach(e => e.remove());
+    [...dt.files].forEach((file, i) => {
+      const s = document.createElement("span");
+      s.className = "pic new";
+      s.innerHTML = '<img class="thumb" alt=""><button type="button" class="mini" aria-label="Убрать фото">✕</button>';
+      s.firstChild.src = URL.createObjectURL(file);
+      s.lastChild.onclick = () => { dt.items.remove(i); sync(); };
+      row.append(s);
+    });
+    inp.required = "req" in inp.dataset && !row.querySelector("input");  // new files count on their own
+  };
+  inp.addEventListener("change", () => { for (const file of inp.files) dt.items.add(file); sync(); });
+  row.addEventListener("click", e => {
+    if (e.target.matches(".pic:not(.new) button")) { e.target.parentNode.remove(); sync(); }
+  });
+}
 // Every edit goes to a local draft, so leaving the page (a label scanned, a call) loses nothing. Photos and files stay out.
 const f = document.querySelector("form[data-draft]"), key = "draft:" + location.pathname;
 const vals = () => Object.fromEntries([...f.elements].filter(e => e.name && e.type != "file" && e.type != "hidden").map(e => [e.name, e.value]));
