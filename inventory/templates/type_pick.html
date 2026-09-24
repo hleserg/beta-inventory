@@ -1,0 +1,8 @@
+{% extends "base.html" %}
+{% block main %}
+<h1>Что это?</h1>
+{% for c in categories %}
+<h2>{{ c.label }}</h2>
+{% for ty in c.types %}<a class="line" href="/items/new?type={{ ty.key }}{% if box %}&box={{ box }}{% endif %}"><span><b>{{ ty.label }}</b>{% if ty.hint %}<br><span class="mut">{{ ty.hint }}</span>{% endif %}</span></a>{% endfor %}
+{% endfor %}
+{% endblock %}

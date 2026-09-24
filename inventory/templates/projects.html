@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block main %}
+<h1>Проекты</h1>
+<details {% if not projects %}open{% endif %}><summary>+ проект</summary>
+<form method="post" action="/projects"><label>Название</label><input name="name" required><label>Описание</label><textarea name="description"></textarea><label>Git</label><input name="git_url" type="url" placeholder="https://github.com/…"><p><button>Добавить</button></p></form></details>
+{% for p in projects %}
+<div class="card"><b>{{ p.name }}</b>{% if p.status != "active" %} <span class="mut">(архив)</span>{% endif %}
+  {% if p.description %}<div>{{ p.description }}</div>{% endif %}
+  {% if p.git_url.startswith(("http://", "https://")) %}<div><a href="{{ p.git_url }}" target="_blank" rel="noopener">{{ p.git_url }}</a></div>{% endif %}
+  <details><summary>изменить</summary><form method="post" action="/projects/{{ p.id }}">
+    <input name="name" value="{{ p.name }}" required><label>Описание</label><textarea name="description">{{ p.description }}</textarea>
+    <label>Git</label><input name="git_url" type="url" value="{{ p.git_url }}">
+    <label>Статус</label><select name="status"><option value="active">активный</option><option value="archived" {% if p.status == "archived" %}selected{% endif %}>архив</option></select>
+    <p><button>Сохранить</button></p></form></details>
+</div>
+{% endfor %}
+{% endblock %}

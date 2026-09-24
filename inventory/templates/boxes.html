@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% block main %}
+<h1>{{ t.boxes }}</h1>
+<form method="post" action="/boxes" class="row"><input type="number" name="n" value="10" min="1" max="100"><button>Новые наклейки</button></form>
+{% if new %}<div class="card"><b>Готово: {{ new|length }}.</b> Сохраните картинки и напечатайте из приложения принтера.
+<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:8px;margin-top:8px">
+{% for id in new %}<a href="/b/{{ id }}/label.png" download="{{ id }}.png"><img src="/b/{{ id }}/label.png" alt="{{ id }}" style="width:100%;background:#fff;border:1px solid var(--line)"></a>{% endfor %}
+</div></div>{% endif %}
+<table>{% for b in boxes %}<tr><td><a href="/b/{{ b.id }}"><b>{{ b.id }}</b></a></td><td>{{ b.name }}<div class="mut">{{ b.where }}</div></td><td class="mut">{{ b.n or "—" }}</td></tr>{% endfor %}</table>
+{% endblock %}

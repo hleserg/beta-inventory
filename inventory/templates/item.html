@@ -1,0 +1,32 @@
+{% extends "base.html" %}{% from "_stock.html" import stock_forms, moves_table %}
+{% block title %}{{ it.name }}{% endblock %}
+{% block main %}
+{% if pk and f[pk] %}<a href="/u/{{ f[pk] }}"><img class="photo" src="/u/{{ f[pk] }}" alt=""></a>{% endif %}
+<h1>{{ it.name }}</h1>
+<div class="row"><span class="mut">{{ type_label(it.type) or "тип не выбран" }}</span><a class="right" href="/i/{{ it.id }}/edit">Изменить</a></div>
+
+<h2>Где лежит</h2>
+{% for s in stock %}
+<div class="card">
+  <div class="row"><a href="/b/{{ s.box_id }}"><b>{{ s.box_id }}</b></a> {{ s.name }} <span class="mut">{{ s.where }}</span><span class="qty right">{{ s.qty }} {{ t.unit }}</span></div>
+  {{ stock_forms(s.box_id, it.id, s.qty, projects, "/i/" ~ it.id) }}
+</div>
+{% else %}<p class="mut">Нигде нет.</p>{% endfor %}
+<details><summary>Положить в {{ t.box|lower }}</summary>
+<form method="post" action="/stock" class="row">
+  <input type="hidden" name="item" value="{{ it.id }}"><input type="hidden" name="action" value="add"><input type="hidden" name="kind" value="put"><input type="hidden" name="back" value="/i/{{ it.id }}">
+  <input name="box" placeholder="ID" required style="text-transform:uppercase"><input type="number" name="qty" value="1" min="1"><button>Положить</button>
+</form></details>
+
+{% for fd in fields if fd.type != "photo" and f[fd.key] %}
+<h2>{{ fd.label }}</h2>
+{% set v = f[fd.key] %}
+{% if fd.type == "markdown" %}<div class="md">{{ v|md }}</div>
+{% elif fd.type == "link" %}{% if v.startswith(("http://", "https://")) %}<a href="{{ v }}" target="_blank" rel="noopener">{{ v }}</a>{% else %}{{ v }}{% endif %}
+{% elif fd.type == "files" %}{% for x in v %}<div><a href="/u/{{ x.file }}" download="{{ x.name }}">{{ x.name }}</a></div>{% endfor %}
+{% else %}<p>{{ v }}</p>{% endif %}
+{% endfor %}
+
+<h2>История</h2>
+{{ moves_table(history) }}
+{% endblock %}

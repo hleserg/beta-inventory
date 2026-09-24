@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block main %}
+<h1>{% if it %}{{ it.name }}{% else %}+ {{ t.item }}{% endif %}</h1>
+<div class="mut">{{ type_label(type) or "тип не выбран" }}</div>
+{% if it %}<details><summary>сменить тип</summary><form class="row" action="/i/{{ it.id }}/edit">
+  <select name="type">{% for c in categories %}<optgroup label="{{ c.label }}">{% for ty in c.types %}<option value="{{ ty.key }}" {% if ty.key == type %}selected{% endif %}>{{ ty.label }}</option>{% endfor %}</optgroup>{% endfor %}</select>
+  <button class="ghost">Сменить</button></form>
+  <p class="mut">Поля, которых у нового типа нет, не удаляются — просто прячутся.</p></details>{% endif %}
+{% for e in errors %}<p class="err">{{ e }}</p>{% endfor %}
+<form method="post" enctype="multipart/form-data" action="{% if it %}/i/{{ it.id }}/edit{% else %}/items/new{% endif %}?type={{ type }}">
+  <label>Название *</label><input name="name" value="{{ name }}" required>
+  {% for fd in fields %}{% set v = vals[fd.key] %}
+  <label>{{ fd.label }}{% if fd.required %} *{% endif %}</label>
+  {% if fd.hint %}<div class="mut">{{ fd.hint }}</div>{% endif %}
+  {% if fd.type == "photo" %}
+    {% if v %}<img class="thumb" src="/u/{{ v }}" alt=""><input type="hidden" name="{{ fd.key }}__keep" value="{{ v }}">{% endif %}
+    <input type="file" name="{{ fd.key }}" accept="image/*" {% if fd.required and not v %}required{% endif %}>
+  {% elif fd.type == "markdown" %}<textarea name="{{ fd.key }}" {% if fd.required %}required{% endif %}>{{ v or "" }}</textarea>
+  {% elif fd.type == "files" %}{% for x in v or [] %}<div class="mut">{{ x.name }}</div>{% endfor %}<input type="file" name="{{ fd.key }}" multiple>
+  {% elif fd.type == "choice" %}<select name="{{ fd.key }}" {% if fd.required %}required{% endif %}><option value="">—</option>{% for o in fd.options %}<option {% if o == v %}selected{% endif %}>{{ o }}</option>{% endfor %}</select>
+  {% else %}<input name="{{ fd.key }}" value="{{ v if v is defined and v is not none else '' }}" {% if fd.type == "number" %}inputmode="decimal"{% elif fd.type == "link" %}type="url"{% endif %} {% if fd.required %}required{% endif %}>
+  {% endif %}
+  {% endfor %}
+  {% if not it %}
+  <label>Положить в {{ t.box|lower }}</label>
+  <div class="row"><input name="box" value="{{ box }}" placeholder="ID, можно пусто" style="text-transform:uppercase"><input type="number" name="qty" value="{{ qty }}" min="0"></div>
+  {% endif %}
+  <p><button>Сохранить</button></p>
+</form>
+{% endblock %}

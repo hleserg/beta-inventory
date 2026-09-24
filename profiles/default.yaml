@@ -1,0 +1,131 @@
+# Profile = what cards look like and what things are called. Nothing here is in the code.
+# Use your own: copy to $DATA_DIR/profile.yaml (or point PROFILE at a file).
+#
+# A card = item_fields + its category's fields + its type's fields.
+# The same key at a deeper level overrides the upper one (e.g. photo optional for resistors).
+# Field types: text, markdown, number, link, choice (needs `options`), photo, files.
+# `search`: weight in text search (name always weighs 3). `required`: must be filled.
+# Type keys are stored in the database: rename labels freely, keep keys.
+
+name: Мастерская
+
+terms:
+  box: Коробка
+  boxes: Коробки
+  item: Компонент
+  items: Компоненты
+  place: Место
+  places: Места
+  unit: шт
+
+item_fields:
+  - key: photo
+    label: Фото
+    type: photo
+    required: true
+  - key: aliases
+    label: Другие названия
+    type: text
+    hint: через запятую — как ещё это называют (понижайка, buck, step-down)
+    search: 2
+  - key: description
+    label: Описание
+    type: markdown
+    search: 1
+  - key: files
+    label: Файлы
+    type: files
+  - key: reorder_at
+    label: Докупить, когда останется меньше
+    type: number
+
+categories:
+  - key: electronics
+    label: Электроника
+    fields:
+      - key: datasheet
+        label: Даташит
+        type: link
+    types:
+      - key: mcu_module
+        label: Микропроцессорный модуль
+        hint: ESP32, Arduino, RP2040 — плата с контроллером
+        fields:
+          - key: chip
+            label: Чип
+            type: text
+            search: 2
+          - key: voltage
+            label: Питание
+            type: text
+            hint: 3.3 В, 5 В через USB
+          - key: pinout
+            label: Распиновка
+            type: markdown
+            required: true
+      - key: module
+        label: Модуль
+        hint: датчики, драйверы, преобразователи, дисплеи, реле
+        fields:
+          - key: voltage
+            label: Питание
+            type: text
+          - key: pinout
+            label: Распиновка
+            type: markdown
+            required: true
+      - key: resistor
+        label: Резистор
+        fields:
+          - key: photo
+            required: false
+          - key: value
+            label: Номинал
+            type: text
+            required: true
+            search: 3
+            hint: 10 кОм, 4.7к
+          - key: power
+            label: Мощность
+            type: text
+            hint: 0.25 Вт
+          - key: package
+            label: Корпус
+            type: choice
+            options: [выводной, "0402", "0603", "0805", "1206"]
+      - key: capacitor
+        label: Конденсатор
+        fields:
+          - key: photo
+            required: false
+          - key: value
+            label: Ёмкость
+            type: text
+            required: true
+            search: 3
+            hint: 100 нФ, 10 мкФ
+          - key: voltage
+            label: Напряжение
+            type: text
+          - key: dielectric
+            label: Тип
+            type: choice
+            options: [керамический, электролитический, танталовый, плёночный]
+            search: 2
+      - key: connector
+        label: Разъём
+        hint: JST, Dupont, клеммники
+        fields:
+          - key: series
+            label: Серия
+            type: text
+            search: 3
+            hint: JST-XH, JST-PH, Dupont
+          - key: pitch
+            label: Шаг, мм
+            type: number
+          - key: pins
+            label: Контактов
+            type: number
+      - key: electronics_other
+        label: Другое
