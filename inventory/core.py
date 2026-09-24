@@ -2,6 +2,7 @@
 import io
 import json
 import os
+import re
 import secrets
 import sqlite3
 import threading
@@ -178,6 +179,26 @@ def box_where(c, box_id):
     return " › ".join(parts)
 
 
+def find_box(text):
+    """Box ID from what a person typed or picked: the ID in any case, «Name (ID)» from the list, a unique part of a name."""
+    t = text.strip()
+    with db() as c:
+        boxes = c.execute("SELECT id, name FROM boxes ORDER BY name").fetchall()
+    ids = {b["id"] for b in boxes}
+    m = re.search(r"\(([A-Za-z0-9]+)\)$", t)  # ASCII only: «Резисторы (Вт)» is a name, not an ID
+    for k in (t.upper(), m and m[1].upper()):
+        if k in ids:
+            return k
+    # casefold here, not SQL: SQLite's lower() and LIKE leave Cyrillic as is
+    hits = [b for b in boxes if t and t.casefold() in (b["name"] or "").casefold()]
+    exact = [b for b in hits if b["name"].casefold() == t.casefold()]
+    if len(hits) == 1 or len(exact) == 1:
+        return (exact or hits)[0]["id"]
+    if not hits:
+        raise ValueError(f"Нет коробки «{t}»")
+    raise ValueError("Несколько коробок: " + ", ".join(f"«{b['name']}» ({b['id']})" for b in hits[:5]) + ". Какая?")
+
+
 def move(item_id, box_id, delta, kind, author, project_id=None, note=""):
     """The only way stock changes: updates the box×item quantity and logs a movement.
 
@@ -216,7 +237,7 @@ def change_stock(box_id, item_id, action, qty, author, project_id=None):
 
     qty None on put/return/buy: some went in, not counted.
     """
-    box_id = box_id.strip().upper()
+    box_id = find_box(box_id)
     if action not in ("put", "return", "buy", "take", "count"):
         raise ValueError(f"нет действия {action}: put, return, buy, take, count")
     if qty is None and action in ("take", "count"):

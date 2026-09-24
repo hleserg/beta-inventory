@@ -121,6 +121,30 @@ def test_uncounted():
     assert "Что кладём" in c.get(f"/b/{box}").text
 
 
+def test_box_by_name():
+    """A box field takes what people know: part of the name in any case, «Name (ID)» from the list, or the ID."""
+    a, b, d = core.new_boxes(3)
+    c.post(f"/b/{a}", data={"name": "Клеммники Phoenix"})
+    c.post(f"/b/{b}", data={"name": "Клеммники WAGO"})
+    for typed in ("phoenix", "КЛЕММНИКИ phoenix", f"Клеммники Phoenix ({a})", a.lower()):
+        r = c.post("/items/new?type=resistor", follow_redirects=False,
+                   data={"name": "220R", "value": "220 Ом", "box": typed, "qty": "1"})
+        assert r.headers["location"] == f"/b/{a}", typed
+    r = c.post("/items/new?type=resistor", data={"name": "220R", "value": "220 Ом", "box": "клеммники", "qty": "1"})
+    assert r.status_code == 400 and "Клеммники WAGO" in r.text and 'value="клеммники"' in r.text  # which one? typed text kept
+
+    assert c.post("/stock", data={"box": "wago", "item": newest(), "action": "add", "kind": "put", "qty": 2}).status_code == 200
+    assert "2 шт" in c.get(f"/b/{b}").text
+    assert c.post("/stock", data={"box": "нет такой", "item": newest(), "action": "add", "qty": 2}).status_code == 400
+    c.post(f"/b/{d}", data={"name": "Ящик", "parent_id": "wago"})
+    assert core.db().execute("SELECT parent_id FROM boxes WHERE id=?", (d,)).fetchone()[0] == b
+
+    page = c.get(f"/b/{d}").text  # names first, the ID last; scan buttons next to the field
+    assert f'value="Клеммники WAGO ({b})"' in page and "data-nfc" in page and "data-qr" in page
+    assert f'<option value="Клеммники Phoenix ({a})">' in c.get("/items/new?type=module").text
+    assert f'<option value="Клеммники Phoenix ({a})">' in c.get(f"/i/{newest()}").text
+
+
 def test_old_stock_table_migrates(tmp_path, monkeypatch):
     """A database from before «не считал» keeps its stock and takes qty NULL after a restart."""
     monkeypatch.setattr(core, "DATA", tmp_path)

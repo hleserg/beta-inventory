@@ -33,6 +33,14 @@ T.env.globals.update(
     # namespace, not dict: in Jinja t.items on a dict is dict.items, not the term
     t=SimpleNamespace(**PROFILE["terms"]), categories=PROFILE["categories"], type_label=core.type_label, kinds=core.KINDS,
     pk=next((f["key"] for f in PROFILE["item_fields"] if f["type"] == "photo"), None))
+
+
+def all_boxes():  # for box fields: named first, by name
+    with db() as c:
+        return c.execute("SELECT id, name FROM boxes ORDER BY name IS NULL OR name='', name, id").fetchall()
+
+
+T.env.globals["all_boxes"] = all_boxes
 _md = MarkdownIt("commonmark", {"html": False}).enable("table")  # raw HTML off: cards come from agents too
 T.env.filters["md"] = lambda s: Markup(_md.render(s or ""))
 
@@ -121,7 +129,7 @@ def box(req: Request, box_id: str):
 
 @app.post("/b/{box_id}")
 def box_save(box_id: str, name: str = Form(""), place: str = Form(""), parent_id: str = Form("")):
-    parent = parent_id.strip().upper() or None
+    parent = core.find_box(parent_id) if parent_id.strip() else None
     with db() as c:
         b = get_box(c, box_id)
         p = parent
@@ -222,10 +230,8 @@ def items(req: Request, type: str = "", cat: str = ""):
 
 
 def card_form(req, status=200, it=None, type="", name="", vals=None, errors=(), box="", qty=""):
-    with db() as c:
-        boxes = c.execute("SELECT id, name FROM boxes ORDER BY id").fetchall() if not it else []
     return page(req, "item_form.html", status, it=it, type=type, fields=core.fields_for(type), name=name,
-                vals=vals or {}, errors=errors, box=box, qty=qty, boxes=boxes)
+                vals=vals or {}, errors=errors, box=box, qty=qty)
 
 
 def check_type(type):
@@ -245,15 +251,15 @@ def item_new(req: Request, box: str = "", type: str = ""):
 async def item_create(req: Request, type: str):
     fields = core.fields_for(check_type(type))
     name, f, errors, form = await read_fields(req, {}, fields)
-    box_id, qty = str(form.get("box", "")).strip().upper(), str(form.get("qty", "")).strip()
-    if box_id:
-        with db() as c:
-            if not c.execute("SELECT 1 FROM boxes WHERE id=?", (box_id,)).fetchone():
-                errors.append(f"Нет коробки {box_id}")
+    box, qty, box_id = str(form.get("box", "")).strip(), str(form.get("qty", "")).strip(), None
+    try:
+        box_id = core.find_box(box) if box else None
+    except ValueError as e:
+        errors.append(str(e))
     if qty and not qty.isdigit():
         errors.append("Количество — целое число; пусто — «не считал»")
     if errors:
-        return card_form(req, 400, type=type, name=name, vals=f, errors=errors, box=box_id, qty=qty)
+        return card_form(req, 400, type=type, name=name, vals=f, errors=errors, box=box, qty=qty)
     iid = core.save_item(None, name, type, f)
     if box_id and (not qty or int(qty) > 0):  # empty: «есть, не считал»
         core.move(iid, box_id, int(qty) if qty else None, "put", AUTHOR)

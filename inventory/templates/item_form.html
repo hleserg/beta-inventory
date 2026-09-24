@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "_box.html" import box_input %}
 {% block main %}
 <h1>{% if it %}{{ it.name }}{% else %}+ {{ t.item }}{% endif %}</h1>
 <div class="mut">{{ type_label(type) or "тип не выбран" }}</div>
@@ -22,9 +23,8 @@
   {% endif %}
   {% endfor %}
   {% if not it %}
-  <label>Куда положить <span class="mut" id="boxname"></span></label>
-  <div class="row"><input name="box" value="{{ box }}" list="boxlist" placeholder="ID или название, можно пусто" style="text-transform:uppercase"><input type="number" name="qty" value="{{ qty }}" min="0" placeholder="не считал"></div>
-  <datalist id="boxlist">{% for b in boxes %}<option value="{{ b.id }}">{{ b.name or "" }}</option>{% endfor %}</datalist>
+  <label>Куда положить</label>
+  <div class="row">{{ box_input(value=box, placeholder="название или скан, можно пусто") }}<input type="number" name="qty" value="{{ qty }}" min="0" placeholder="не считал"></div>
   {% endif %}
   <p><button>Сохранить</button></p>
 </form>
@@ -46,9 +46,6 @@ if (d && JSON.stringify(d.v) !== shown) {
   dcancel.onclick = () => { localStorage.removeItem(key); location.replace(location.pathname + location.search); };
 } else if (d || unsaved) store();
 f.addEventListener("input", store);
-const box = f.elements.box, boxName = () => { const o = [...boxlist.options].find(o => o.value == box.value.trim().toUpperCase());
-  boxname.textContent = o ? `${o.value} «${o.textContent || "без названия"}»` : ""; };
-if (box) { box.addEventListener("input", boxName); boxName(); }
 f.addEventListener("submit", () => { if (localStorage[key]) localStorage[key] = JSON.stringify({...JSON.parse(localStorage[key]), sent: 1}); });
 }</script>
 {% endblock %}

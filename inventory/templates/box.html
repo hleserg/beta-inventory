@@ -1,4 +1,4 @@
-{% extends "base.html" %}{% from "_stock.html" import stock_forms %}
+{% extends "base.html" %}{% from "_stock.html" import stock_forms %}{% from "_box.html" import box_input %}
 {% block title %}{{ b.id }}{% if b.name %} · {{ b.name }}{% endif %}{% endblock %}
 {% block main %}
 <h1>{{ b.id }}{% if b.name %} · {{ b.name }}{% endif %}</h1>
@@ -25,7 +25,8 @@
     <label>{{ t.place }}</label>
     <input name="place" list="placelist" value="{% for p in places if p.id == b.place_id %}{{ p.name }}{% endfor %}" placeholder="выберите или впишите новое">
     <datalist id="placelist">{% for p in places %}<option value="{{ p.name }}">{% endfor %}</datalist>
-    <label>Стоит внутри другой (ID)</label><input name="parent_id" value="{{ b.parent_id or '' }}" placeholder="пусто — стоит сама" style="text-transform:uppercase">
+    <label>Стоит внутри другой</label>
+    <div class="row">{{ box_input("parent_id", b.parent_id or "", "пусто — стоит сама", armed_only=True) }}</div>
     <p><button>Сохранить</button></p>
   </form>
   <p><img src="/b/{{ b.id }}/label.png" alt="наклейка" style="width:240px;max-width:100%;background:#fff;border:1px solid var(--line)"><br>

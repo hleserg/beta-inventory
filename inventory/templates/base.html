@@ -47,6 +47,9 @@ summary{cursor:pointer;color:var(--acc)}
 .seg a{font-size:1em;padding:6px 14px}
 .chips a.on{background:var(--acc);color:#fff;border-color:var(--acc)}
 .md img{max-width:100%}.md pre{overflow-x:auto}.md table td,.md table th{border:1px solid var(--line);padding:4px 6px}
+[data-nfc],[data-qr]{display:none}.nfc [data-nfc],.qr [data-qr]{display:inline-block}
+.mini{padding:6px 9px;font-size:.85em}.mini.on{background:var(--acc);color:#fff}
+dialog video{width:min(80vw,480px);display:block;margin-bottom:8px}
 </style>
 </head>
 <body>
@@ -56,7 +59,7 @@ summary{cursor:pointer;color:var(--acc)}
 // Card-form drafts (item_form.html) are kept until saved: offer the way back from any other page.
 for (const k of Object.keys(localStorage)) if (k.startsWith("draft:") && k !== "draft:" + location.pathname) {
   const d = JSON.parse(localStorage[k]);
-  if (d.sent && /^\/i\/\d+$/.test(location.pathname)) { localStorage.removeItem(k); continue; }  // a save lands on the card
+  if (d.sent) { localStorage.removeItem(k); continue; }  // saved: it landed on the card or the box; a failed save stays on its form
   const c = document.createElement("div"), a = document.createElement("a");
   c.className = "card";
   c.append(`Несохранённый черновик «${d.name || "без названия"}» от ${when(d.t)} — `, a);
@@ -66,17 +69,59 @@ for (const k of Object.keys(localStorage)) if (k.startsWith("draft:") && k !== "
 function when(t) { return new Date(t).toLocaleString("ru", {day: "numeric", month: "short", hour: "2-digit", minute: "2-digit"}); }
 
 // With the site open, a box label goes straight to its box (Web NFC, Chrome on Android; permission via /phone).
-function nfcScan() {
-  const r = new NDEFReader();
-  r.onreading = e => {
-    if (window.nfcBusy) return;  // the box page is writing this tag
-    for (const rec of e.message.records) {
-      const m = ["url", "absolute-url"].includes(rec.recordType) && new TextDecoder().decode(rec.data).match(/\/b\/(\w+)\/?$/i);
-      if (m && location.pathname.toLowerCase() !== "/b/" + m[1].toLowerCase()) location.href = "/b/" + m[1];  // this origin: labels may name the host differently
-    }
-  };
-  return r.scan();
+// On a page with a box field (_box.html) it fills the field instead.
+document.documentElement.classList.toggle("nfc", "NDEFReader" in window);
+document.documentElement.classList.toggle("qr", "BarcodeDetector" in window && !!navigator.mediaDevices);
+let armed = null, scanning = null;  // armed: the field whose NFC/QR button was pressed
+const boxField = () => armed || [...document.querySelectorAll("[data-box]:not([data-box=armed])")]
+  .find(e => e.checkVisibility ? e.checkVisibility() : e.offsetParent);
+function gotBox(id) {
+  const f = boxField();
+  if (!f) { if (location.pathname.toLowerCase() !== "/b/" + id.toLowerCase()) location.href = "/b/" + id; return; }  // this origin: labels may name the host differently
+  const o = [...document.querySelectorAll("#boxlist option")].find(o => o.value === id || o.value.endsWith(` (${id})`)), label = o ? o.value : id;
+  // empty, being typed in or asked for by its button: fill; a box already chosen: ask first
+  if (f.value !== label && (f === armed || !f.value || f === document.activeElement || confirm(`Изменить коробку на ${label}?`))) {
+    f.value = label; f.dispatchEvent(new Event("input", {bubbles: true}));
+  }
+  armed = null; document.querySelectorAll(".mini.on").forEach(b => b.classList.remove("on"));
 }
+function nfcScan() {  // one reader per page: two would both fire and the second would miss the armed field
+  return scanning ||= (() => { const r = new NDEFReader();
+    r.onreading = e => {
+      if (window.nfcBusy) return;  // the box page is writing this tag
+      for (const rec of e.message.records) {
+        const m = ["url", "absolute-url"].includes(rec.recordType) && new TextDecoder().decode(rec.data).match(/\/b\/([A-Za-z0-9]+)\/?$/i);
+        if (m) return gotBox(m[1].toUpperCase());
+      }
+    };
+    return r.scan(); })().catch(e => { scanning = null; throw e; });
+}
+async function qrScan() {
+  const f = armed, d = document.createElement("dialog"), v = document.createElement("video"), x = document.createElement("button");
+  let s;
+  v.playsInline = v.muted = true;
+  x.type = "button"; x.className = "ghost"; x.textContent = "Закрыть"; x.onclick = () => d.close();
+  d.onclose = () => { s?.getTracks().forEach(t => t.stop()); d.remove(); };
+  d.append(v, x); document.body.append(d); d.showModal();
+  try {
+    s = await navigator.mediaDevices.getUserMedia({video: {facingMode: "environment"}});
+    if (!d.open) return s.getTracks().forEach(t => t.stop());
+    v.srcObject = s; await v.play();
+    const det = new BarcodeDetector({formats: ["qr_code"]});
+    while (d.open) {
+      const m = (await det.detect(v).catch(() => [])).map(c => c.rawValue.match(/\/b\/([A-Za-z0-9]+)\/?$/i)).find(Boolean);
+      if (m) { d.close(); armed = f; return gotBox(m[1].toUpperCase()); }  // a label read: straight into the field, no questions
+      await new Promise(r => setTimeout(r, 200));
+    }
+  } catch (e) { d.close(); alert("Камера недоступна: " + e.message); }
+}
+addEventListener("click", e => {
+  const b = e.target.closest("[data-nfc],[data-qr]");
+  if (!b) return;
+  armed = b.parentElement.querySelector("[data-box]"); b.classList.add("on");
+  if (b.matches("[data-qr]")) qrScan().finally(() => b.classList.remove("on"));
+  else nfcScan().catch(e => { b.classList.remove("on"); alert("NFC: " + e.message); });
+});
 if ("NDEFReader" in window) navigator.permissions.query({name: "nfc"})
   .then(p => p.state === "granted" && nfcScan().catch(() => addEventListener("click", nfcScan, {once: true}))).catch(() => {});
 </script>
