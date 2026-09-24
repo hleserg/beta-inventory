@@ -35,4 +35,4 @@ inventory and write new part cards for you.
 
 ## License
 
-MIT
+GPL-3.0 — see [LICENSE](LICENSE).
