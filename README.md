@@ -10,9 +10,9 @@ the history remembers where it went.
 AI agents (Claude Code, Codex, any MCP client) can check stock, run an
 inventory and write new part cards for you.
 
-> **Status: v0 prototype.** Boxes, labels, cards, stock moves, search and
-> projects work. The UI is Russian for now. Semantic search, the MCP server and
-> GitHub sync are next.
+> **Status: v0 prototype.** Boxes, labels, cards, stock moves, search by
+> words and by meaning, and projects work. The UI is Russian for now. The MCP
+> server and GitHub sync are next.
 
 ## Run
 
@@ -29,9 +29,13 @@ Settings go in a `.env` file next to `compose.yaml`:
 | `PUBLIC_BASE_URL` | the URL you opened | Address printed into label QR codes, e.g. `HTTP://INV.LAN` (uppercase keeps the QR small) |
 | `TZ` | `UTC` | Time zone for the history, POSIX form such as `MSK-3` |
 | `LABEL_W_MM`, `LABEL_H_MM`, `LABEL_DPI` | `25`, `15`, `300` | Label image size |
+| `SEMANTIC_MODEL` | multilingual MiniLM-L12 | Local model for search by meaning (fastembed); empty turns it off |
+| `SEMANTIC_MIN` | `0.35` | How close in meaning an item must be to show up |
 | `PIP_INDEX_URL` | PyPI | Package mirror for the build |
 
-Data (SQLite, photos, files) lives in `./data`.
+Data (SQLite, photos, files, the search model) lives in `./data`. On first
+start the search model (~470 MB) downloads there; until it is ready, search
+works by words only.
 
 ## Profiles: what a card looks like
 
@@ -55,13 +59,12 @@ weight.
 - **Take / return / restock / recount / empty box** — every change is a
   movement with author and project.
 - **Search** by name, other names, description and typed fields, ranked by
-  relevance; box IDs and places too.
+  relevance; box IDs and places too. Below the word matches, a small local
+  model adds items close in meaning, so "step-down" finds a buck converter.
 - **Projects** with a git link, to charge takes against.
 
 ## Planned
 
-- Semantic search (a small local embedding model), so "step-down" finds a buck
-  converter.
 - **MCP server** so agents can read stock and write cards, plus a card-writing
   skill.
 - Projects synced from a GitHub account into an inbox.

@@ -3,8 +3,10 @@ import json
 import os
 import secrets
 import sqlite3
+import threading
 from pathlib import Path
 
+import numpy as np
 import yaml
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -73,6 +75,17 @@ def type_label(type_key):
     return f"{t['category']['label']} › {t['label']}" if t else ""
 
 
+# field key -> search weight, per type ("" = untyped item)
+WEIGHTS = {k: {f["key"]: int(f["search"]) for f in fields_for(k) if f.get("search")} for k in [*TYPES, ""]}
+
+# Meaning search: a small local model, so "понижайка" finds a buck converter with no alias typed in.
+# Off with SEMANTIC_MODEL= ; keyword search works alone while the model loads or if it can't.
+SEM_MODEL = os.environ.get("SEMANTIC_MODEL", "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2")
+SEM_MIN = float(os.environ.get("SEMANTIC_MIN", "0.35"))  # cosine below this is noise; tune on real data
+SEM_TOP = 10
+_sem = {"model": None, "vecs": {}}  # vecs: item_id -> (embedded text, unit vector)
+
+
 def db():
     c = sqlite3.connect(DATA / "inventory.db")
     c.row_factory = sqlite3.Row
@@ -84,6 +97,40 @@ def init():
     UPLOADS.mkdir(parents=True, exist_ok=True)
     with db() as c:
         c.executescript(SCHEMA)
+    if SEM_MODEL:
+        threading.Thread(target=_load_model, daemon=True).start()
+
+
+def _load_model():
+    try:
+        from fastembed import TextEmbedding
+        _sem["model"] = TextEmbedding(SEM_MODEL, cache_dir=str(DATA / "models"))  # ~470 MB, first start only
+        with db() as c:
+            _item_vecs(c.execute("SELECT * FROM items").fetchall())  # warm up before the first search
+    except Exception as e:  # no network, unknown model: keep keyword search
+        print(f"meaning search off: {e!r}", flush=True)
+
+
+def _unit(vectors):
+    m = np.array(list(vectors))
+    return m / np.linalg.norm(m, axis=1, keepdims=True)
+
+
+def item_text(row):
+    """What the model reads: name, type, then searchable fields, heaviest first (the model truncates the tail)."""
+    f = item_fields(row)
+    keys = sorted(WEIGHTS.get(row["type"], WEIGHTS[""]).items(), key=lambda kw: -kw[1])
+    return ". ".join(filter(None, [row["name"], type_label(row["type"])] + [str(f.get(k) or "") for k, _ in keys]))
+
+
+def _item_vecs(rows):
+    """Item vectors, re-embedding only items whose text changed since last time."""
+    vecs = _sem["vecs"]
+    todo = [(r["id"], t) for r in rows if vecs.get(r["id"], ("",))[0] != (t := item_text(r))]
+    if todo:
+        for (iid, t), v in zip(todo, _unit(_sem["model"].embed([t for _, t in todo]))):
+            vecs[iid] = (t, v)
+    return vecs
 
 
 def norm(s):
@@ -163,34 +210,45 @@ def stock_of_item(c, item_id):
 
 
 def search(q):
-    """Substring search over name + profile fields marked `search`, ranked by field weight.
+    """Items by keyword (name, type, profile fields marked `search`) and by meaning; boxes by id/name/place.
 
-    Every word of the query must hit somewhere. Returns (items, boxes).
+    Keyword hits need every word of the query and rank first, by field weight. Items found only by
+    meaning come after them, marked `similar`. Returns (items, boxes).
     """
     # ponytail: full scan in Python (proper Cyrillic lowercasing, ё=е); fine to ~10k items, then FTS5.
     words = norm(q).split()
     if not words:
         return [], []
-    weights = {k: {f["key"]: int(f["search"]) for f in fields_for(k) if f.get("search")} for k in [*TYPES, ""]}
     items, boxes = [], []
     with db() as c:
-        for row in c.execute("SELECT * FROM items"):
+        rows = c.execute("SELECT * FROM items").fetchall()
+        sims = {}
+        if _sem["model"] and rows:
+            qv = _unit(_sem["model"].embed([q]))[0]
+            sims = {iid: float(v @ qv) for iid, (_, v) in _item_vecs(rows).items()}
+        for row in rows:
             f = item_fields(row)
             texts = [(3, norm(row["name"])), (2, norm(type_label(row["type"])))]
-            texts += [(w, norm(f.get(k))) for k, w in weights.get(row["type"], weights[""]).items()]
+            texts += [(w, norm(f.get(k))) for k, w in WEIGHTS.get(row["type"], WEIGHTS[""]).items()]
             score = 0
             for word in words:
                 hit = max((w for w, t in texts if word in t), default=0)
                 if not hit:
+                    score = 0
                     break
                 score += hit
             else:
                 score += norm(row["name"]).startswith(words[0])
-                items.append(dict(id=row["id"], name=row["name"], type=row["type"], fields=f, score=score,
-                                  stock=stock_of_item(c, row["id"])))
+            sim = sims.get(row["id"], 0.0)
+            if score or sim >= SEM_MIN:
+                items.append(dict(id=row["id"], name=row["name"], type=row["type"], fields=f,
+                                  score=score + sim, similar=not score))
+        items.sort(key=lambda i: (i["similar"], -i["score"], norm(i["name"])))
+        items = [i for i in items if not i["similar"]] + [i for i in items if i["similar"]][:SEM_TOP]
+        for i in items:
+            i["stock"] = stock_of_item(c, i["id"])
         for b in c.execute("SELECT b.*, p.name AS place FROM boxes b LEFT JOIN places p ON p.id=b.place_id"):
             text = norm(f"{b['id']} {b['name']} {b['place'] or ''}")
             if all(w in text for w in words):
                 boxes.append(dict(id=b["id"], name=b["name"], where=box_where(c, b["id"])))
-    items.sort(key=lambda i: (-i["score"], norm(i["name"])))
     return items, boxes

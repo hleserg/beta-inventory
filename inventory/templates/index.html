@@ -9,7 +9,9 @@
 {% if q %}
   {% if boxes %}<h2>{{ t.boxes }}</h2>{% for b in boxes %}<div><a href="/b/{{ b.id }}"><b>{{ b.id }}</b></a> {{ b.name }} <span class="mut">{{ b.where }}</span></div>{% endfor %}{% endif %}
   <h2>{{ t.items }}{% if items %} <span class="mut">{{ items|length }}</span>{% endif %}</h2>
+  {% set ns = namespace(sim=false) %}
   {% for i in items %}
+  {% if i.similar and not ns.sim %}{% set ns.sim = true %}<h2>Похоже по смыслу</h2>{% endif %}
   <div class="card">
     <a class="row" href="/i/{{ i.id }}" style="text-decoration:none;color:inherit">{% if pk and i.fields[pk] %}<img class="thumb" src="/u/{{ i.fields[pk] }}" alt="">{% endif %}<span><b>{{ i.name }}</b><br><span class="mut">{{ type_label(i.type) }}</span></span></a>
     {% for s in i.stock %}<div><a href="/b/{{ s.box_id }}"><b>{{ s.box_id }}</b></a> {{ s.name }} <span class="mut">{{ s.where }}</span> — <span class="qty">{{ s.qty }} {{ t.unit }}</span></div>

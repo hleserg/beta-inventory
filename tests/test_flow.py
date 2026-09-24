@@ -4,10 +4,12 @@ import os
 import tempfile
 
 os.environ["DATA_DIR"] = tempfile.mkdtemp()  # before the app import: it opens the DB on import
+os.environ["SEMANTIC_MODEL"] = ""  # no 470 MB download in tests; test_meaning stubs the model
 
 from fastapi.testclient import TestClient  # noqa: E402
 from PIL import Image  # noqa: E402
 
+from inventory import core  # noqa: E402
 from inventory.app import app  # noqa: E402
 
 c = TestClient(app)
@@ -45,3 +47,22 @@ def test_main_path():
     c.post(f"/b/{box}/clear")
     assert "Что кладём" in c.get(f"/b/{box}").text
     assert "Метеостанция" in c.get("/history").text
+
+
+class StubModel:
+    """Two 'meanings': voltage converters and everything else."""
+    def embed(self, texts):
+        for t in texts:
+            yield [1.0, 0.1] if any(w in t.lower() for w in ("понижайка", "step-down")) else [0.1, 1.0]
+
+
+def test_meaning():
+    core._sem["model"] = StubModel()
+    try:
+        c.post("/items/new?type=module", files=photo(), data={"name": "LM2596", "description": "DC-DC step-down",
+                                                              "pinout": "IN OUT"})
+        page = c.get("/?q=понижайка").text
+        assert "Похоже по смыслу" in page and "LM2596" in page
+        assert page.index("MP1584") < page.index("Похоже по смыслу")  # keyword hit (alias) ranks first
+    finally:
+        core._sem["model"] = None

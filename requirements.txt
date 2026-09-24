@@ -6,3 +6,4 @@ pyyaml
 qrcode
 pillow
 markdown-it-py
+fastembed
