@@ -160,9 +160,10 @@ def box_save(box_id: str, name: str = Form(""), place: str = Form(""), parent_id
                 raise ValueError("Коробка не может лежать сама в себе")
             p = get_box(c, p)["parent_id"]
         place_id = None
-        if place.strip() and not parent:  # a new name makes the place, so a first box needs no trip to places
-            c.execute("INSERT OR IGNORE INTO places(name) VALUES (?)", (place.strip(),))
-            place_id = c.execute("SELECT id FROM places WHERE name=?", (place.strip(),)).fetchone()["id"]
+        if place.strip() and not parent:  # chosen from the list, never made from typed text (a half-typed «Мой» became a place)
+            place_id = int(place) if place.strip().isdigit() else 0
+            if not c.execute("SELECT 1 FROM places WHERE id=?", (place_id,)).fetchone():
+                raise ValueError(f"Нет такого места — добавьте его в «{PROFILE['terms']['places']}»")
         if b["kind"] == "shelf":  # a shelf stays in its cabinet: only the name changes
             c.execute("UPDATE boxes SET name=? WHERE id=?", (name.strip() or b["name"], bid))
         else:

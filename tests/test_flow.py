@@ -28,8 +28,13 @@ def test_main_path():
     box = c.post("/boxes", data={"n": 1}, follow_redirects=False).headers["location"].split("=")[1]
     assert f"http://testserver/b/{box.lower()}" in c.get(f"/B/{box.lower()}").text  # QR URL, any case; NFC link
     assert c.get(f"/b/{box}/label.png").headers["content-type"] == "image/png"
-    c.post(f"/b/{box}", data={"name": "JST", "place": "Антресоль"})  # a new place right from the box
-    assert 'value="Антресоль"' in c.get(f"/b/{box}").text and "Антресоль" in c.get("/places").text
+    shelf = core.db().execute("SELECT id FROM places WHERE name='Шкаф'").fetchone()[0]
+    c.post(f"/b/{box}", data={"name": "JST", "place": shelf})
+    assert f'<option value="{shelf}" selected>Шкаф' in c.get(f"/b/{box}").text
+    n = core.db().execute("SELECT count(*) FROM places").fetchone()[0]
+    assert c.post(f"/b/{box}", data={"name": "JST", "place": "Мой"}).status_code == 400  # a place is chosen, never typed
+    assert c.post(f"/b/{box}", data={"name": "JST", "place": "9999"}).status_code == 400
+    assert core.db().execute("SELECT count(*) FROM places").fetchone()[0] == n
 
     # module: photo and pinout required; resistor: photo optional (type overrides the common field)
     assert c.post("/items/new?type=module", data={"name": "MP1584"}).status_code == 400

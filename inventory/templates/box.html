@@ -24,8 +24,8 @@
     <label>Название</label><input name="name" value="{{ b.name }}" placeholder="например: разъёмы JST">
     {% if b.kind != "shelf" %}{# a shelf stays in its cabinet #}
     <label>{{ t.place }}</label>
-    <input name="place" list="placelist" value="{% for p in places if p.id == b.place_id %}{{ p.name }}{% endfor %}" placeholder="выберите или впишите новое">
-    <datalist id="placelist">{% for p in places %}<option value="{{ p.name }}">{% endfor %}</datalist>
+    <select name="place" data-pick><option value="">—</option>{% for p in places %}<option value="{{ p.id }}"{% if p.id == b.place_id %} selected{% endif %}>{{ p.name }}</option>{% endfor %}</select>
+    {% if not places %}<div class="mut">Мест ещё нет — <a href="/places">добавить</a></div>{% endif %}
     <label>Стоит внутри другой</label>
     <div class="row">{{ box_input("parent_id", b.parent_id or "", "пусто — стоит сама", armed_only=True) }}</div>
     {% endif %}
