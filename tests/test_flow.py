@@ -1,6 +1,7 @@
 """One walk through the main path: box → card → search → take → clear."""
 import io
 import json
+import re
 
 from fastapi.testclient import TestClient
 from PIL import Image
@@ -151,10 +152,41 @@ def test_box_by_name():
     assert f'<h1>Клеммники WAGO <span class="mut">{b}</span></h1>' in page and f'<b>Ящик</b> <span class="mut">{d}</span>' in page
 
 
+def test_new_box_and_shelves():
+    """«+ Коробка» makes a box only once something is done with it; shelves come one at a time from a place."""
+    count = lambda: core.db().execute("SELECT count(*) FROM boxes").fetchone()[0]
+    before = count()
+    page = c.get("/boxes/new").text
+    bid = re.search(r"/b/(\w{5})/label\.png", page)[1]
+    assert count() == before and 'id="boxf"' in page  # looked and went back: no box
+    assert c.get(f"/b/{bid}/label.png").headers["content-type"] == "image/png"  # the label shows before the box exists
+    assert c.get(f"/b/{bid}").status_code == 404
+    r = c.post(f"/b/{bid}", data={"name": "Макетки"}, headers={"X-Autosave": "1"})  # the first typed name saves it
+    assert r.status_code == 200 and count() == before + 1 and "Макетки" in c.get("/boxes").text
+    assert c.post("/b/NOPE!", data={"name": "x"}).status_code == 404  # only IDs the site hands out
+
+    c.post("/places", data={"name": "Стеллаж"})
+    pid = core.db().execute("SELECT id FROM places WHERE name='Стеллаж'").fetchone()[0]
+    r = c.post(f"/places/{pid}/shelves", data={"name": "Верхняя"}, follow_redirects=False)
+    assert r.headers["location"].startswith("/places")  # no label: stay among the places
+    r = c.post(f"/places/{pid}/shelves", data={"label": "1"}, follow_redirects=False)
+    shelf = r.headers["location"].split("/")[-1]  # with a label: its page, to print and write the tag
+    page = c.get(f"/b/{shelf}").text
+    assert "Полка 2" in page and "label.png" in page and "Стоит внутри другой" not in page  # shelves do not move
+    boxes = c.get("/boxes").text
+    assert "Верхняя" not in boxes and "Полка 2" not in boxes  # shelves live in places, not among boxes
+
+    c.post(f"/b/{bid}", data={"name": "Макетки", "parent_id": shelf}, headers={"X-Autosave": "1"})
+    places = c.get("/places").text
+    assert places.index("Стеллаж") < places.index("Верхняя") < places.index("Полка 2") < places.index("Макетки")
+    assert f'<option value="Стеллаж › Полка 2 ({shelf})">' in c.get(f"/b/{bid}").text  # «Полка 2» is in every cabinet
+
+
 def test_old_stock_table_migrates(tmp_path, monkeypatch):
-    """A database from before «не считал» keeps its stock and takes qty NULL after a restart."""
+    """A database from before «не считал» and shelves keeps its stock and takes qty NULL and shelves after a restart."""
     monkeypatch.setattr(core, "DATA", tmp_path)
-    old = core.SCHEMA.replace("qty INTEGER CHECK (qty IS NULL OR qty > 0)", "qty INTEGER NOT NULL CHECK (qty > 0)")
+    old = core.SCHEMA.replace("qty INTEGER CHECK (qty IS NULL OR qty > 0)", "qty INTEGER NOT NULL CHECK (qty > 0)"
+                              ).replace("kind TEXT NOT NULL DEFAULT 'box',", "")  # and boxes from before shelves
     assert old != core.SCHEMA
     with core.db() as d:
         d.executescript(old)
@@ -165,3 +197,4 @@ def test_old_stock_table_migrates(tmp_path, monkeypatch):
     with core.db() as d:
         d.execute("INSERT INTO stock(box_id, item_id, qty) VALUES ('OLD01', 2, NULL)")
         assert [tuple(r) for r in d.execute("SELECT item_id, qty FROM stock ORDER BY item_id")] == [(1, 7), (2, None)]
+        assert d.execute("SELECT kind FROM boxes").fetchone()[0] == "box"

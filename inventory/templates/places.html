@@ -3,8 +3,11 @@
 <h1>{{ t.places }}</h1>
 <form method="post" action="/places" class="row"><input name="name" placeholder="например: шкаф в комнате" required><button>Добавить</button></form>
 {% for p in places %}
-<div class="card"><b>{{ p.name }}</b>{% if p.note %} <span class="mut">{{ p.note }}</span>{% endif %}
-  <div>{% for b in p.boxes %}{{ box_link(b.id, b.name) }}{% if not loop.last %}, {% endif %}{% else %}<span class="mut">пусто</span>{% endfor %}</div>
+<div class="card" id="p{{ p.id }}"><b>{{ p.name }}</b>{% if p.note %} <span class="mut">{{ p.note }}</span>{% endif %}
+  {% for s in p.shelves %}<div>{{ box_link(s.id, s.name) }}{% for b in s.boxes %}{{ ":" if loop.first else "," }} {{ box_link(b.id, b.name) }}{% endfor %}</div>{% endfor %}
+  <div>{% for b in p.boxes %}{{ box_link(b.id, b.name) }}{% if not loop.last %}, {% endif %}{% else %}{% if not p.shelves %}<span class="mut">пусто</span>{% endif %}{% endfor %}</div>
+  <form method="post" action="/places/{{ p.id }}/shelves" class="row"><input name="name" placeholder="{{ t.shelf }} {{ p.shelves|length + 1 }}">
+    <button class="ghost">+ {{ t.shelf }}</button><button class="ghost" name="label" value="1">+ с наклейкой</button></form>
   <details><summary>изменить</summary><form method="post" action="/places/{{ p.id }}">
     <input name="name" value="{{ p.name }}" required><label>Заметка</label><input name="note" value="{{ p.note }}"><p><button>Сохранить</button></p></form></details>
 </div>

@@ -16,6 +16,8 @@ terms:
   items: Предметы
   place: Место
   places: Места
+  shelf: Полка
+  shelves: Полки
   unit: шт
 
 item_fields:

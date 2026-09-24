@@ -81,7 +81,7 @@ function gotBox(id) {
   const o = [...document.querySelectorAll("#boxlist option")].find(o => o.value === id || o.value.endsWith(` (${id})`)), label = o ? o.value : id;
   // empty, being typed in or asked for by its button: fill; a box already chosen: ask first
   if (f.value !== label && (f === armed || !f.value || f === document.activeElement || confirm(`Изменить коробку на ${label}?`))) {
-    f.value = label; f.dispatchEvent(new Event("input", {bubbles: true}));
+    f.value = label; f.dispatchEvent(new Event("input", {bubbles: true})); f.dispatchEvent(new Event("change", {bubbles: true}));
   }
   armed = null; document.querySelectorAll(".mini.on").forEach(b => b.classList.remove("on"));
 }

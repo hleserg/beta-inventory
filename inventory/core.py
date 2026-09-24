@@ -29,6 +29,7 @@ CREATE TABLE IF NOT EXISTS places(
   id INTEGER PRIMARY KEY, name TEXT NOT NULL UNIQUE, note TEXT NOT NULL DEFAULT '');
 CREATE TABLE IF NOT EXISTS boxes(
   id TEXT PRIMARY KEY, name TEXT NOT NULL DEFAULT '',
+  kind TEXT NOT NULL DEFAULT 'box',
   place_id INTEGER REFERENCES places(id) ON DELETE SET NULL,
   parent_id TEXT REFERENCES boxes(id) ON DELETE SET NULL,
   created_at TEXT NOT NULL DEFAULT (datetime('now','localtime')));
@@ -110,6 +111,8 @@ def init():
             # stock from before «не считал»: SQLite changes a CHECK only by rebuilding the table
             c.executescript("BEGIN; ALTER TABLE stock RENAME TO stock_v0;" + STOCK +
                             "INSERT INTO stock SELECT * FROM stock_v0; DROP TABLE stock_v0; COMMIT;")
+        if "kind" not in [r["name"] for r in c.execute("PRAGMA table_info(boxes)")]:  # boxes from before shelves
+            c.execute("ALTER TABLE boxes ADD COLUMN kind TEXT NOT NULL DEFAULT 'box'")
     if SEM_MODEL:
         threading.Thread(target=_load_model, daemon=True).start()
 
@@ -154,14 +157,30 @@ def item_fields(row):
     return json.loads(row["fields"])
 
 
+def new_id():
+    return "".join(secrets.choice(ID_ALPHABET) for _ in range(5))
+
+
+def is_box_id(s):
+    return len(s) == 5 and set(s) <= set(ID_ALPHABET)
+
+
 def new_boxes(n):
     ids = []
     with db() as c:
         while len(ids) < n:
-            bid = "".join(secrets.choice(ID_ALPHABET) for _ in range(5))
+            bid = new_id()
             if c.execute("INSERT OR IGNORE INTO boxes(id) VALUES (?)", (bid,)).rowcount:
                 ids.append(bid)
     return ids
+
+
+def free_box_id():
+    """An ID for a box not made yet: «+ Коробка» shows it, the first save makes the box."""
+    with db() as c:
+        while c.execute("SELECT 1 FROM boxes WHERE id=?", (bid := new_id(),)).fetchone():
+            pass
+    return bid
 
 
 def box_where(c, box_id):
@@ -172,7 +191,7 @@ def box_where(c, box_id):
         seen.add(b["parent_id"])
         b = c.execute("SELECT * FROM boxes WHERE id=?", (b["parent_id"],)).fetchone()
         if b:
-            parts.insert(0, b["id"] + (f" {b['name']}" if b["name"] else ""))
+            parts.insert(0, b["name"] or b["id"])
     if b and b["place_id"]:
         p = c.execute("SELECT name FROM places WHERE id=?", (b["place_id"],)).fetchone()
         parts.insert(0, p["name"])

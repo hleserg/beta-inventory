@@ -7,7 +7,7 @@ from urllib.parse import urlsplit
 from types import SimpleNamespace
 
 import qrcode
-from fastapi import FastAPI, Form, Request
+from fastapi import FastAPI, Form, Header, Request
 from fastapi.responses import FileResponse, JSONResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -35,9 +35,11 @@ T.env.globals.update(
     pk=next((f["key"] for f in PROFILE["item_fields"] if f["type"] == "photo"), None))
 
 
-def all_boxes():  # for box fields: named first, by name
+def all_boxes():  # for box fields: named first, by name; a shelf carries its cabinet, «Полка 2» is in every one
     with db() as c:
-        return c.execute("SELECT id, name FROM boxes ORDER BY name IS NULL OR name='', name, id").fetchall()
+        return c.execute("SELECT * FROM (SELECT b.id, CASE WHEN b.kind='shelf' AND p.name IS NOT NULL "
+                         "THEN p.name || ' › ' || b.name ELSE b.name END AS name "
+                         "FROM boxes b LEFT JOIN places p ON p.id=b.place_id) ORDER BY name IS NULL OR name='', name, id").fetchall()
 
 
 T.env.globals["all_boxes"] = all_boxes
@@ -105,7 +107,7 @@ def boxes(req: Request, new: str = ""):
     with db() as c:
         rows = [dict(b, where=core.box_where(c, b["id"])) for b in c.execute(
             "SELECT b.*, COUNT(s.item_id) AS n FROM boxes b LEFT JOIN stock s ON s.box_id=b.id "
-            "GROUP BY b.id ORDER BY b.created_at DESC, b.id")]
+            "WHERE b.kind='box' GROUP BY b.id ORDER BY b.created_at DESC, b.id")]
     return page(req, "boxes.html", boxes=rows, new=[x for x in new.split(",") if x])
 
 
@@ -114,24 +116,44 @@ def boxes_create(n: int = Form(1)):
     return go("/boxes?new=" + ",".join(core.new_boxes(max(1, min(n, 100)))))
 
 
+@app.get("/boxes/new")
+def box_new(req: Request):
+    """«+ Коробка»: the page of a box not made yet. Leave untouched and there is no box; box_save makes it."""
+    return box_page(req, dict(id=core.free_box_id(), name="", kind="box", place_id=None, parent_id=None), draft=True)
+
+
+def valid_box_id(s):
+    """A box the site knows or could have handed out (a «+ Коробка» page not saved yet)."""
+    if not core.is_box_id(s := s.strip().upper()):
+        raise HTTPException(404, f"Нет коробки {s}")
+    return s
+
+
 @app.get("/b/{box_id}")
 @app.get("/B/{box_id}")  # QR codes carry upper-case URLs
 def box(req: Request, box_id: str):
     with db() as c:
-        b = get_box(c, box_id)
+        return box_page(req, get_box(c, box_id))
+
+
+def box_page(req, b, draft=False):
+    with db() as c:
         contents = core.box_contents(c, b["id"])
         children = c.execute("SELECT * FROM boxes WHERE parent_id=? ORDER BY id", (b["id"],)).fetchall()
         places = c.execute("SELECT * FROM places ORDER BY name").fetchall()
         return page(req, "box.html", b=b, where=core.box_where(c, b["id"]), contents=contents,
-                    children=children, places=places, projects=core.projects(c),
+                    children=children, places=places, projects=core.projects(c), draft=draft,
                     nfc=f"{public_base(req)}/b/{b['id']}".lower())  # NFC Tools writes it as typed
 
 
 @app.post("/b/{box_id}")
-def box_save(box_id: str, name: str = Form(""), place: str = Form(""), parent_id: str = Form("")):
+def box_save(box_id: str, name: str = Form(""), place: str = Form(""), parent_id: str = Form(""),
+             x_autosave: str = Header("")):
+    bid = valid_box_id(box_id)
     parent = core.find_box(parent_id) if parent_id.strip() else None
-    with db() as c:
-        b = get_box(c, box_id)
+    with db() as c:  # an error rolls the insert back: a draft stays a draft
+        c.execute("INSERT OR IGNORE INTO boxes(id) VALUES (?)", (bid,))
+        b = get_box(c, bid)
         p = parent
         while p:  # parent must exist and must not sit inside this box
             if p == b["id"]:
@@ -141,8 +163,14 @@ def box_save(box_id: str, name: str = Form(""), place: str = Form(""), parent_id
         if place.strip() and not parent:  # a new name makes the place, so a first box needs no trip to places
             c.execute("INSERT OR IGNORE INTO places(name) VALUES (?)", (place.strip(),))
             place_id = c.execute("SELECT id FROM places WHERE name=?", (place.strip(),)).fetchone()["id"]
-        c.execute("UPDATE boxes SET name=?, place_id=?, parent_id=? WHERE id=?", (name.strip(), place_id, parent, b["id"]))
-    return go(f"/b/{b['id']}")
+        if b["kind"] == "shelf":  # a shelf stays in its cabinet: only the name changes
+            c.execute("UPDATE boxes SET name=? WHERE id=?", (name.strip() or b["name"], bid))
+        else:
+            c.execute("UPDATE boxes SET name=?, place_id=?, parent_id=? WHERE id=?", (name.strip(), place_id, parent, bid))
+        where = core.box_where(c, bid)
+    if x_autosave:  # box.html saves as you type and redraws the heading
+        return {"id": bid, "name": name.strip(), "where": where}
+    return go(f"/b/{bid}")
 
 
 @app.post("/b/{box_id}/clear")
@@ -154,10 +182,8 @@ def box_clear(box_id: str):
 
 
 @app.get("/b/{box_id}/label.png")
-def label(req: Request, box_id: str):
-    with db() as c:
-        b = get_box(c, box_id)
-    return Response(label_png(b["id"], public_base(req)), media_type="image/png")
+def label(req: Request, box_id: str):  # a «+ Коробка» page shows it before the box is saved
+    return Response(label_png(valid_box_id(box_id), public_base(req)), media_type="image/png")
 
 
 def public_base(req):
@@ -339,8 +365,11 @@ def phone(req: Request):
 @app.get("/places")
 def places(req: Request):
     with db() as c:
-        rows = [dict(p, boxes=c.execute("SELECT * FROM boxes WHERE place_id=? AND parent_id IS NULL ORDER BY id",
-                                        (p["id"],)).fetchall())
+        inside = lambda bid: c.execute("SELECT * FROM boxes WHERE parent_id=? ORDER BY name='', name, id", (bid,)).fetchall()
+        rows = [dict(p, boxes=c.execute("SELECT * FROM boxes WHERE place_id=? AND parent_id IS NULL AND kind='box' "
+                                        "ORDER BY name='', name, id", (p["id"],)).fetchall(),
+                     shelves=[dict(s, boxes=inside(s["id"])) for s in c.execute(
+                         "SELECT * FROM boxes WHERE place_id=? AND kind='shelf' ORDER BY rowid", (p["id"],))])
                 for p in c.execute("SELECT * FROM places ORDER BY name")]
     return page(req, "places.html", places=rows)
 
@@ -350,6 +379,19 @@ def place_add(name: str = Form(), note: str = Form("")):
     with db() as c:
         c.execute("INSERT OR IGNORE INTO places(name, note) VALUES (?, ?)", (name.strip(), note.strip()))
     return go("/places")
+
+
+@app.post("/places/{place_id}/shelves")
+def shelf_add(place_id: int, name: str = Form(""), label: str = Form("")):
+    """Shelves come one at a time, from their cabinet; with a label, straight to its page to print and write it."""
+    with db() as c:
+        if not c.execute("SELECT 1 FROM places WHERE id=?", (place_id,)).fetchone():
+            raise HTTPException(404, "Нет такого места")
+        n = c.execute("SELECT count(*) FROM boxes WHERE place_id=? AND kind='shelf'", (place_id,)).fetchone()[0]
+        bid = core.free_box_id()
+        c.execute("INSERT INTO boxes(id, name, kind, place_id) VALUES (?, ?, 'shelf', ?)",
+                  (bid, name.strip() or f"{PROFILE['terms']['shelf']} {n + 1}", place_id))
+    return go(f"/b/{bid}" if label else f"/places#p{place_id}")
 
 
 @app.post("/places/{place_id}")
