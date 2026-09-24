@@ -8,7 +8,7 @@ from mcp import Client
 from inventory import core, mcp_server
 from inventory.app import app
 from inventory.mcp_server import server
-from test_flow import photo
+from test_flow import newest, photo
 
 
 def call(tool, **args):
@@ -21,9 +21,9 @@ def call(tool, **args):
 def test_read_tools():
     c = TestClient(app)
     box = core.new_boxes(1)[0]
-    r = c.post("/items/new?type=resistor", follow_redirects=False,
-               data={"name": "220R", "aliases": "токоограничительный", "value": "220 Ом", "box": box, "qty": "7"})
-    iid = int(r.headers["location"].rsplit("/", 1)[1])
+    c.post("/items/new?type=resistor", follow_redirects=False,
+           data={"name": "220R", "aliases": "токоограничительный", "value": "220 Ом", "box": box, "qty": "7"})
+    iid = newest()
 
     hit = call("search", query="токоограничительный").structured_content["items"][0]
     assert hit["id"] == iid and hit["stock"][0]["qty"] == 7
@@ -48,8 +48,8 @@ def test_http():
 def test_stock_tools():
     c = TestClient(app)
     box = core.new_boxes(1)[0]
-    r = c.post("/items/new?type=resistor", follow_redirects=False, data={"name": "1k", "value": "1 кОм", "box": box, "qty": "7"})
-    iid = int(r.headers["location"].rsplit("/", 1)[1])
+    c.post("/items/new?type=resistor", follow_redirects=False, data={"name": "1k", "value": "1 кОм", "box": box, "qty": "7"})
+    iid = newest()
     c.post("/projects", data={"name": "Часы"})
     pid = next(p["id"] for p in call("list_projects").structured_content["projects"] if p["name"] == "Часы")
 
@@ -61,6 +61,8 @@ def test_stock_tools():
     assert err.is_error and "только 5" in err.content[0].text  # core's own words reach the agent
     err = call("change_stock", box_id=box, item_id=iid, action="take", qty=1, agent="Мара", project_id=9999)
     assert err.is_error and "list_projects" in err.content[0].text
+    loose = call("change_stock", box_id=box, item_id=iid, action="put", qty=None, agent="Мара")
+    assert loose.structured_content["qty"] is None  # a handful more, uncounted: «есть, не считал»
     assert call("change_stock", box_id=box, item_id=iid, action="count", qty=10, agent="Мара"
                 ).structured_content["qty"] == 10
 

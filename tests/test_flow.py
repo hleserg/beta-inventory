@@ -17,6 +17,10 @@ def photo():
     return {"photo": ("p.png", b.getvalue(), "image/png")}
 
 
+def newest():
+    return core.db().execute("SELECT max(id) FROM items").fetchone()[0]
+
+
 def test_main_path():
     assert core.PROFILE["terms"]["items"] in c.get("/items").text  # t.items once rendered dict.items
     assert c.post("/places", data={"name": "Шкаф"}).status_code == 200
@@ -33,8 +37,8 @@ def test_main_path():
     r = c.post("/items/new?type=module", files=photo(), follow_redirects=False,
                data={"name": "MP1584 mini buck", "aliases": "понижайка", "pinout": "IN+ IN- OUT+ OUT-",
                      "box": box, "qty": "5"})
-    assert r.status_code == 303
-    iid = r.headers["location"].rsplit("/", 1)[1]
+    assert r.headers["location"] == f"/b/{box}"  # put in a box: back to the box, the next item goes in
+    iid = newest()
     pic = json.loads(core.db().execute("SELECT fields FROM items WHERE id=?", (iid,)).fetchone()["fields"])["photo"]
     r = c.post(f"/i/{iid}/edit?type=module", follow_redirects=False, data={
         "name": "MP1584 mini buck", "aliases": "понижайка", "pinout": "IN+ IN- OUT+ OUT-", "photo__keep": pic,
@@ -105,7 +109,7 @@ def test_uncounted():
     box = core.new_boxes(1)[0]
     r = c.post("/items/new?type=resistor", data={"name": "1k россыпь", "value": "1 кОм", "box": box, "qty": ""},
                follow_redirects=False)
-    rid = r.headers["location"].rsplit("/", 1)[1]
+    rid = newest()
     assert "есть, не считал" in c.get(f"/b/{box}").text and "есть, не считал" in c.get("/items").text
     assert c.post("/stock", data={"box": box, "item": rid, "action": "take", "qty": 3}).status_code == 200
     assert "есть, не считал" in c.get(f"/i/{rid}").text  # taking some leaves the pile uncounted

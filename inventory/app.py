@@ -257,7 +257,7 @@ async def item_create(req: Request, type: str):
     iid = core.save_item(None, name, type, f)
     if box_id and (not qty or int(qty) > 0):  # empty: «есть, не считал»
         core.move(iid, box_id, int(qty) if qty else None, "put", AUTHOR)
-    return go(f"/i/{iid}")
+    return go(f"/b/{box_id}" if box_id else f"/i/{iid}")  # filling a box: back to it for the next item
 
 
 @app.get("/i/{item_id}")
