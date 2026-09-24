@@ -2,7 +2,6 @@
 import io
 import json
 import os
-import uuid
 from pathlib import Path
 from urllib.parse import urlsplit
 from types import SimpleNamespace
@@ -14,7 +13,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from markdown_it import MarkdownIt
 from markupsafe import Markup
-from PIL import Image, ImageDraw, ImageFont, ImageOps
+from PIL import Image, ImageDraw, ImageFont
 from starlette.exceptions import HTTPException
 
 from . import core
@@ -71,10 +70,6 @@ def get_item(c, item_id):
     return it
 
 
-def projects(c):
-    return c.execute("SELECT id, name FROM projects WHERE status='active' ORDER BY name").fetchall()
-
-
 # --- search / home ---
 
 @app.get("/")
@@ -110,7 +105,7 @@ def box(req: Request, box_id: str):
         children = c.execute("SELECT * FROM boxes WHERE parent_id=? ORDER BY id", (b["id"],)).fetchall()
         places = c.execute("SELECT * FROM places ORDER BY name").fetchall()
         return page(req, "box.html", b=b, where=core.box_where(c, b["id"]), contents=contents,
-                    children=children, places=places, projects=projects(c),
+                    children=children, places=places, projects=core.projects(c),
                     nfc=f"{public_base(req)}/b/{b['id']}".lower())  # NFC Tools writes it as typed
 
 
@@ -175,28 +170,13 @@ def label_png(box_id, base):
 # --- items ---
 
 def save_upload(up, photo=False):
-    ext, data = Path(up.filename).suffix.lower()[:10], up.file.read()
-    if photo:  # phones shoot 5-10 MB; shrink so pages stay fast
-        try:
-            im = ImageOps.exif_transpose(Image.open(io.BytesIO(data)))
-            im.thumbnail((1600, 1600))
-            buf = io.BytesIO()
-            im.convert("RGB").save(buf, "JPEG", quality=85)
-            data, ext = buf.getvalue(), ".jpg"
-        except OSError:
-            pass  # Pillow can't read it (HEIC…) — keep the original
-    name = uuid.uuid4().hex + ext
-    (core.UPLOADS / name).write_bytes(data)
-    return name
+    return core.save_bytes(up.file.read(), Path(up.filename).suffix.lower()[:10], photo)
 
 
 async def read_fields(req, old, fields):
     """Card form → (name, fields, errors, form), driven entirely by the profile."""
     form = await req.form()
-    f, errors = dict(old), []
-    name = str(form.get("name", "")).strip()
-    if not name:
-        errors.append("Название: обязательно")
+    f = dict(old)
     for fd in fields:
         k, typ = fd["key"], fd["type"]
         if typ == "photo":
@@ -210,17 +190,9 @@ async def read_fields(req, old, fields):
                 if getattr(up, "filename", ""):
                     f.setdefault(k, []).append({"name": up.filename, "file": save_upload(up)})
         else:
-            v = str(form.get(k, "")).strip()
-            if typ == "number" and v:
-                try:
-                    v = float(v.replace(",", "."))
-                    v = int(v) if v.is_integer() else v
-                except ValueError:
-                    errors.append(f"{fd['label']}: нужно число")
-            f[k] = v
-        if fd.get("required") and f.get(k) in (None, "", []):
-            errors.append(f"{fd['label']}: обязательно")
-    return name, f, errors, form
+            f[k] = str(form.get(k, "")).strip()
+    name = str(form.get("name", "")).strip()
+    return name, f, core.clean_fields(name, fields, f), form
 
 
 @app.get("/items")
@@ -278,7 +250,7 @@ def item(req: Request, item_id: int):
     with db() as c:
         it = get_item(c, item_id)
         return page(req, "item.html", it=it, f=json.loads(it["fields"]), fields=core.fields_for(it["type"]),
-                    stock=core.stock_of_item(c, item_id), projects=projects(c),
+                    stock=core.stock_of_item(c, item_id), projects=core.projects(c),
                     history=c.execute(MOVES + " WHERE m.item_id=? ORDER BY m.id DESC LIMIT 50", (item_id,)).fetchall())
 
 
@@ -309,17 +281,9 @@ async def item_update(req: Request, item_id: int, type: str):
 @app.post("/stock")
 def stock(box: str = Form(), item: int = Form(), action: str = Form(), qty: int = Form(1),
           kind: str = Form("put"), project: str = Form(""), back: str = Form("/")):
-    box = box.strip().upper()
-    if action == "set":
-        with db() as c:
-            row = c.execute("SELECT qty FROM stock WHERE box_id=? AND item_id=?", (box, item)).fetchone()
-        core.move(item, box, max(qty, 0) - (row["qty"] if row else 0), "count", AUTHOR)
-    elif qty < 1:
-        raise ValueError("Количество должно быть больше нуля")
-    elif action == "take":
-        core.move(item, box, -qty, "take", AUTHOR, int(project) if project else None)
-    else:
-        core.move(item, box, qty, kind if kind in ("put", "return", "buy") else "put", AUTHOR)
+    if action != "take":
+        action = "count" if action == "set" else kind if kind in ("put", "return", "buy") else "put"
+    core.change_stock(box, item, action, qty, AUTHOR, int(project) if project and action == "take" else None)
     return go(back if back.startswith("/") and not back.startswith("//") else "/")
 
 

@@ -1,13 +1,16 @@
 """Storage, profile, search and stock movements. Shared by the web pages and (later) MCP."""
+import io
 import json
 import os
 import secrets
 import sqlite3
 import threading
+import uuid
 from pathlib import Path
 
 import numpy as np
 import yaml
+from PIL import Image, ImageOps
 
 ROOT = Path(__file__).resolve().parent.parent
 DATA = Path(os.environ.get("DATA_DIR", ROOT / "data"))
@@ -193,6 +196,55 @@ def move(item_id, box_id, delta, kind, author, project_id=None, note=""):
                   "VALUES (?,?,?,?,?,?,?)", (item_id, box_id, delta, kind, project_id, author, note))
     return qty
 
+
+def change_stock(box_id, item_id, action, qty, author, project_id=None):
+    """A stock change as people say it: put/return/buy/take qty, or count: the box holds qty now."""
+    box_id = box_id.strip().upper()
+    if action == "count":
+        with db() as c:
+            row = c.execute("SELECT qty FROM stock WHERE box_id=? AND item_id=?", (box_id, item_id)).fetchone()
+        return move(item_id, box_id, max(qty, 0) - (row["qty"] if row else 0), "count", author)
+    if action not in ("put", "return", "buy", "take"):
+        raise ValueError(f"нет действия {action}: put, return, buy, take, count")
+    if qty < 1:
+        raise ValueError("Количество должно быть больше нуля")
+    return move(item_id, box_id, -qty if action == "take" else qty, action, author, project_id)
+
+
+def projects(c):
+    return c.execute("SELECT id, name FROM projects WHERE status='active' ORDER BY name").fetchall()
+
+
+def clean_fields(name, fields, f):
+    """Card check shared by the site and MCP: numbers parsed in place, required fields present. → errors."""
+    errors = [] if name.strip() else ["Название: обязательно"]
+    for fd in fields:
+        k, v = fd["key"], f.get(fd["key"])
+        if fd["type"] == "number" and isinstance(v, str) and v.strip():
+            try:
+                v = float(v.strip().replace(",", "."))
+                f[k] = int(v) if v.is_integer() else v
+            except ValueError:
+                errors.append(f"{fd['label']}: нужно число")
+        if fd.get("required") and f.get(k) in (None, "", []):
+            errors.append(f"{fd['label']}: обязательно")
+    return errors
+
+
+def save_bytes(data, ext, photo=False):
+    """Store an upload, return its name under /u/. Photos: phones shoot 5-10 MB, shrink so pages stay fast."""
+    if photo:
+        try:
+            im = ImageOps.exif_transpose(Image.open(io.BytesIO(data)))
+            im.thumbnail((1600, 1600))
+            buf = io.BytesIO()
+            im.convert("RGB").save(buf, "JPEG", quality=85)
+            data, ext = buf.getvalue(), ".jpg"
+        except OSError:
+            pass  # Pillow can't read it (HEIC…) — keep the original
+    name = uuid.uuid4().hex + ext
+    (UPLOADS / name).write_bytes(data)
+    return name
 
 def clear_box(box_id, author):
     """Empty the box for reuse: stock out with 'clear' movements, child boxes move up a level."""
