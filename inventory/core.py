@@ -233,7 +233,8 @@ def move(item_id, box_id, delta, kind, author, project_id=None, note=""):
     """The only way stock changes: updates the box×item quantity and logs a movement.
 
     delta None puts some in without counting: the pair's qty becomes None, «есть, не считал». Puts and takes
-    keep such a pair uncounted (the movement still logs their delta); count and clear give it a number again.
+    keep such a pair uncounted (the movement still logs their delta); count and clear give it a number again,
+    and so does a return: «вернул 1» on a thing made without a count means there is one (№34).
     """
     if kind not in KINDS:
         raise ValueError(f"unknown kind {kind}")
@@ -244,6 +245,8 @@ def move(item_id, box_id, delta, kind, author, project_id=None, note=""):
             raise ValueError(f"нет позиции {item_id}")
         row = c.execute("SELECT qty FROM stock WHERE box_id=? AND item_id=?", (box_id, item_id)).fetchone()
         old = row["qty"] if row else 0
+        if old is None and kind == "return" and delta:
+            old = 0
         if delta is None or old is None and kind not in ("count", "clear"):
             qty, note = None, note or "не считал"
         else:

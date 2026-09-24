@@ -125,6 +125,8 @@ def test_uncounted():
     assert "40 шт" in c.get(f"/b/{box}").text  # counted: a number again
     c.post("/stock", data={"box": box, "item": rid, "action": "add", "kind": "put", "qty": ""})
     assert "есть, не считал" in c.get(f"/b/{box}").text  # a handful more, uncounted
+    c.post("/stock", data={"box": box, "item": rid, "action": "add", "kind": "return", "qty": 2})
+    assert "2 шт" in c.get(f"/b/{box}").text  # «вернул 2» to an uncounted pair: now there are 2 (№34)
     c.post(f"/b/{box}/clear")
     assert "Что кладём" in c.get(f"/b/{box}").text
 
