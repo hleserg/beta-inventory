@@ -1,6 +1,6 @@
 """MCP for agents: the same inventory as the site. Mounted by app.py at /mcp (streamable HTTP)."""
 import os
-from typing import Any
+from typing import Any, Literal
 
 from mcp.server.mcpserver import MCPServer
 from mcp.server.mcpserver.exceptions import ToolError  # plain exceptions reach the agent without their text
@@ -12,11 +12,13 @@ from .core import PROFILE, db
 BASE = os.environ.get("PUBLIC_BASE_URL", "").rstrip("/")  # empty: links come out as site paths
 T = PROFILE["terms"]
 READ = ToolAnnotations(readOnlyHint=True, openWorldHint=False)
+LOGGED = ToolAnnotations(readOnlyHint=False, destructiveHint=False, openWorldHint=False)  # history keeps every change
 
 server = MCPServer("inventory", instructions=(
     f"Home inventory «{PROFILE['name']}». {T['items']} (items) lie in {T['boxes']} (boxes); a box has a 5-char id "
     f"printed on its label, may sit in another box and stands in a {T['place']} (place). Quantity belongs to the "
     "box×item pair. Start with search; card fields are defined by the profile, see card_template. "
+    "Stock changes go through change_stock under your name. "
     "Data is in the profile's language: answer the user in it."))
 
 
@@ -89,3 +91,32 @@ def card_template(type: str = "") -> dict[str, Any]:
     if type not in core.TYPES:
         raise ToolError(f"Unknown type {type!r}. Call card_template without type for the list.")
     return {"type": type, "label": core.type_label(type), "fields": core.fields_for(type)}
+
+
+@server.tool(annotations=READ)
+def list_projects() -> dict[str, Any]:
+    """Active projects, for project_id when stock is taken for a project."""
+    with db() as c:
+        return {"projects": [dict(p) for p in core.projects(c)]}
+
+
+@server.tool(annotations=LOGGED)
+def change_stock(box_id: str, item_id: int, action: Literal["put", "return", "buy", "take", "count"], qty: int,
+                 agent: str, project_id: int | None = None) -> dict[str, Any]:
+    """Change how many of an item lie in a box. Every change goes to history with agent as the author.
+
+    put / return / buy: qty more in the box; take: qty out, project_id says what for (list_projects);
+    count: the box holds exactly qty now (stocktaking). agent: your name as the user knows you.
+    Returns the new qty in the box.
+    """
+    if not agent.strip():
+        raise ToolError("agent is empty: pass your name, it is shown as the author in history.")
+    if project_id is not None:
+        with db() as c:
+            if not c.execute("SELECT 1 FROM projects WHERE id=?", (project_id,)).fetchone():
+                raise ToolError(f"No project {project_id}. Call list_projects.")
+    try:
+        qty = core.change_stock(box_id, item_id, action, qty, agent.strip(), project_id)
+    except ValueError as e:
+        raise ToolError(f"{e}. Check the box with get_box, the item with get_item.") from None
+    return {"box_id": box_id.strip().upper(), "item_id": item_id, "qty": qty}

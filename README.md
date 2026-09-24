@@ -60,7 +60,8 @@ weight.
   model adds items close in meaning, so "step-down" finds a buck converter.
 - **Projects** with a git link, to charge takes against.
 - **MCP for agents** at `http://<host>/mcp` (streamable HTTP, same port and
-  data as the site): `search`, `get_item`, `get_box`, `card_template`.
+  data as the site): `search`, `get_item`, `get_box`, `card_template`,
+  `list_projects`; `change_stock` writes history with the agent as the author.
 
 ## Planned
 
