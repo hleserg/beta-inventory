@@ -29,6 +29,7 @@
   </form>
   <p><img src="/b/{{ b.id }}/label.png" alt="наклейка" style="width:240px;max-width:100%;background:#fff;border:1px solid var(--line)"><br>
   <a href="/b/{{ b.id }}/label.png" download="{{ b.id }}.png">Скачать наклейку</a></p>
+  <label>Ссылка для NFC-метки</label><input readonly value="{{ nfc }}" onfocus="this.select()">
   {% if contents %}<form method="post" action="/b/{{ b.id }}/clear" onsubmit="return confirm('Всё содержимое спишется в историю. Освободить?')"><button class="bad">Освободить</button></form>{% endif %}
 </details>
 {% endblock %}

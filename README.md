@@ -18,20 +18,12 @@ inventory and write new part cards for you.
 
 ```sh
 git clone https://github.com/hleserg/beta-inventory && cd beta-inventory
+cp .env.example .env             # settings, all in one file
 docker compose up -d --build     # http://localhost:8000
 ```
 
-Settings go in a `.env` file next to `compose.yaml`:
-
-| Variable | Default | What it does |
-|---|---|---|
-| `PORT` | `8000` | Port on the host |
-| `PUBLIC_BASE_URL` | the URL you opened | Address printed into label QR codes, e.g. `HTTP://INV.LAN` (uppercase keeps the QR small) |
-| `TZ` | `UTC` | Time zone for the history, POSIX form such as `MSK-3` |
-| `LABEL_W_MM`, `LABEL_H_MM`, `LABEL_DPI` | `25`, `15`, `300` | Label image size |
-| `SEMANTIC_MODEL` | multilingual MiniLM-L12 | Local model for search by meaning (fastembed); empty turns it off |
-| `SEMANTIC_MIN` | `0.35` | How close in meaning an item must be to show up |
-| `PIP_INDEX_URL` | PyPI | Package mirror for the build |
+Settings: `cp .env.example .env` and edit. Every setting is listed there with
+a comment; the code only holds defaults.
 
 Data (SQLite, photos, files, the search model) lives in `./data`. On first
 start the search model (~240 MB) downloads there; until it is ready, search

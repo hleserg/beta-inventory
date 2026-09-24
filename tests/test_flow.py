@@ -25,7 +25,7 @@ def test_main_path():
     assert core.PROFILE["terms"]["items"] in c.get("/items").text  # t.items once rendered dict.items
     assert c.post("/places", data={"name": "Шкаф"}).status_code == 200
     box = c.post("/boxes", data={"n": 1}, follow_redirects=False).headers["location"].split("=")[1]
-    assert c.get(f"/B/{box.lower()}").status_code == 200  # QR URL, any case
+    assert f"http://testserver/b/{box.lower()}" in c.get(f"/B/{box.lower()}").text  # QR URL, any case; NFC link
     assert c.get(f"/b/{box}/label.png").headers["content-type"] == "image/png"
 
     # module: photo and pinout required; resistor: photo optional (type overrides the common field)

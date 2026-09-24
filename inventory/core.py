@@ -82,8 +82,8 @@ WEIGHTS = {k: {f["key"]: int(f["search"]) for f in fields_for(k) if f.get("searc
 # Off with SEMANTIC_MODEL= ; keyword search works alone while the model loads or if it can't.
 SEM_MODEL = os.environ.get("SEMANTIC_MODEL", "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2")
 SEM_MIN = float(os.environ.get("SEMANTIC_MIN", "0.35"))  # cosine floor; tune on real data
-SEM_MARGIN = 0.08  # and no further than this below the best match: cut noise 4x on 22 test queries
-SEM_TOP = 5
+SEM_MARGIN = float(os.environ.get("SEMANTIC_MARGIN", "0.08"))  # and no further than this below the best match: cut noise 4x on 22 test queries
+SEM_TOP = int(os.environ.get("SEMANTIC_TOP", "5"))
 _sem = {"model": None, "vecs": {}}  # vecs: item_id -> (embedded text, unit vector)
 
 

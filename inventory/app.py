@@ -107,7 +107,8 @@ def box(req: Request, box_id: str):
         children = c.execute("SELECT * FROM boxes WHERE parent_id=? ORDER BY id", (b["id"],)).fetchall()
         places = c.execute("SELECT * FROM places ORDER BY name").fetchall()
         return page(req, "box.html", b=b, where=core.box_where(c, b["id"]), contents=contents,
-                    children=children, places=places, projects=projects(c))
+                    children=children, places=places, projects=projects(c),
+                    nfc=f"{public_base(req)}/b/{b['id']}".lower())  # NFC Tools writes it as typed
 
 
 @app.post("/b/{box_id}")
@@ -137,8 +138,12 @@ def box_clear(box_id: str):
 def label(req: Request, box_id: str):
     with db() as c:
         b = get_box(c, box_id)
-    base = os.environ.get("PUBLIC_BASE_URL") or str(req.base_url)
-    return Response(label_png(b["id"], base), media_type="image/png")
+    return Response(label_png(b["id"], public_base(req)), media_type="image/png")
+
+
+def public_base(req):
+    """Address in labels: PUBLIC_BASE_URL from .env, else whatever the browser used."""
+    return (os.environ.get("PUBLIC_BASE_URL") or str(req.base_url)).rstrip("/")
 
 
 def label_png(box_id, base):
@@ -146,7 +151,7 @@ def label_png(box_id, base):
                        (("LABEL_W_MM", 25), ("LABEL_H_MM", 15), ("LABEL_DPI", 300)))
     W, H = round(w_mm / 25.4 * dpi), round(h_mm / 25.4 * dpi)
     qr = qrcode.QRCode(error_correction=qrcode.constants.ERROR_CORRECT_L, border=1)
-    qr.add_data(f"{base.rstrip('/')}/B/{box_id}".upper())  # upper case = alphanumeric mode = smaller QR
+    qr.add_data(f"{base}/B/{box_id}".upper())  # upper case = alphanumeric mode = smaller QR
     qr.make(fit=True)
     qr.box_size = max(1, H // (qr.modules_count + 2))
     code = qr.make_image().get_image().convert("1")

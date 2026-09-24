@@ -9,10 +9,7 @@ services:
       - "${PORT:-8000}:8000"
     volumes:
       - ./data:/data
-    environment:
-      PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-}
-      TZ: ${TZ:-UTC}
-      LABEL_W_MM: ${LABEL_W_MM:-25}
-      LABEL_H_MM: ${LABEL_H_MM:-15}
-      LABEL_DPI: ${LABEL_DPI:-300}
+    env_file:
+      - path: .env
+        required: false
     restart: unless-stopped
