@@ -81,8 +81,9 @@ WEIGHTS = {k: {f["key"]: int(f["search"]) for f in fields_for(k) if f.get("searc
 # Meaning search: a small local model, so "понижайка" finds a buck converter with no alias typed in.
 # Off with SEMANTIC_MODEL= ; keyword search works alone while the model loads or if it can't.
 SEM_MODEL = os.environ.get("SEMANTIC_MODEL", "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2")
-SEM_MIN = float(os.environ.get("SEMANTIC_MIN", "0.35"))  # cosine below this is noise; tune on real data
-SEM_TOP = 10
+SEM_MIN = float(os.environ.get("SEMANTIC_MIN", "0.35"))  # cosine floor; tune on real data
+SEM_MARGIN = 0.08  # and no further than this below the best match: cut noise 4x on 22 test queries
+SEM_TOP = 5
 _sem = {"model": None, "vecs": {}}  # vecs: item_id -> (embedded text, unit vector)
 
 
@@ -104,7 +105,7 @@ def init():
 def _load_model():
     try:
         from fastembed import TextEmbedding
-        _sem["model"] = TextEmbedding(SEM_MODEL, cache_dir=str(DATA / "models"))  # ~470 MB, first start only
+        _sem["model"] = TextEmbedding(SEM_MODEL, cache_dir=str(DATA / "models"))  # ~240 MB, first start only
         with db() as c:
             _item_vecs(c.execute("SELECT * FROM items").fetchall())  # warm up before the first search
     except Exception as e:  # no network, unknown model: keep keyword search
@@ -222,10 +223,11 @@ def search(q):
     items, boxes = [], []
     with db() as c:
         rows = c.execute("SELECT * FROM items").fetchall()
-        sims = {}
+        sims, cut = {}, SEM_MIN
         if _sem["model"] and rows:
             qv = _unit(_sem["model"].embed([q]))[0]
             sims = {iid: float(v @ qv) for iid, (_, v) in _item_vecs(rows).items()}
+            cut = max(SEM_MIN, max(sims.values()) - SEM_MARGIN)
         for row in rows:
             f = item_fields(row)
             texts = [(3, norm(row["name"])), (2, norm(type_label(row["type"])))]
@@ -240,7 +242,7 @@ def search(q):
             else:
                 score += norm(row["name"]).startswith(words[0])
             sim = sims.get(row["id"], 0.0)
-            if score or sim >= SEM_MIN:
+            if score or sim >= cut:
                 items.append(dict(id=row["id"], name=row["name"], type=row["type"], fields=f,
                                   score=score + sim, similar=not score))
         items.sort(key=lambda i: (i["similar"], -i["score"], norm(i["name"])))

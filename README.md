@@ -34,7 +34,7 @@ Settings go in a `.env` file next to `compose.yaml`:
 | `PIP_INDEX_URL` | PyPI | Package mirror for the build |
 
 Data (SQLite, photos, files, the search model) lives in `./data`. On first
-start the search model (~470 MB) downloads there; until it is ready, search
+start the search model (~240 MB) downloads there; until it is ready, search
 works by words only.
 
 ## Profiles: what a card looks like
