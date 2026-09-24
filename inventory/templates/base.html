@@ -66,6 +66,17 @@ summary{cursor:pointer;color:var(--acc)}
 .stock select{grid-column:1/-1}
 .mini{padding:6px 9px;font-size:.85em}.mini.on{background:var(--acc);color:#fff}
 dialog video{width:min(80vw,480px);display:block;margin-bottom:8px}
+.pick{position:relative;display:flex;width:100%}.row .pick{flex:1;width:auto;min-width:0}.stock .pick{grid-column:1/-1}
+.pick input{flex:1;min-width:0;padding-right:2.4em}
+.pick select{position:absolute;inset:0;opacity:0;pointer-events:none}
+.pick>button{position:absolute;right:1px;top:1px;bottom:1px;background:none;color:var(--mut);padding:0 12px}
+.pickl,.pickall{display:flex;flex-direction:column}
+.pickl{flex-basis:100%;grid-column:1/-1;border:1px solid var(--line);border-radius:8px;overflow:hidden;background:var(--card)}
+.pickl button,.pickall button{background:none;color:inherit;text-align:left;border-radius:0;padding:11px 12px;border-top:1px solid var(--line)}
+.pickl button:first-child{border-top:0}.pickl .pmore{color:var(--acc)}.pickl>div{padding:11px 12px}
+.pickm{padding:0;margin:12px auto auto;width:min(92vw,480px);border:1px solid var(--line);border-radius:12px;background:var(--card);color:var(--fg)}
+.pickm::backdrop{background:#0008}.pickm>div{display:flex;gap:8px;padding:8px}.pickm input{flex:1;min-width:0}
+.pickall{max-height:70vh;overflow-y:auto}
 </style>
 </head>
 <body>
@@ -142,6 +153,110 @@ addEventListener("click", e => {
 });
 if ("NDEFReader" in window) navigator.permissions.query({name: "nfc"})
   .then(p => p.state === "granted" && nfcScan().catch(() => addEventListener("click", nfcScan, {once: true}))).catch(() => {});
+
+// Our own list over a choice (select[data-pick], a long select, a datalist field): the native datalist won't open on an
+// Android tap and filters by the value already in it. Open: the value hides, the field searches; recent choices first,
+// «Выбрать…» opens them all. Leaving without a choice puts the old value back. The real field changes only on a choice.
+let pk = null;  // the open picker: its .pick span
+const pickOpts = s => {
+  const f = s.f, o = f.tagName == "SELECT" ? [...f.options].map(o => ({v: o.value, t: o.text})) : [...s.dl.options].map(o => ({v: o.value, t: o.value}));
+  return f.tagName == "SELECT" || f.required || o.some(o => !o.v) ? o : [{v: "", t: "—"}, ...o];
+};
+const pickRecent = f => { try { return JSON.parse(localStorage["recent:" + f.dataset.pk] || "[]"); } catch { return []; } };
+function pickBtn(o, fn) {
+  const b = document.createElement("button"), m = o.t === o.v && o.t.match(/^(.*) (\([A-Z0-9]+\))$/);  // a box: its ID grey
+  b.type = "button"; b.onclick = fn;
+  if (m) b.append(m[1] + " ", Object.assign(document.createElement("span"), {className: "mut", textContent: m[2]}));
+  else b.textContent = o.t;
+  return b;
+}
+function pickFill(s, q) {
+  const all = pickOpts(s), empty = all.find(o => !o.v), r = pickRecent(s.f);
+  let l = all.filter(o => o.v);
+  if (q) l = l.filter(o => o.t.toLowerCase().includes(q.toLowerCase()));
+  else if (l.length > 6) l = [...r.map(v => l.find(o => o.v === v)).filter(Boolean), ...l.filter(o => !r.includes(o.v))];
+  s.list.replaceChildren(...(!q && empty ? [empty] : []).concat(l.slice(0, 6)).map(o => pickBtn(o, () => pickSet(s, o.v))));
+  if (l.length > 6) s.list.append(Object.assign(pickBtn({t: "Выбрать…"}, () => pickAll(s, q)), {className: "pmore"}));
+  if (!l.length) s.list.append(Object.assign(document.createElement("div"), {className: "mut", textContent: "не нашлось"}));
+}
+function pickOpen(s) {
+  pickClose(true);
+  pk = s; s.old = s.vis.value; s.vis.value = ""; s.vis.placeholder = "поиск…"; s.b.textContent = "✕";
+  s.list = document.createElement("div"); s.list.className = "pickl";
+  s.parentElement.matches(".row,.stock") ? s.parentElement.append(s.list) : s.after(s.list);  // a row keeps its buttons on one line
+  pickFill(s, "");
+}
+function pickClose(back) {
+  const s = pk;
+  if (!s) return;
+  pk = null;
+  if (back) s.vis.value = s.old;
+  s.vis.placeholder = s.ph; s.b.textContent = "▾"; s.list.remove();
+  if (document.activeElement === s.vis) s.vis.blur();
+  document.querySelector("dialog.pickm")?.close();
+}
+function pickSet(s, v) {
+  pickClose(false);
+  s.f.value = v;
+  if (s.vis !== s.f) s.vis.value = s.f.selectedOptions[0]?.text ?? "";
+  s.f.dispatchEvent(new Event("input", {bubbles: true})); s.f.dispatchEvent(new Event("change", {bubbles: true}));
+}
+function pickAll(s, q) {  // all of them, with search
+  const d = document.createElement("dialog"), top = document.createElement("div"), i = document.createElement("input"), x = document.createElement("button"), l = document.createElement("div");
+  d.className = "pickm"; l.className = "pickall"; i.placeholder = "поиск…"; i.autocomplete = "off"; i.value = q;
+  x.type = "button"; x.className = "ghost"; x.textContent = "✕"; x.autofocus = true; x.onclick = () => pickClose(true);
+  l.append(...pickOpts(s).map(o => pickBtn(o, () => pickSet(s, o.v))));
+  i.oninput = () => { const q = i.value.toLowerCase(); for (const b of l.children) b.hidden = !!q && !b.textContent.toLowerCase().includes(q); };
+  i.oninput();
+  d.onclick = e => e.target === d && pickClose(true);  // the backdrop
+  d.onclose = () => { d.remove(); if (pk === s) pickClose(true); };  // the phone's Back
+  top.append(i, x); d.append(top, l); document.body.append(d);
+  document.activeElement?.blur();  // else closing it focuses the field again, and that opens the list
+  d.showModal();
+}
+addEventListener("DOMContentLoaded", () => {
+  const sel = [...document.querySelectorAll("select")].filter(f => f.hasAttribute("data-pick") || f.options.length > 7 && !f.querySelector("optgroup"));
+  for (const f of [...document.querySelectorAll("input[list]"), ...sel]) {
+    const s = document.createElement("span");
+    s.className = "pick"; s.f = f; s.b = document.createElement("button"); s.b.type = "button"; s.b.textContent = "▾";
+    f.before(s);
+    if (f.tagName == "SELECT") {  // stays in the form, unseen: its value is what gets sent, `required` still works
+      s.vis = document.createElement("input"); s.vis.autocomplete = "off"; s.vis.value = f.selectedOptions[0]?.text ?? "";
+      f.tabIndex = -1; f.dataset.pk = f.name; s.append(s.vis, f, s.b);
+    } else { s.vis = f; s.dl = f.list; f.dataset.pk = f.getAttribute("list"); f.removeAttribute("list"); s.append(f, s.b); }
+    s.ph = s.vis.placeholder;
+  }
+});
+addEventListener("focusin", e => { const s = e.target.closest?.(".pick"); if (s && e.target === s.vis && pk !== s) pickOpen(s); });
+addEventListener("click", e => {
+  const b = e.target.closest?.(".pick>button");
+  if (b) pk === b.parentElement ? pickClose(true) : pickOpen(b.parentElement);
+  else if (pk && !e.target.closest?.(".pick,.pickl,.pickm")) pickClose(true);
+}, true);
+addEventListener("keydown", e => {
+  if (!pk || !e.target.closest?.(".pick")) return;
+  if (e.key == "Escape") pickClose(true);
+  if (e.key != "Enter") return;
+  e.preventDefault();  // not the form's submit: Enter takes the first match
+  const b = pk.vis.value && pk.list.querySelector("button:not(.pmore)");
+  b ? b.click() : pickClose(true);
+});
+// A person typing in a picker is searching: the form (autosave, drafts) must not see it. Our own events pass.
+addEventListener("input", e => {
+  const s = e.target.closest?.(".pick");
+  if (!s || !e.isTrusted) return;
+  e.stopImmediatePropagation();
+  if (pk === s) pickFill(s, s.vis.value.trim());
+}, true);
+addEventListener("change", e => {
+  const s = e.target.closest?.(".pick");
+  if (!s) return;
+  if (e.isTrusted) return e.stopImmediatePropagation();
+  if (pk === s) pickClose(false);  // a scanned label filled the open field
+  const f = s.f;
+  if (f.value) try { localStorage["recent:" + f.dataset.pk] = JSON.stringify([f.value, ...pickRecent(f).filter(v => v !== f.value)].slice(0, 6)); } catch {}
+}, true);
+addEventListener("pagehide", () => pickClose(true));  // before a page's own pagehide saves the form
 </script>
 {% block main %}{% endblock %}</main>
 </body>
