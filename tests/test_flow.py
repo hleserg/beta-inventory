@@ -323,3 +323,7 @@ def test_hands():
     assert box in loose and placed not in loose and core.HANDS not in loose
     assert c.get(f"/b/{core.HANDS}", follow_redirects=False).headers["location"] == "/items?hands=1"
     assert f"({core.HANDS})" not in c.get(f"/i/{iid}").text  # not offered as a box to put into
+    n = c.get(f"/i/{iid}").text.count("положил")
+    c.post("/stock", data={"box": core.HANDS, "item": iid, "action": "add", "kind": "put", "qty": 1})
+    assert stock(iid) == {box: 1, core.HANDS: 1} and c.get(f"/i/{iid}").text.count("положил") == n + 1  # not a mirror leg
+    assert c.post("/stock", data={"box": "руках", "item": iid, "action": "add", "qty": 1}).status_code == 400  # not by name

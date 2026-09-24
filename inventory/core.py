@@ -57,7 +57,7 @@ CREATE TABLE IF NOT EXISTS trash(
 MOVES = ("SELECT m.*, i.name AS item, p.name AS project, b.name AS box FROM movements m JOIN items i ON i.id=m.item_id "
          "LEFT JOIN projects p ON p.id=m.project_id LEFT JOIN boxes b ON b.id=m.box_id "
          # the hand's leg of a take/put/return mirrors the box's: history shows the box's only (№28)
-         "WHERE NOT (m.box_id='HANDS' AND m.kind IN ('take', 'put', 'return'))")
+         "WHERE NOT (m.box_id='HANDS' AND (m.kind='take' AND m.delta>0 OR m.kind IN ('put', 'return') AND m.delta<0))")
 KINDS = {"put": "положил", "take": "забрал", "return": "вернул", "buy": "докупил",
          "count": "инвентаризация", "clear": "освободил", "move": "переложил", "spend": "списал"}
 
@@ -226,14 +226,14 @@ def find_box(text):
     if not t:  # no box: in hand (№28)
         return HANDS
     with db() as c:
-        boxes = c.execute("SELECT id, name FROM boxes ORDER BY name").fetchall()
+        boxes = c.execute("SELECT id, name, kind FROM boxes ORDER BY name").fetchall()
     ids = {b["id"] for b in boxes}
     m = re.search(r"\(([A-Za-z0-9]+)\)$", t)  # ASCII only: «Резисторы (Вт)» is a name, not an ID
     for k in (t.upper(), m and m[1].upper()):
         if k in ids:
             return k
     # casefold here, not SQL: SQLite's lower() and LIKE leave Cyrillic as is
-    hits = [b for b in boxes if t and t.casefold() in (b["name"] or "").casefold()]
+    hits = [b for b in boxes if t and b["kind"] != "hands" and t.casefold() in (b["name"] or "").casefold()]
     exact = [b for b in hits if b["name"].casefold() == t.casefold()]
     if len(hits) == 1 or len(exact) == 1:
         return (exact or hits)[0]["id"]
