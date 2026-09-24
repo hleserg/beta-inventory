@@ -77,6 +77,7 @@ dialog video{width:min(80vw,480px);display:block;margin-bottom:8px}
 .pickm{padding:0;margin:12px auto auto;width:min(92vw,480px);border:1px solid var(--line);border-radius:12px;background:var(--card);color:var(--fg)}
 .pickm::backdrop{background:#0008}.pickm>div{display:flex;gap:8px;padding:8px}.pickm input{flex:1;min-width:0}
 .pickall{max-height:70vh;overflow-y:auto}
+form[data-sent] button{opacity:.5}
 </style>
 </head>
 <body>
@@ -257,6 +258,14 @@ addEventListener("change", e => {
   if (f.value) try { localStorage["recent:" + f.dataset.pk] = JSON.stringify([f.value, ...pickRecent(f).filter(v => v !== f.value)].slice(0, 6)); } catch {}
 }, true);
 addEventListener("pagehide", () => pickClose(true));  // before a page's own pagehide saves the form
+// A second tap while photos upload sent a whole second card (№32): a posted form goes once until the page is back.
+document.addEventListener("submit", e => {
+  const f = e.target;
+  if (e.defaultPrevented || f.method != "post") return;  // fetch-saved forms (box page) send as often as they like
+  if (f.dataset.sent) return e.preventDefault();
+  f.dataset.sent = 1;
+});
+addEventListener("pageshow", () => document.querySelectorAll("form[data-sent]").forEach(f => delete f.dataset.sent));  // back button
 </script>
 {% block main %}{% endblock %}</main>
 </body>
