@@ -201,7 +201,8 @@ def test_new_box_and_shelves():
 
     c.post(f"/b/{bid}", data={"name": "Макетки", "parent_id": shelf}, headers={"X-Autosave": "1"})
     places = c.get("/places").text
-    assert places.index("Стеллаж") < places.index("Верхняя") < places.index("Полка 2") < places.index("Макетки")
+    assert places.index("Стеллаж") < places.index("Верхняя") < places.index("Полка 2") and "Макетки" not in places  # №38
+    assert "Макетки" in c.get(f"/b/{shelf}").text  # a box on a shelf is on the shelf's page
     assert f'<option value="Стеллаж › Полка 2 ({shelf})">' in c.get(f"/b/{bid}").text  # «Полка 2» is in every cabinet
 
 
