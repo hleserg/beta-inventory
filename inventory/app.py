@@ -4,6 +4,7 @@ import json
 import os
 import uuid
 from pathlib import Path
+from types import SimpleNamespace
 
 import qrcode
 from fastapi import FastAPI, Form, Request
@@ -23,7 +24,8 @@ app = FastAPI(title="beta-inventory")
 app.mount("/u", StaticFiles(directory=core.UPLOADS), name="uploads")
 T = Jinja2Templates(directory=Path(__file__).parent / "templates")
 T.env.globals.update(
-    t=PROFILE["terms"], categories=PROFILE["categories"], type_label=core.type_label, kinds=core.KINDS,
+    # namespace, not dict: in Jinja t.items on a dict is dict.items, not the term
+    t=SimpleNamespace(**PROFILE["terms"]), categories=PROFILE["categories"], type_label=core.type_label, kinds=core.KINDS,
     pk=next((f["key"] for f in PROFILE["item_fields"] if f["type"] == "photo"), None))
 _md = MarkdownIt("commonmark", {"html": False}).enable("table")  # raw HTML off: cards come from agents too
 T.env.filters["md"] = lambda s: Markup(_md.render(s or ""))

@@ -22,6 +22,7 @@ def photo():
 
 
 def test_main_path():
+    assert core.PROFILE["terms"]["items"] in c.get("/items").text  # t.items once rendered dict.items
     assert c.post("/places", data={"name": "Шкаф"}).status_code == 200
     box = c.post("/boxes", data={"n": 1}, follow_redirects=False).headers["location"].split("=")[1]
     assert c.get(f"/B/{box.lower()}").status_code == 200  # QR URL, any case
