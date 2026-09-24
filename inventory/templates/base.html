@@ -209,7 +209,7 @@ function pickBtn(o, fn) {
 function pickFill(s, q) {
   const all = pickOpts(s), empty = all.find(o => !o.v), r = pickRecent(s.f);
   let l = all.filter(o => o.v);
-  if (q) l = l.filter(o => o.t.toLowerCase().includes(q.toLowerCase()));
+  if (q) l = l.filter(o => (o.t + " " + (o.w || "")).toLowerCase().includes(q.toLowerCase()));  // «шкаф» finds its shelves
   else if (l.length > 6) l = [...r.map(v => l.find(o => o.v === v)).filter(Boolean), ...l.filter(o => !r.includes(o.v))];
   s.list.replaceChildren(...(!q && empty ? [empty] : []).concat(l.slice(0, 6)).map(o => pickBtn(o, () => pickSet(s, o.v))));
   if (l.length > 6) s.list.append(Object.assign(pickBtn({t: "Выбрать…"}, () => pickAll(s, q)), {className: "pmore"}));
