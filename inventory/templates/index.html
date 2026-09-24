@@ -1,20 +1,20 @@
-{% extends "base.html" %}
+{% extends "base.html" %}{% from "_box.html" import box_link %}
 {% block main %}
-{% if put %}<div class="card">Кладём в <a href="/b/{{ put }}"><b>{{ put }}</b></a>. Найдите, что кладёте, или <a href="/items/new?box={{ put }}">заведите новое</a>.</div>{% endif %}
+{% if put %}<div class="card">Кладём в {{ box_link(put, (all_boxes()|selectattr("id", "equalto", put)|first or {}).name) }}. Найдите, что кладёте, или <a href="/items/new?box={{ put }}">заведите новое</a>.</div>{% endif %}
 <form action="/" class="row" style="margin-top:12px">
   <input name="q" value="{{ q }}" placeholder="jst, понижайка, резистор 10к, ID коробки" {% if not q %}autofocus{% endif %}>
   {% if put %}<input type="hidden" name="put" value="{{ put }}">{% endif %}
   <button>Найти</button>
 </form>
 {% if q %}
-  {% if boxes %}<h2>{{ t.boxes }}</h2>{% for b in boxes %}<div><a href="/b/{{ b.id }}"><b>{{ b.id }}</b></a> {{ b.name }} <span class="mut">{{ b.where }}</span></div>{% endfor %}{% endif %}
+  {% if boxes %}<h2>{{ t.boxes }}</h2>{% for b in boxes %}<div>{{ box_link(b.id, b.name) }} <span class="mut">{{ b.where }}</span></div>{% endfor %}{% endif %}
   <h2>{{ t.items }}{% if items %} <span class="mut">{{ items|length }}</span>{% endif %}</h2>
   {% set ns = namespace(sim=false) %}
   {% for i in items %}
   {% if i.similar and not ns.sim %}{% set ns.sim = true %}<h2>Похоже по смыслу</h2>{% endif %}
   <div class="card">
     <a class="row" href="/i/{{ i.id }}" style="text-decoration:none;color:inherit">{% if pk and i.fields[pk] %}<img class="thumb" src="/u/{{ i.fields[pk] }}" alt="">{% endif %}<span><b>{{ i.name }}</b><br><span class="mut">{{ type_label(i.type) }}</span></span></a>
-    {% for s in i.stock %}<div><a href="/b/{{ s.box_id }}"><b>{{ s.box_id }}</b></a> {{ s.name }} <span class="mut">{{ s.where }}</span> — <span class="qty">{{ s.qty|qty }}</span></div>
+    {% for s in i.stock %}<div>{{ box_link(s.box_id, s.name) }} <span class="mut">{{ s.where }}</span> — <span class="qty">{{ s.qty|qty }}</span></div>
     {% else %}<div class="mut">Нигде нет</div>{% endfor %}
     {% if put %}<form method="post" action="/stock" class="row" style="margin-top:8px">
       <input type="hidden" name="box" value="{{ put }}"><input type="hidden" name="item" value="{{ i.id }}"><input type="hidden" name="action" value="add"><input type="hidden" name="kind" value="put"><input type="hidden" name="back" value="/b/{{ put }}">

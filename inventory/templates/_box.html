@@ -1,5 +1,6 @@
 {# A box field: a list by name, the ID last; NFC and QR buttons fill it (base.html). One per page. #}
 {% macro label(b) %}{{ b.name ~ " (" ~ b.id ~ ")" if b.name else b.id }}{% endmacro %}
+{% macro box_link(id, name) %}<a href="/b/{{ id }}">{% if name %}<b>{{ name }}</b> <span class="mut">{{ id }}</span>{% else %}<b>{{ id }}</b>{% endif %}</a>{% endmacro %}
 {% macro box_input(name="box", value="", placeholder="название, часть названия или скан", required=False, armed_only=False) %}
 {%- set boxes = all_boxes() %}{% set hit = boxes|selectattr("id", "equalto", value)|first %}
 <input name="{{ name }}" value="{{ label(hit) if hit else value }}" list="boxlist" data-box{% if armed_only %}="armed"{% endif %} placeholder="{{ placeholder }}" autocomplete="off"{% if required %} required{% endif %}>

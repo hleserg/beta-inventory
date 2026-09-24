@@ -1,3 +1,4 @@
+{% from "_box.html" import box_link %}
 {# Stock forms for one box×item pair. folded=True hides even «Забрать» (box page with many items). #}
 {% macro stock_forms(box_id, item_id, qty, projects, back, folded=False) %}
 {% set hidden %}<input type="hidden" name="box" value="{{ box_id }}"><input type="hidden" name="item" value="{{ item_id }}"><input type="hidden" name="back" value="{{ back }}">{% endset %}
@@ -23,7 +24,7 @@
 {% macro moves_table(moves) %}
 <table>{% for m in moves %}
 <tr><td class="mut">{{ m.at[5:16] }}</td>
-<td><a href="/i/{{ m.item_id }}">{{ m.item }}</a> · <a href="/b/{{ m.box_id }}">{{ m.box_id }}</a><br>
+<td><a href="/i/{{ m.item_id }}">{{ m.item }}</a> · {{ box_link(m.box_id, m.box) }}<br>
 <span class="mut">{{ kinds[m.kind] }}{% if m.project %} → {{ m.project }}{% endif %} · {{ m.author }}</span></td>
 <td class="qty">{{ "%+d"|format(m.delta) if m.delta else "?" }}</td></tr>
 {% else %}<tr><td class="mut">Пока пусто.</td></tr>{% endfor %}</table>

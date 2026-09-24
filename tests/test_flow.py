@@ -144,6 +144,12 @@ def test_box_by_name():
     assert f'<option value="Клеммники Phoenix ({a})">' in c.get("/items/new?type=module").text
     assert f'<option value="Клеммники Phoenix ({a})">' in c.get(f"/i/{newest()}").text
 
+    named = f'<b>Клеммники WAGO</b> <span class="mut">{b}</span>'  # the name first, the ID grey at the end
+    for url in (f"/i/{newest()}", "/boxes", "/history", "/?q=wago"):
+        assert named in c.get(url).text, url
+    page = c.get(f"/b/{b}").text
+    assert f'<h1>Клеммники WAGO <span class="mut">{b}</span></h1>' in page and f'<b>Ящик</b> <span class="mut">{d}</span>' in page
+
 
 def test_old_stock_table_migrates(tmp_path, monkeypatch):
     """A database from before «не считал» keeps its stock and takes qty NULL after a restart."""

@@ -47,8 +47,8 @@ CREATE TABLE IF NOT EXISTS movements(
   at TEXT NOT NULL DEFAULT (datetime('now','localtime')));
 """
 
-MOVES = ("SELECT m.*, i.name AS item, p.name AS project FROM movements m "
-         "JOIN items i ON i.id=m.item_id LEFT JOIN projects p ON p.id=m.project_id")
+MOVES = ("SELECT m.*, i.name AS item, p.name AS project, b.name AS box FROM movements m JOIN items i ON i.id=m.item_id "
+         "LEFT JOIN projects p ON p.id=m.project_id LEFT JOIN boxes b ON b.id=m.box_id")
 KINDS = {"put": "положил", "take": "забрал", "return": "вернул", "buy": "докупил",
          "count": "инвентаризация", "clear": "освободил"}
 

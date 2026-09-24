@@ -1,10 +1,10 @@
-{% extends "base.html" %}
+{% extends "base.html" %}{% from "_box.html" import box_link %}
 {% block main %}
 <h1>{{ t.places }}</h1>
 <form method="post" action="/places" class="row"><input name="name" placeholder="например: шкаф в комнате" required><button>Добавить</button></form>
 {% for p in places %}
 <div class="card"><b>{{ p.name }}</b>{% if p.note %} <span class="mut">{{ p.note }}</span>{% endif %}
-  <div>{% for b in p.boxes %}<a href="/b/{{ b.id }}">{{ b.id }}</a>{% if b.name %} {{ b.name }}{% endif %}{% if not loop.last %}, {% endif %}{% else %}<span class="mut">пусто</span>{% endfor %}</div>
+  <div>{% for b in p.boxes %}{{ box_link(b.id, b.name) }}{% if not loop.last %}, {% endif %}{% else %}<span class="mut">пусто</span>{% endfor %}</div>
   <details><summary>изменить</summary><form method="post" action="/places/{{ p.id }}">
     <input name="name" value="{{ p.name }}" required><label>Заметка</label><input name="note" value="{{ p.note }}"><p><button>Сохранить</button></p></form></details>
 </div>
