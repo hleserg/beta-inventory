@@ -23,6 +23,8 @@ def test_main_path():
     box = c.post("/boxes", data={"n": 1}, follow_redirects=False).headers["location"].split("=")[1]
     assert f"http://testserver/b/{box.lower()}" in c.get(f"/B/{box.lower()}").text  # QR URL, any case; NFC link
     assert c.get(f"/b/{box}/label.png").headers["content-type"] == "image/png"
+    c.post(f"/b/{box}", data={"name": "JST", "place": "Антресоль"})  # a new place right from the box
+    assert 'value="Антресоль"' in c.get(f"/b/{box}").text and "Антресоль" in c.get("/places").text
 
     # module: photo and pinout required; resistor: photo optional (type overrides the common field)
     assert c.post("/items/new?type=module", data={"name": "MP1584"}).status_code == 400

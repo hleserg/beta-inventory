@@ -110,7 +110,7 @@ def box(req: Request, box_id: str):
 
 
 @app.post("/b/{box_id}")
-def box_save(box_id: str, name: str = Form(""), place_id: str = Form(""), parent_id: str = Form("")):
+def box_save(box_id: str, name: str = Form(""), place: str = Form(""), parent_id: str = Form("")):
     parent = parent_id.strip().upper() or None
     with db() as c:
         b = get_box(c, box_id)
@@ -119,8 +119,11 @@ def box_save(box_id: str, name: str = Form(""), place_id: str = Form(""), parent
             if p == b["id"]:
                 raise ValueError("Коробка не может лежать сама в себе")
             p = get_box(c, p)["parent_id"]
-        c.execute("UPDATE boxes SET name=?, place_id=?, parent_id=? WHERE id=?",
-                  (name.strip(), None if parent or not place_id else int(place_id), parent, b["id"]))
+        place_id = None
+        if place.strip() and not parent:  # a new name makes the place, so a first box needs no trip to places
+            c.execute("INSERT OR IGNORE INTO places(name) VALUES (?)", (place.strip(),))
+            place_id = c.execute("SELECT id FROM places WHERE name=?", (place.strip(),)).fetchone()["id"]
+        c.execute("UPDATE boxes SET name=?, place_id=?, parent_id=? WHERE id=?", (name.strip(), place_id, parent, b["id"]))
     return go(f"/b/{b['id']}")
 
 
