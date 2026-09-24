@@ -54,7 +54,7 @@ CREATE TABLE IF NOT EXISTS trash(
 MOVES = ("SELECT m.*, i.name AS item, p.name AS project, b.name AS box FROM movements m JOIN items i ON i.id=m.item_id "
          "LEFT JOIN projects p ON p.id=m.project_id LEFT JOIN boxes b ON b.id=m.box_id")
 KINDS = {"put": "положил", "take": "забрал", "return": "вернул", "buy": "докупил",
-         "count": "инвентаризация", "clear": "освободил"}
+         "count": "инвентаризация", "clear": "освободил", "move": "переложил"}
 
 
 def load_profile():
@@ -251,7 +251,8 @@ def move(item_id, box_id, delta, kind, author, project_id=None, note=""):
         old = row["qty"] if row else 0
         if old is None and kind == "return" and delta:
             old = 0
-        if delta is None or old is None and kind not in ("count", "clear"):
+        # count and clear say how many are left, and so does moving all of an uncounted pile out
+        if delta is None or old is None and kind not in ("count", "clear") and (kind, delta) != ("move", 0):
             qty, note = None, note or "не считал"
         else:
             qty = (old or 0) + delta
@@ -286,6 +287,20 @@ def change_stock(box_id, item_id, action, qty, author, project_id=None):
     if qty is not None and qty < 1:
         raise ValueError("Количество должно быть больше нуля")
     return move(item_id, box_id, -qty if action == "take" else qty, action, author, project_id)
+
+
+def transfer(item_id, src, dst, author):
+    """All of a thing from one box to another (a box scanned on its card, №30): two «переложил» movements."""
+    src, dst = find_box(src), find_box(dst)
+    if src == dst:
+        return
+    with db() as c:
+        row = c.execute("SELECT qty FROM stock WHERE box_id=? AND item_id=?", (src, item_id)).fetchone()
+    if not row:
+        raise ValueError(f"в {src} этого нет")
+    # ponytail: two transactions like clear_box; both boxes are checked first, so a half-move needs a crash between
+    move(item_id, src, -(row["qty"] or 0), "move", author)
+    return move(item_id, dst, row["qty"], "move", author)
 
 
 def projects(c):

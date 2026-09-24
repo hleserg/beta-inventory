@@ -343,10 +343,13 @@ async def item_update(req: Request, item_id: int, type: str):
 
 @app.post("/stock")
 def stock(box: str = Form(), item: int = Form(), action: str = Form(), qty: int | None = Form(None),
-          kind: str = Form("put"), project: str = Form(""), back: str = Form("/")):
-    if action != "take":
-        action = "count" if action == "set" else kind if kind in ("put", "return", "buy") else "put"
-    core.change_stock(box, item, action, qty, AUTHOR, int(project) if project and action == "take" else None)
+          kind: str = Form("put"), project: str = Form(""), back: str = Form("/"), src: str = Form("")):
+    if kind == "move" and src:  # the item card: a scanned box takes all of it from the one box it lay in
+        core.transfer(item, src, box, AUTHOR)
+    else:
+        if action != "take":
+            action = "count" if action == "set" else kind if kind in ("put", "return", "buy") else "put"
+        core.change_stock(box, item, action, qty, AUTHOR, int(project) if project and action == "take" else None)
     return go(back if back.startswith("/") and not back.startswith("//") else "/")
 
 

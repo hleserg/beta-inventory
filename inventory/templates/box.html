@@ -27,7 +27,7 @@
     <select name="place" data-pick><option value="">—</option>{% for p in places %}<option value="{{ p.id }}"{% if p.id == b.place_id %} selected{% endif %}>{{ p.name }}</option>{% endfor %}</select>
     {% if not places %}<div class="mut">Мест ещё нет — <a href="/places">добавить</a></div>{% endif %}
     <label>Стоит внутри другой</label>
-    <div class="row">{{ box_input("parent_id", b.parent_id or "", "пусто — стоит сама", armed_only=True, exclude=b.id) }}</div>
+    <div class="row">{{ box_input("parent_id", b.parent_id or "", "пусто — стоит сама", exclude=b.id) }}</div>
     {% endif %}
     <p id="savest" class="mut">Изменения сохраняются сами.</p>
   </form>

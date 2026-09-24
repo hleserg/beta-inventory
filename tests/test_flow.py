@@ -163,8 +163,8 @@ def test_box_by_name():
     c.post(f"/b/{d}", data={"name": "Ящик", "parent_id": "wago"})
     assert core.db().execute("SELECT parent_id FROM boxes WHERE id=?", (d,)).fetchone()[0] == b
 
-    page = c.get(f"/b/{d}").text  # names first, the ID last; scan buttons next to the field
-    assert f'value="Клеммники WAGO ({b})"' in page and "data-nfc" in page and "data-qr" in page
+    page = c.get(f"/b/{d}").text  # names first, the ID last; QR next to the field, NFC needs no button (№29)
+    assert f'value="Клеммники WAGO ({b})"' in page and "data-nfc" not in page and "data-qr" in page
     assert f'<option value="Клеммники Phoenix ({a})">' in c.get("/items/new?type=module").text
     assert f'<option value="Клеммники Phoenix ({a})">' in c.get(f"/i/{newest()}").text
 
@@ -265,3 +265,18 @@ def test_trash():
     core.db().execute("UPDATE trash SET at=datetime('now','-31 days')").connection.commit()
     c.post(f"/i/{item}/delete")  # fresh stays, older than TRASH_DAYS goes for good
     assert "Флюс ЛТИ" in c.get("/trash").text and q("SELECT count(*) FROM trash WHERE at < datetime('now','-30 days')") == 0
+
+
+def test_scan_moves_to_box():
+    """№30: a box scanned on an item card that lies in one box moves all of it there, counted or not."""
+    a, b = core.new_boxes(2)
+    for name, qty in (("клеммник", 5), ("стяжки россыпь", "")):
+        c.post("/items/new?type=resistor", data={"name": name, "value": "x", "box": a, "qty": qty})
+        iid = newest()
+        c.post("/stock", data={"box": b, "item": iid, "action": "add", "kind": "move", "src": a})
+        with core.db() as db:
+            rows = db.execute("SELECT box_id, qty FROM stock WHERE item_id=?", (iid,)).fetchall()
+            kinds = [r[0] for r in db.execute("SELECT kind FROM movements WHERE item_id=? ORDER BY id", (iid,))]
+        assert [tuple(r) for r in rows] == [(b, qty or None)]  # nothing left behind, the count travels as is
+        assert kinds[-2:] == ["move", "move"]
+    assert "переложил" in c.get(f"/i/{iid}").text

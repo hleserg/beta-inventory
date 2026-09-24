@@ -61,7 +61,8 @@ summary{cursor:pointer;color:var(--acc)}
 .seg a{font-size:1em;padding:6px 14px}
 .chips a.on{background:var(--acc);color:#fff;border-color:var(--acc)}
 .md img{max-width:100%}.md pre{overflow-x:auto}.md table td,.md table th{border:1px solid var(--line);padding:4px 6px}
-[hidden]{display:none!important}[data-nfc],[data-qr]{display:none}.nfc [data-nfc],.qr [data-qr]{display:inline-block}
+[hidden]{display:none!important}[data-qr]{display:none}.qr [data-qr]{display:inline-block}
+label.chk{display:flex;gap:8px;align-items:center;font-weight:400}.chk input{flex:none;width:auto}
 .stock{display:grid;grid-template-columns:5em 1fr;gap:8px;margin-top:8px}
 .spin,.acts{display:flex;flex-direction:column;gap:4px}.acts{justify-content:space-between}
 .spin input{text-align:center;font-size:1.2em;padding:6px 2px}.spin button{padding:4px 0}
@@ -99,28 +100,42 @@ for (const k of Object.keys(localStorage)) if (k.startsWith("draft:") && k !== "
 function when(t) { return new Date(t).toLocaleString("ru", {day: "numeric", month: "short", hour: "2-digit", minute: "2-digit"}); }
 
 // With the site open, a box label goes straight to its box (Web NFC, Chrome on Android; permission via /phone).
-// On a page with a box field (_box.html) it fills the field instead.
-document.documentElement.classList.toggle("nfc", "NDEFReader" in window);
+// On a page with a visible box field (_box.html) it fills the field instead; on an item card it puts the item there.
 document.documentElement.classList.toggle("qr", "BarcodeDetector" in window && !!navigator.mediaDevices);
-let armed = null, scanning = null;  // armed: the field whose NFC/QR button was pressed
-const boxField = () => armed || [...document.querySelectorAll("[data-box]:not([data-box=armed])")]
+let armed = null, scanning = null;  // armed: the field whose QR button was pressed
+const boxField = () => armed || [...document.querySelectorAll("[data-box]")]
   .find(e => e.checkVisibility ? e.checkVisibility() : e.offsetParent) || document.querySelector("form[data-put] [data-box]");
-function gotBox(id) {
+async function gotBox(id) {
+  if (location.pathname.toLowerCase() === "/b/" + id.toLowerCase()) return;  // this box's own label: already here
   const f = boxField();
-  if (!f) { if (location.pathname.toLowerCase() !== "/b/" + id.toLowerCase()) location.href = "/b/" + id; return; }  // this origin: labels may name the host differently
+  if (!f) return location.href = "/b/" + id;  // this origin: labels may name the host differently
   const o = [...document.querySelectorAll("#boxlist option")].find(o => o.value === id || o.value.endsWith(` (${id})`)), label = o ? o.value : id;
-  const put = f.form?.hasAttribute("data-put");  // the item card: a scanned box is where the item goes, no button
-  // empty, being typed in or asked for by its button: fill; a box already chosen: ask first
-  if (f.value !== label && (put || f === armed || !f.value || f === document.activeElement || confirm(`Изменить коробку на ${label}?`))) {
-    f.value = label; f.dispatchEvent(new Event("input", {bubbles: true})); f.dispatchEvent(new Event("change", {bubbles: true}));
-  }
-  armed = null; document.querySelectorAll(".mini.on").forEach(b => b.classList.remove("on"));
+  const put = f.form?.hasAttribute("data-put"), from = put && f.form.dataset.from;  // the item card; from: the one box it lies in
+  const asked = f === armed; armed = null; document.querySelectorAll(".mini.on").forEach(b => b.classList.remove("on"));
+  if (from === id || f.value === label && !put) return;  // already there
+  // empty, being typed in or asked for by its button: fill; lying in another box or a box already chosen: ask first
+  if (!(put ? !from : asked || !f.value || f === document.activeElement) && !await askMove(label)) return;
+  f.value = label; f.dispatchEvent(new Event("input", {bubbles: true})); f.dispatchEvent(new Event("change", {bubbles: true}));
+  if (from) { f.form.elements.kind.value = "move"; f.form.elements.src.value = from; }
   if (put) f.form.requestSubmit();
+}
+function askMove(label) {  // «больше не спрашивать» stays on this phone; /phone turns asking back on
+  try { if (localStorage.askMove === "no") return true; } catch {}
+  const d = document.createElement("dialog");
+  d.innerHTML = `<form method="dialog"><p></p><label class="chk"><input type="checkbox"> больше не спрашивать</label>
+    <p class="row"><button value="y">Переложить</button><button value="" class="ghost">Отмена</button></p></form>`;
+  d.querySelector("p").textContent = `Переложить в ${label}?`;
+  document.body.append(d); d.showModal();
+  return new Promise(done => d.onclose = () => {
+    const yes = d.returnValue === "y";
+    if (yes && d.querySelector("input").checked) try { localStorage.askMove = "no"; } catch {}
+    d.remove(); done(yes);
+  });
 }
 function nfcScan() {  // one reader per page: two would both fire and the second would miss the armed field
   return scanning ||= (() => { const r = new NDEFReader();
     r.onreading = e => {
-      if (window.nfcBusy) return;  // the box page is writing this tag
+      if (window.nfcBusy || document.querySelector("dialog[open]")) return;  // the box page is writing this tag; a question is open
       for (const rec of e.message.records) {
         const m = ["url", "absolute-url"].includes(rec.recordType) && new TextDecoder().decode(rec.data).match(/\/b\/([A-Za-z0-9]+)\/?$/i);
         if (m) return gotBox(m[1].toUpperCase());
@@ -148,11 +163,10 @@ async function qrScan() {
   } catch (e) { d.close(); alert("Камера недоступна: " + e.message); }
 }
 addEventListener("click", e => {
-  const b = e.target.closest("[data-nfc],[data-qr]");
+  const b = e.target.closest("[data-qr]");
   if (!b) return;
   armed = b.parentElement.querySelector("[data-box]"); b.classList.add("on");
-  if (b.matches("[data-qr]")) qrScan().finally(() => b.classList.remove("on"));
-  else nfcScan().catch(e => { b.classList.remove("on"); alert("NFC: " + e.message); });
+  qrScan().finally(() => b.classList.remove("on"));
 });
 if ("NDEFReader" in window) navigator.permissions.query({name: "nfc"})
   .then(p => p.state === "granted" && nfcScan().catch(() => addEventListener("click", nfcScan, {once: true}))).catch(() => {});
