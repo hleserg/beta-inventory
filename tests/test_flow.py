@@ -55,6 +55,9 @@ def test_main_path():
     assert "MP1584" in c.get("/?q=ПОНИЖАЙКА").text
     assert "10k" in c.get("/?q=резистор").text  # type label is searchable
     assert "10k" in c.get("/items?cat=electronics").text and "10k" not in c.get("/items?cat=tools").text
+    found = c.get("/items?q=резистор").text  # the list has its own search line (№33)
+    assert 'name="q" value="резистор"' in found and "10k" in found and "MP1584" not in found
+    assert "10k" not in c.get("/items?q=резистор&cat=tools").text
 
     c.post("/projects", data={"name": "Метеостанция"})
     assert c.post("/stock", data={"box": box, "item": iid, "action": "take", "qty": 2, "project": 1}).status_code == 200

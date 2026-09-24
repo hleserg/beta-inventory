@@ -250,7 +250,7 @@ async def read_fields(req, old, fields):
 
 
 @app.get("/items")
-def items(req: Request, type: str = "", cat: str = ""):
+def items(req: Request, type: str = "", cat: str = "", q: str = ""):
     if type in core.TYPES:
         cat = core.TYPES[type]["category"]["key"]
     with db() as c:
@@ -259,7 +259,10 @@ def items(req: Request, type: str = "", cat: str = ""):
             "WHERE ?='' OR i.type=? GROUP BY i.id ORDER BY i.name", (type, type))]
     if cat:
         rows = [r for r in rows if r["type"] in core.TYPES and core.TYPES[r["type"]]["category"]["key"] == cat]
-    return page(req, "items.html", items=rows, type=type, cat=cat)
+    if q.strip():  # same search as the main page, kept in its rank order
+        rank = {i["id"]: n for n, i in enumerate(core.search(q)[0])}
+        rows = sorted((r for r in rows if r["id"] in rank), key=lambda r: rank[r["id"]])
+    return page(req, "items.html", items=rows, type=type, cat=cat, q=q)
 
 
 def card_form(req, status=200, it=None, type="", name="", vals=None, errors=(), box="", qty="", dups=()):
