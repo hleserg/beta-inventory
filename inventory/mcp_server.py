@@ -1,16 +1,23 @@
 """MCP for agents: the same inventory as the site. Mounted by app.py at /mcp (streamable HTTP)."""
+import asyncio
+import io
 import os
+import urllib.request
+from pathlib import Path
 from typing import Any, Literal
+from urllib.parse import urlparse
 
 from mcp.server.mcpserver import MCPServer
 from mcp.server.mcpserver.exceptions import ToolError  # plain exceptions reach the agent without their text
 from mcp.types import ToolAnnotations
+from PIL import Image
 
 from . import core
 from .core import PROFILE, db
 
 BASE = os.environ.get("PUBLIC_BASE_URL", "").rstrip("/")  # empty: links come out as site paths
 T = PROFILE["terms"]
+FETCH_LIMIT = 20 * 1024 * 1024
 READ = ToolAnnotations(readOnlyHint=True, openWorldHint=False)
 LOGGED = ToolAnnotations(readOnlyHint=False, destructiveHint=False, openWorldHint=False)  # history keeps every change
 
@@ -18,7 +25,7 @@ server = MCPServer("inventory", instructions=(
     f"Home inventory «{PROFILE['name']}». {T['items']} (items) lie in {T['boxes']} (boxes); a box has a 5-char id "
     f"printed on its label, may sit in another box and stands in a {T['place']} (place). Quantity belongs to the "
     "box×item pair. Start with search; card fields are defined by the profile, see card_template. "
-    "Stock changes go through change_stock under your name. "
+    "Search before create_item: the item may exist. Stock changes go through change_stock under your name. "
     "Data is in the profile's language: answer the user in it."))
 
 
@@ -54,6 +61,10 @@ def search(query: str) -> dict[str, Any]:
 @server.tool(annotations=READ)
 def get_item(item_id: int) -> dict[str, Any]:
     """Full card of an item: fields (keys as in card_template), stock per box, last 10 movements."""
+    return card(item_id)
+
+
+def card(item_id):
     with db() as c:
         it = c.execute("SELECT * FROM items WHERE id=?", (item_id,)).fetchone()
         if not it:
@@ -93,6 +104,12 @@ def card_template(type: str = "") -> dict[str, Any]:
     return {"type": type, "label": core.type_label(type), "fields": core.fields_for(type)}
 
 
+def author(agent):
+    if not agent.strip():
+        raise ToolError("agent is empty: pass your name, it is shown as the author in history.")
+    return agent.strip()
+
+
 @server.tool(annotations=READ)
 def list_projects() -> dict[str, Any]:
     """Active projects, for project_id when stock is taken for a project."""
@@ -109,14 +126,114 @@ def change_stock(box_id: str, item_id: int, action: Literal["put", "return", "bu
     count: the box holds exactly qty now (stocktaking). agent: your name as the user knows you.
     Returns the new qty in the box.
     """
-    if not agent.strip():
-        raise ToolError("agent is empty: pass your name, it is shown as the author in history.")
     if project_id is not None:
         with db() as c:
             if not c.execute("SELECT 1 FROM projects WHERE id=?", (project_id,)).fetchone():
                 raise ToolError(f"No project {project_id}. Call list_projects.")
     try:
-        qty = core.change_stock(box_id, item_id, action, qty, agent.strip(), project_id)
+        qty = core.change_stock(box_id, item_id, action, qty, author(agent), project_id)
     except ValueError as e:
         raise ToolError(f"{e}. Check the box with get_box, the item with get_item.") from None
     return {"box_id": box_id.strip().upper(), "item_id": item_id, "qty": qty}
+
+
+def fetch(url):
+    """Download what an agent found online. ponytail: no private-address guard, the site is LAN-only anyway."""
+    try:
+        with urllib.request.urlopen(urllib.request.Request(url, headers={"User-Agent": "beta-inventory"}),
+                                    timeout=30) as r:
+            data = r.read(FETCH_LIMIT + 1)
+    except (OSError, ValueError) as e:
+        raise ToolError(f"Can't download {url}: {e}") from None
+    if len(data) > FETCH_LIMIT:
+        raise ToolError(f"{url} is over {FETCH_LIMIT >> 20} MB.")
+    return data
+
+
+def own_upload(v):
+    """Name of our own upload, given as get_item's /u/ link or bare, or None."""
+    name = str(v).rsplit("/u/", 1)[-1]
+    return name if name and Path(name).name == name and (core.UPLOADS / name).is_file() else None
+
+
+async def upload(url, photo):
+    if not str(url).lower().startswith(("http://", "https://")):
+        raise ToolError(f"{url!r} is not a link: photos and files are given as http(s) URLs.")
+    data = await asyncio.to_thread(fetch, url)
+    if photo:
+        try:
+            Image.open(io.BytesIO(data)).verify()
+        except Exception:
+            raise ToolError(f"{url} is not a picture: give a direct link to the image file.") from None
+    return core.save_bytes(data, Path(urlparse(url).path).suffix.lower()[:10], photo)
+
+
+async def fill(type_key, old, given):
+    """Agent's field values → stored card fields, merged over old. Unknown keys fail, hidden stored ones stay."""
+    defs = {fd["key"]: fd for fd in core.fields_for(type_key)}
+    f = dict(old)
+    for k, v in given.items():
+        fd = defs.get(k)
+        if not fd:
+            if k in old:
+                continue  # a field of the card's former type, kept but hidden: get_item returns it too
+            raise ToolError(f"No field {k!r} for type {type_key!r}. See card_template({type_key!r}).")
+        if fd["type"] == "photo":
+            f[k] = "" if not v else own_upload(v) or await upload(v, photo=True)
+        elif fd["type"] == "files":
+            have = [x["file"] for x in f.get(k, [])]
+            for x in v or []:
+                src = x.get("url") or x.get("file", "") if isinstance(x, dict) else x
+                if own_upload(src) in have:
+                    continue  # already on the card
+                name = x.get("name") if isinstance(x, dict) else ""
+                f.setdefault(k, []).append({"name": name or Path(urlparse(src).path).name or "file",
+                                            "file": own_upload(src) or await upload(src, photo=False)})
+        else:
+            f[k] = v if isinstance(v, (int, float)) else str(v or "").strip()
+    return f
+
+
+def check(name, type_key, f):
+    errors = core.clean_fields(name, core.fields_for(type_key), f)
+    if errors:
+        raise ToolError("; ".join(errors) + f". See card_template({type_key!r}).")
+
+
+@server.tool(annotations=LOGGED)
+async def create_item(type: str, name: str, fields: dict[str, Any], agent: str, box_id: str = "",
+                      qty: int = 0) -> dict[str, Any]:
+    """New card. Fields by card_template(type), keys as there; photo: a direct image URL, the server downloads it;
+    files: [{name, url}]. With box_id and qty, puts qty into that box (history author: agent, your name).
+
+    Search first: the item may already exist. Returns the card as get_item does.
+    """
+    if type not in core.TYPES:
+        raise ToolError(f"Unknown type {type!r}. Call card_template without type for the list.")
+    box_id = box_id.strip().upper()
+    if box_id:
+        with db() as c:
+            if not c.execute("SELECT 1 FROM boxes WHERE id=?", (box_id,)).fetchone():
+                raise ToolError(f"No box {box_id}. Find boxes with search.")
+    agent, f = author(agent), await fill(type, {}, fields)
+    check(name, type, f)
+    iid = core.save_item(None, name.strip(), type, f)
+    if box_id and qty > 0:
+        core.move(iid, box_id, qty, "put", agent)
+    return card(iid)
+
+
+@server.tool(annotations=ToolAnnotations(readOnlyHint=False, destructiveHint=True, openWorldHint=False))
+async def update_item(item_id: int, fields: dict[str, Any], name: str = "") -> dict[str, Any]:
+    """Change card fields: only the keys given change, "" clears one. photo: new image URL or the link get_item
+    gave; files: new [{name, url}] are added, ones already on the card are kept. Returns the card.
+    """
+    with db() as c:
+        it = c.execute("SELECT * FROM items WHERE id=?", (item_id,)).fetchone()
+    if not it:
+        raise ToolError(f"No item {item_id}. Find item ids with search.")
+    name = name.strip() or it["name"]
+    f = await fill(it["type"], core.item_fields(it), fields)
+    check(name, it["type"], f)
+    core.save_item(item_id, name, it["type"], f)
+    return card(item_id)

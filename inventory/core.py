@@ -231,6 +231,17 @@ def clean_fields(name, fields, f):
     return errors
 
 
+
+def save_item(item_id, name, type_key, f):
+    """New card when item_id is None. → item id"""
+    with db() as c:
+        if item_id is None:
+            return c.execute("INSERT INTO items(name, type, fields) VALUES (?, ?, ?)",
+                             (name, type_key, json.dumps(f, ensure_ascii=False))).lastrowid
+        c.execute("UPDATE items SET name=?, type=?, fields=?, updated_at=datetime('now','localtime') WHERE id=?",
+                  (name, type_key, json.dumps(f, ensure_ascii=False), item_id))
+        return item_id
+
 def save_bytes(data, ext, photo=False):
     """Store an upload, return its name under /u/. Photos: phones shoot 5-10 MB, shrink so pages stay fast."""
     if photo:

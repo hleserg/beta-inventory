@@ -61,7 +61,8 @@ weight.
 - **Projects** with a git link, to charge takes against.
 - **MCP for agents** at `http://<host>/mcp` (streamable HTTP, same port and
   data as the site): `search`, `get_item`, `get_box`, `card_template`,
-  `list_projects`; `change_stock` writes history with the agent as the author.
+  `list_projects`; `create_item`, `update_item` (photos and files by URL, the
+  server downloads them), `change_stock` (history names the agent as author).
 
 ## Planned
 

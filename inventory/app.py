@@ -237,9 +237,7 @@ async def item_create(req: Request, type: str):
                 errors.append(f"Нет коробки {box_id}")
     if errors:
         return card_form(req, 400, type=type, name=name, vals=f, errors=errors, box=box_id, qty=qty)
-    with db() as c:
-        iid = c.execute("INSERT INTO items(name, type, fields) VALUES (?, ?, ?)",
-                        (name, type, json.dumps(f, ensure_ascii=False))).lastrowid
+    iid = core.save_item(None, name, type, f)
     if box_id and qty > 0:
         core.move(iid, box_id, qty, "put", AUTHOR)
     return go(f"/i/{iid}")
@@ -270,9 +268,7 @@ async def item_update(req: Request, item_id: int, type: str):
     name, f, errors, _ = await read_fields(req, json.loads(it["fields"]), core.fields_for(check_type(type)))
     if errors:
         return card_form(req, 400, it=it, type=type, name=name, vals=f, errors=errors)
-    with db() as c:
-        c.execute("UPDATE items SET name=?, type=?, fields=?, updated_at=datetime('now','localtime') WHERE id=?",
-                  (name, type, json.dumps(f, ensure_ascii=False), item_id))
+    core.save_item(item_id, name, type, f)
     return go(f"/i/{item_id}")
 
 

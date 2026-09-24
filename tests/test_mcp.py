@@ -1,12 +1,14 @@
 """Agents see the same inventory as the site, through MCP."""
 import asyncio
+import os
 
 from fastapi.testclient import TestClient
 from mcp import Client
 
-from inventory import core
+from inventory import core, mcp_server
 from inventory.app import app
 from inventory.mcp_server import server
+from test_flow import photo
 
 
 def call(tool, **args):
@@ -61,3 +63,28 @@ def test_stock_tools():
     assert err.is_error and "list_projects" in err.content[0].text
     assert call("change_stock", box_id=box, item_id=iid, action="count", qty=10, agent="Мара"
                 ).structured_content["qty"] == 10
+
+
+def test_card_tools(monkeypatch):
+    got = []
+    monkeypatch.setattr(mcp_server, "fetch", lambda url: got.append(url) or photo()["photo"][1])
+    box = core.new_boxes(1)[0]
+    card = call("create_item", type="module", name="INA219", agent="Claude", box_id=box, qty=2, fields={
+        "photo": "https://example.com/ina.png", "pinout": "VCC GND SCL SDA", "aliases": "датчик тока",
+        "reorder_at": "1,5", "files": [{"name": "datasheet.pdf", "url": "https://example.com/ina.pdf"}]}
+    ).structured_content
+    assert card["stock"][0]["qty"] == 2 and card["history"][0]["author"] == "Claude"
+    assert card["fields"]["photo"].endswith(".jpg") and card["fields"]["reorder_at"] == 1.5
+    assert "INA219" in call("search", query="датчик тока").structured_content["items"][0]["name"]
+
+    n = len(os.listdir(core.UPLOADS))  # the card goes back as get_item gave it: own /u/ links are not fetched again
+    new = call("update_item", item_id=card["id"], fields=dict(card["fields"], description="Шунт 0,1 Ом")
+               ).structured_content
+    assert new["fields"]["photo"] == card["fields"]["photo"] and new["fields"]["files"] == card["fields"]["files"]
+    assert new["fields"]["description"] == "Шунт 0,1 Ом" and len(os.listdir(core.UPLOADS)) == n and len(got) == 2
+
+    err = call("update_item", item_id=card["id"], fields={"colour": "red"})
+    assert err.is_error and "card_template" in err.content[0].text
+    assert call("update_item", item_id=card["id"], fields={"photo": "../inventory.db"}).is_error  # only own uploads
+    err = call("create_item", type="module", name="X", agent="Claude", fields={"pinout": "A B"})
+    assert err.is_error and "Фото: обязательно" in err.content[0].text
