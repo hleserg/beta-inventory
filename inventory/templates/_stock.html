@@ -1,24 +1,14 @@
 {% from "_box.html" import box_link %}
-{# Stock forms for one box×item pair. folded=True hides even «Забрать» (box page with many items). #}
+{# Stock form for one box×item pair: one number, ▲▼ to turn it, and what to do with it. folded=True: box page with many items. #}
 {% macro stock_forms(box_id, item_id, qty, projects, back, folded=False) %}
-{% set hidden %}<input type="hidden" name="box" value="{{ box_id }}"><input type="hidden" name="item" value="{{ item_id }}"><input type="hidden" name="back" value="{{ back }}">{% endset %}
-{% if folded %}<details><summary>забрать / добавить</summary>{% endif %}
-<form method="post" action="/stock" class="row">{{ hidden }}<input type="hidden" name="action" value="take">
-  <input type="number" name="qty" value="1" min="1"{% if qty %} max="{{ qty }}"{% endif %} required>
-  <select name="project"><option value="">без проекта</option>{% for p in projects %}<option value="{{ p.id }}">{{ p.name }}</option>{% endfor %}</select>
-  <button>Забрать</button>
+{% if folded %}<details><summary>взять / вернуть / пересчитать</summary>{% endif %}
+<form method="post" action="/stock" class="stock">
+  <input type="hidden" name="box" value="{{ box_id }}"><input type="hidden" name="item" value="{{ item_id }}"><input type="hidden" name="back" value="{{ back }}"><input type="hidden" name="kind" value="return">
+  <div class="spin"><button type="button" class="ghost" onclick="this.nextElementSibling.stepUp()">▲</button><input type="number" name="qty" value="1" min="0" inputmode="numeric" required><button type="button" class="ghost" onclick="this.previousElementSibling.stepDown()">▼</button></div>
+  <div class="acts"><button name="action" value="take">Взять</button><button name="action" value="add" class="ghost">Вернуть</button><button name="action" value="set" class="ghost">Пересчитать</button></div>
+  {% if projects %}<select name="project"><option value="">взять: без проекта</option>{% for p in projects %}<option value="{{ p.id }}">взять на {{ p.name }}</option>{% endfor %}</select>{% endif %}
 </form>
-{% if not folded %}<details><summary>добавить / исправить</summary>{% endif %}
-<form method="post" action="/stock" class="row" style="margin-top:8px">{{ hidden }}<input type="hidden" name="action" value="add">
-  <input type="number" name="qty" value="{{ 1 if qty }}" min="1" placeholder="не считал">
-  <select name="kind"><option value="return">вернул</option><option value="buy">докупил</option><option value="put">положил</option></select>
-  <button class="ghost">Добавить</button>
-</form>
-<form method="post" action="/stock" class="row" style="margin-top:8px">{{ hidden }}<input type="hidden" name="action" value="set">
-  <input type="number" name="qty" value="{{ qty if qty is not none }}" min="0" required>
-  <button class="ghost">Пересчитал — теперь столько</button>
-</form>
-</details>
+{% if folded %}</details>{% endif %}
 {% endmacro %}
 
 {% macro moves_table(moves) %}
