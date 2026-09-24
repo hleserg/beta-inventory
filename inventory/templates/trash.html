@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block title %}Корзина{% endblock %}
+{% block main %}
+<h1>Корзина</h1>
+<p class="mut">Удалённое лежит здесь {{ trash_days }} дней, потом стирается насовсем.</p>
+{% for r in rows %}
+<form method="post" action="/trash/{{ r.id }}" class="card row">
+  <span>{{ {"item": t.item, "box": t.box, "place": t.place}[r.kind] }} <b>{{ r.label }}</b>
+    <span class="mut">{{ r.at[:16] }} · ещё {{ r.left|round(0, "ceil")|int }} дн.</span></span>
+  <button class="ghost right">Вернуть</button></form>
+{% else %}<p class="mut">Пусто.</p>{% endfor %}
+{% endblock %}

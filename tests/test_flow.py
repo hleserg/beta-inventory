@@ -225,3 +225,40 @@ def test_old_single_photo():
     iid = core.save_item(None, "старое", "module", {"photo": "x.jpg", "pinout": "A"})
     core.init()
     assert core.item_fields(core.db().execute("SELECT * FROM items WHERE id=?", (iid,)).fetchone())["photo"] == ["x.jpg"]
+
+
+def test_trash():
+    """№18/№27/№32: an item, a box, a place go to the trash at once and come back whole with «Вернуть»."""
+    q = lambda sql, *a: core.db().execute(sql, a).fetchone()[0]
+    c.post("/places", data={"name": "Антресоль"})
+    pid = q("SELECT id FROM places WHERE name='Антресоль'")
+    shelf = c.post(f"/places/{pid}/shelves", data={"label": "1"}, follow_redirects=False).headers["location"].split("/")[-1]
+    box, inner, loose = core.new_boxes(3)
+    c.post(f"/b/{box}", data={"name": "Паяльное", "parent_id": shelf})
+    c.post(f"/b/{inner}", data={"name": "Жала", "parent_id": box})
+    c.post(f"/b/{loose}", data={"name": "Разное", "place": pid})
+    c.post("/items/new?type=resistor", data={"dup_ok": "1", "name": "Флюс ЛТИ", "value": "1", "box": box, "qty": "3"})
+    item = newest()
+    assert f'action="/places/{pid}/delete"' in c.get("/places").text
+
+    r = c.post(f"/i/{item}/delete", follow_redirects=False)  # an item: gone from lists, history and search
+    assert r.status_code == 303 and "Флюс ЛТИ" not in c.get("/items").text + c.get(f"/b/{box}").text + c.get("/history").text
+    assert c.get(f"/i/{item}").status_code == 404 and "Флюс ЛТИ" in c.get("/trash").text
+    back = c.post(f"/trash/{q('SELECT max(id) FROM trash')}", follow_redirects=False).headers["location"]
+    assert back == f"/i/{item}" and "3 шт" in c.get(f"/b/{box}").text and "Флюс ЛТИ" in c.get("/history").text
+
+    c.post(f"/b/{box}/delete")  # a box: its stock goes with it, boxes inside move up a level
+    assert c.get(f"/b/{box}").status_code == 404 and "Нигде нет" in c.get(f"/i/{item}").text
+    assert q("SELECT parent_id FROM boxes WHERE id=?", inner) == shelf
+    c.post("/places/%d/delete" % pid)  # a place: its shelves go too, boxes on it lose the place (№27)
+    assert "Антресоль" not in c.get("/places").text and q("SELECT place_id FROM boxes WHERE id=?", loose) is None
+    assert c.get(f"/b/{shelf}").status_code == 404 and q("SELECT parent_id FROM boxes WHERE id=?", inner) is None
+
+    for t in core.db().execute("SELECT id FROM trash ORDER BY id DESC LIMIT 2").fetchall():  # place, then box
+        c.post(f"/trash/{t[0]}")
+    assert q("SELECT place_id FROM boxes WHERE id=?", loose) == pid and q("SELECT parent_id FROM boxes WHERE id=?", inner) == box
+    assert q("SELECT parent_id FROM boxes WHERE id=?", box) == shelf and "3 шт" in c.get(f"/b/{box}").text
+
+    core.db().execute("UPDATE trash SET at=datetime('now','-31 days')").connection.commit()
+    c.post(f"/i/{item}/delete")  # fresh stays, older than TRASH_DAYS goes for good
+    assert "Флюс ЛТИ" in c.get("/trash").text and q("SELECT count(*) FROM trash WHERE at < datetime('now','-30 days')") == 0

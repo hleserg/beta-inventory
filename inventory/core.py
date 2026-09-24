@@ -46,6 +46,9 @@ CREATE TABLE IF NOT EXISTS movements(
   delta INTEGER NOT NULL, kind TEXT NOT NULL, project_id INTEGER REFERENCES projects(id),
   author TEXT NOT NULL, note TEXT NOT NULL DEFAULT '',
   at TEXT NOT NULL DEFAULT (datetime('now','localtime')));
+CREATE TABLE IF NOT EXISTS trash(
+  id INTEGER PRIMARY KEY, kind TEXT NOT NULL, label TEXT NOT NULL, data TEXT NOT NULL,
+  at TEXT NOT NULL DEFAULT (datetime('now','localtime')));
 """
 
 MOVES = ("SELECT m.*, i.name AS item, p.name AS project, b.name AS box FROM movements m JOIN items i ON i.id=m.item_id "
@@ -93,11 +96,12 @@ SEM_MODEL = os.environ.get("SEMANTIC_MODEL", "sentence-transformers/paraphrase-m
 SEM_MIN = float(os.environ.get("SEMANTIC_MIN", "0.35"))  # cosine floor; tune on real data
 SEM_MARGIN = float(os.environ.get("SEMANTIC_MARGIN", "0.08"))  # and no further than this below the best match: cut noise 4x on 22 test queries
 SEM_TOP = int(os.environ.get("SEMANTIC_TOP", "5"))
-_sem = {"model": None, "vecs": {}}
+_sem = {"model": None, "vecs": {}}  # vecs: item_id -> (embedded text, unit vector)
 
 # Photos: phones shoot 5-10 MB. Shrunk to this long side and JPEG quality: screw sizes on a box photo stay readable.
 PHOTO_MAX_PX = int(os.environ.get("PHOTO_MAX_PX", "2560"))
-PHOTO_QUALITY = int(os.environ.get("PHOTO_QUALITY", "90"))  # vecs: item_id -> (embedded text, unit vector)
+PHOTO_QUALITY = int(os.environ.get("PHOTO_QUALITY", "90"))
+TRASH_DAYS = int(os.environ.get("TRASH_DAYS", "30"))  # deleted things wait this long for «Вернуть», then go for good
 
 
 def db():
@@ -157,7 +161,7 @@ def _item_vecs(rows):
     if todo:
         for (iid, t), v in zip(todo, _unit(_sem["model"].embed([t for _, t in todo]))):
             vecs[iid] = (t, v)
-    return vecs
+    return {r["id"]: vecs[r["id"]] for r in rows}  # a deleted item's vector must not raise the cut
 
 
 def norm(s):
@@ -346,6 +350,113 @@ def clear_box(box_id, author):
     with db() as c:
         c.execute("UPDATE boxes SET parent_id=?, place_id=COALESCE(place_id, ?) WHERE parent_id=?",
                   (b["parent_id"], b["place_id"], box_id))
+
+
+# Trash (№18): the rows leave their tables for one JSON snapshot, so every list, search and agent stops seeing
+# them with no filter anywhere; «Вернуть» puts them back. ponytail: uploaded photos stay on disk after the purge.
+def _rows(c, sql, *a):
+    return [dict(r) for r in c.execute(sql, a)]
+
+
+def _relink(c, s, b, parent, place):
+    """A box that loses its parent or place; «Вернуть» undoes it unless the box was moved since."""
+    s["links"].append([b["id"], b["parent_id"], b["place_id"], parent, place])
+    c.execute("UPDATE boxes SET parent_id=?, place_id=? WHERE id=?", (parent, place, b["id"]))
+
+
+def _drop_box(c, s, b):
+    """The box and its stock go into the snapshot; boxes inside move up a level, as when it is freed."""
+    s["boxes"].append(dict(b))
+    s["stock"] += _rows(c, "SELECT * FROM stock WHERE box_id=?", b["id"])
+    for r in c.execute("SELECT * FROM boxes WHERE parent_id=?", (b["id"],)).fetchall():
+        _relink(c, s, r, b["parent_id"], r["place_id"] or b["place_id"])
+    c.execute("DELETE FROM stock WHERE box_id=?", (b["id"],))
+    c.execute("DELETE FROM boxes WHERE id=?", (b["id"],))
+
+
+def trash(kind, key):
+    """kind is item, box or place. A place takes its shelves along (a shelf never leaves its cabinet);
+    boxes standing on it lose the place (№27)."""
+    s = {k: [] for k in ("places", "boxes", "items", "stock", "movements", "links")}
+    with db() as c:
+        table = {"item": "items", "box": "boxes", "place": "places"}[kind]
+        r = c.execute(f"SELECT * FROM {table} WHERE id=?", (key,)).fetchone()
+        if not r:
+            raise ValueError("Уже удалено")
+        if kind == "item":
+            s["items"].append(dict(r))
+            s["stock"] = _rows(c, "SELECT * FROM stock WHERE item_id=?", key)
+            s["movements"] = _rows(c, "SELECT * FROM movements WHERE item_id=?", key)
+            for t in ("movements", "stock"):
+                c.execute(f"DELETE FROM {t} WHERE item_id=?", (key,))
+            c.execute("DELETE FROM items WHERE id=?", (key,))
+        elif kind == "box":
+            _drop_box(c, s, r)
+        else:
+            for sh in c.execute("SELECT * FROM boxes WHERE place_id=? AND kind='shelf'", (key,)).fetchall():
+                _drop_box(c, s, sh)
+            for b in c.execute("SELECT * FROM boxes WHERE place_id=?", (key,)).fetchall():
+                _relink(c, s, b, b["parent_id"], None)
+            s["places"].append(dict(r))
+            c.execute("DELETE FROM places WHERE id=?", (key,))
+        c.execute("INSERT INTO trash(kind, label, data) VALUES (?, ?, ?)",
+                  (kind, r["name"] or r["id"], json.dumps(s, ensure_ascii=False)))
+        _purge(c)
+
+
+def _put(c, table, r):
+    return c.execute(f"INSERT INTO {table}({','.join(r)}) VALUES ({','.join('?' * len(r))})", list(r.values())).lastrowid
+
+
+def restore(trash_id):
+    """Everything back where it was; returns the page to show. A number taken meanwhile gives a new one."""
+    with db() as c:
+        t = c.execute("SELECT * FROM trash WHERE id=?", (trash_id,)).fetchone()
+        if not t:
+            raise ValueError("В корзине этого уже нет")
+        s, pid, iid = json.loads(t["data"]), {}, {}
+        has = lambda table, key: c.execute(f"SELECT 1 FROM {table} WHERE id=?", (key,)).fetchone()
+        for r in s["places"]:
+            if c.execute("SELECT 1 FROM places WHERE name=?", (r["name"],)).fetchone():
+                raise ValueError(f"Место «{r['name']}» уже есть — переименуйте его, потом верните это")
+            old = r["id"]
+            pid[old] = _put(c, "places", {k: v for k, v in r.items() if k != "id" or not has("places", old)})
+        for r in s["boxes"]:
+            if has("boxes", r["id"]):
+                raise ValueError(f"Коробку {r['id']} уже завели заново — удалите её, потом верните эту")
+            r["place_id"] = pid.get(r["place_id"], r["place_id"])
+            r["parent_id"], r["place_id"] = (r["parent_id"] if has("boxes", r["parent_id"]) else None,
+                                             r["place_id"] if has("places", r["place_id"]) else None)
+            _put(c, "boxes", r)
+        for r in s["items"]:
+            old = r["id"]
+            iid[old] = _put(c, "items", {k: v for k, v in r.items() if k != "id" or not has("items", old)})
+        for r in s["stock"]:
+            r["item_id"] = iid.get(r["item_id"], r["item_id"])
+            if has("boxes", r["box_id"]) and has("items", r["item_id"]):  # one of them deleted since: that pile is gone
+                c.execute("INSERT OR IGNORE INTO stock(box_id, item_id, qty, updated_at) VALUES (?, ?, ?, ?)",
+                          (r["box_id"], r["item_id"], r["qty"], r["updated_at"]))
+        for r in s["movements"]:
+            r["item_id"] = iid.get(r["item_id"], r["item_id"])
+            _put(c, "movements", {k: v for k, v in r.items() if k != "id" or not has("movements", r["id"])})
+        for box, parent, place, parent_now, place_now in reversed(s["links"]):
+            c.execute("UPDATE boxes SET parent_id=?, place_id=? WHERE id=? AND parent_id IS ? AND place_id IS ?",
+                      (parent, pid.get(place, place), box, parent_now, pid.get(place_now, place_now)))
+        c.execute("DELETE FROM trash WHERE id=?", (trash_id,))
+    if s["items"]:
+        return f"/i/{iid[s['items'][0]['id']]}"
+    return f"/b/{s['boxes'][0]['id']}" if t["kind"] == "box" else f"/places#p{pid[s['places'][0]['id']]}"
+
+
+def _purge(c):
+    c.execute("DELETE FROM trash WHERE at < datetime('now', 'localtime', ?)", (f"-{TRASH_DAYS} days",))
+
+
+def trash_list():
+    with db() as c:
+        _purge(c)
+        return c.execute("SELECT id, kind, label, at, julianday(at, ?) - julianday('now', 'localtime') AS left "
+                         "FROM trash ORDER BY id DESC", (f"+{TRASH_DAYS} days",)).fetchall()
 
 
 def stock_of_item(c, item_id):

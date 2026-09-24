@@ -34,6 +34,8 @@ button,.btn{cursor:pointer;background:var(--acc);color:#fff;border:0;text-decora
 .bad{background:var(--bad)}
 label{display:block;margin:14px 0 4px;font-weight:600}
 .err{color:var(--bad)}
+.sw{position:relative}.sw>form{position:absolute;inset:8px 0;display:flex;justify-content:flex-end}
+.sw>form button{border-radius:12px}.sw>.card{position:relative;touch-action:pan-y}
 .car{position:relative}
 .car .strip{display:flex;overflow-x:auto;scroll-snap-type:x mandatory;scrollbar-width:none;border-radius:12px;background:var(--line)}
 .car .strip::-webkit-scrollbar{display:none}
@@ -81,7 +83,7 @@ form[data-sent] button{opacity:.5}
 </style>
 </head>
 <body>
-<nav><a href="/">Поиск</a><a href="/boxes">{{ t.boxes }}</a><a href="/items">{{ t.items }}</a><a href="/places">{{ t.places }}</a><a href="/projects">Проекты</a><a href="/history">История</a><a href="/phone">Телефон</a></nav>
+<nav><a href="/">Поиск</a><a href="/boxes">{{ t.boxes }}</a><a href="/items">{{ t.items }}</a><a href="/places">{{ t.places }}</a><a href="/projects">Проекты</a><a href="/history">История</a><a href="/trash">Корзина</a><a href="/phone">Телефон</a></nav>
 <main><div id="drafts"></div>
 <script>
 // Card-form drafts (item_form.html) are kept until saved: offer the way back from any other page.
@@ -264,6 +266,25 @@ document.addEventListener("submit", e => {
   if (e.defaultPrevented || f.method != "post") return;  // fetch-saved forms (box page) send as often as they like
   if (f.dataset.sent) return e.preventDefault();
   f.dataset.sent = 1;
+});
+// №27: a card with data-swipe slides left over the «Удалить» form under it; let go past 20% of its width and
+// that form asks and sends. Short of it, the card slides back.
+document.addEventListener("pointerdown", e => {
+  const card = e.target.closest?.("[data-swipe]");
+  if (!card || e.button || e.target.closest("input,textarea,select")) return;
+  const x0 = e.clientX, form = card.previousElementSibling;
+  let dx = 0;
+  const move = e => { dx = Math.min(0, e.clientX - x0); card.style.transform = `translateX(${dx}px)`; };
+  const up = () => {
+    removeEventListener("pointermove", move); removeEventListener("pointerup", up); removeEventListener("pointercancel", up);
+    if (-dx > card.offsetWidth * .2) form.requestSubmit();
+    card.style.transition = "transform .2s"; card.style.transform = "";
+    setTimeout(() => card.style.transition = "", 200);
+    if (dx > -10) return;
+    const eat = e => e.preventDefault();  // a slide is not a tap on the link it started on
+    card.addEventListener("click", eat, true); setTimeout(() => card.removeEventListener("click", eat, true), 300);
+  };
+  addEventListener("pointermove", move); addEventListener("pointerup", up); addEventListener("pointercancel", up);
 });
 addEventListener("pageshow", e => { if (e.persisted) location.reload(); });  // back button: the page from memory has old counts
 </script>

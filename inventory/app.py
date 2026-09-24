@@ -32,6 +32,7 @@ T = Jinja2Templates(directory=Path(__file__).parent / "templates")
 T.env.globals.update(
     # namespace, not dict: in Jinja t.items on a dict is dict.items, not the term
     t=SimpleNamespace(**PROFILE["terms"]), categories=PROFILE["categories"], type_label=core.type_label, kinds=core.KINDS,
+    trash_days=core.TRASH_DAYS,
     pk=next((f["key"] for f in PROFILE["item_fields"] if f["type"] == "photo"), None))
 
 
@@ -182,6 +183,14 @@ def box_clear(box_id: str):
     return go(f"/b/{b['id']}")
 
 
+@app.post("/b/{box_id}/delete")
+def box_delete(box_id: str):
+    with db() as c:
+        b = get_box(c, box_id)
+    core.trash("box", b["id"])
+    return go(f"/places#p{b['place_id']}" if b["kind"] == "shelf" else "/boxes")
+
+
 @app.get("/b/{box_id}/label.png")
 def label(req: Request, box_id: str):  # a «+ Коробка» page shows it before the box is saved
     return Response(label_png(valid_box_id(box_id), public_base(req)), media_type="image/png")
@@ -301,6 +310,12 @@ def item(req: Request, item_id: int):
                     history=c.execute(MOVES + " WHERE m.item_id=? ORDER BY m.id DESC LIMIT 50", (item_id,)).fetchall())
 
 
+@app.post("/i/{item_id}/delete")
+def item_delete(item_id: int):
+    core.trash("item", item_id)
+    return go("/items")
+
+
 @app.get("/i/{item_id}/edit")
 def item_edit(req: Request, item_id: int, type: str = ""):
     """`?type=` switches the form to another type; values of fields it lacks stay stored, just hidden."""
@@ -369,7 +384,9 @@ def places(req: Request):
         rows = [dict(p, boxes=c.execute("SELECT * FROM boxes WHERE place_id=? AND parent_id IS NULL AND kind='box' "
                                         "ORDER BY name='', name, id", (p["id"],)).fetchall(),
                      shelves=[dict(s, boxes=inside(s["id"])) for s in c.execute(
-                         "SELECT * FROM boxes WHERE place_id=? AND kind='shelf' ORDER BY rowid", (p["id"],))])
+                         "SELECT * FROM boxes WHERE place_id=? AND kind='shelf' ORDER BY rowid", (p["id"],))],
+                     gone=c.execute("SELECT count(*) FROM stock JOIN boxes b ON b.id=box_id "  # things on its shelves
+                                    "WHERE b.place_id=? AND b.kind='shelf'", (p["id"],)).fetchone()[0])
                 for p in c.execute("SELECT * FROM places ORDER BY name")]
     return page(req, "places.html", places=rows)
 
@@ -399,6 +416,22 @@ def place_save(place_id: int, name: str = Form(), note: str = Form("")):
     with db() as c:
         c.execute("UPDATE places SET name=?, note=? WHERE id=?", (name.strip(), note.strip(), place_id))
     return go("/places")
+
+
+@app.post("/places/{place_id}/delete")
+def place_delete(place_id: int):
+    core.trash("place", place_id)
+    return go("/places")
+
+
+@app.get("/trash")
+def trash_page(req: Request):
+    return page(req, "trash.html", rows=core.trash_list())
+
+
+@app.post("/trash/{trash_id}")
+def trash_restore(trash_id: int):
+    return go(core.restore(trash_id))
 
 
 @app.get("/projects")
