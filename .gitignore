@@ -1,0 +1,17 @@
+# Local working notes (personal deployment, not part of the product)
+docs/HANDOFF.md
+docs/projects-seed.md
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.ruff_cache/
+
+# Runtime data
+.env
+data/
+uploads/
+*.db
+*.db-*
