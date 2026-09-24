@@ -165,7 +165,7 @@ async def upload(url, photo):
             Image.open(io.BytesIO(data)).verify()
         except Exception:
             raise ToolError(f"{url} is not a picture: give a direct link to the image file.") from None
-    return core.save_bytes(data, Path(urlparse(url).path).suffix.lower()[:10], photo)
+    return await asyncio.to_thread(core.save_bytes, data, Path(urlparse(url).path).suffix.lower()[:10], photo)
 
 
 async def fill(type_key, old, given):

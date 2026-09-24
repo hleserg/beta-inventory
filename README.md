@@ -12,7 +12,7 @@ inventory and write new part cards for you.
 
 > **Status: v0 prototype.** Boxes, labels, cards, stock moves, search by
 > words and by meaning, and projects work. The UI is Russian for now. Agents
-> can read over MCP; writing cards and GitHub sync are next.
+> read and write over MCP; a card-writing skill and GitHub sync are next.
 
 ## Install
 
@@ -66,7 +66,7 @@ weight.
 
 ## Planned
 
-- **MCP writes** (new card, take, put) and a card-writing skill.
+- A card-writing skill for agents.
 - Projects synced from a GitHub account into an inbox.
 - Markdown editor with toolbar, batch label printing, English UI.
 

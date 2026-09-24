@@ -1,5 +1,6 @@
 """One walk through the main path: box → card → search → take → clear."""
 import io
+import json
 
 from fastapi.testclient import TestClient
 from PIL import Image
@@ -32,6 +33,11 @@ def test_main_path():
                      "box": box, "qty": "5"})
     assert r.status_code == 303
     iid = r.headers["location"].rsplit("/", 1)[1]
+    pic = json.loads(core.db().execute("SELECT fields FROM items WHERE id=?", (iid,)).fetchone()["fields"])["photo"]
+    r = c.post(f"/i/{iid}/edit?type=module", follow_redirects=False, data={
+        "name": "MP1584 mini buck", "aliases": "понижайка", "pinout": "IN+ IN- OUT+ OUT-", "photo__keep": pic,
+        "description": "до 3 А"})
+    assert r.status_code == 303 and "до 3 А" in c.get(f"/i/{iid}").text and pic in c.get(f"/i/{iid}").text
     assert "MP1584" in c.get("/?q=ПОНИЖАЙКА").text
     assert "10k" in c.get("/?q=резистор").text  # type label is searchable
     assert "10k" in c.get("/items?cat=electronics").text and "10k" not in c.get("/items?cat=tools").text
