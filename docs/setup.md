@@ -61,8 +61,10 @@ address filled in:
 2. In `chrome://flags/#unsafely-treat-insecure-origin-as-secure` add the site
    address, port included, choose *Enabled*, tap *Relaunch*. Chrome lets only
    "secure" sites write NFC tags, and a home site has no HTTPS.
-3. Chrome menu ⋮ → *Add to Home screen* (or *Install app*). Tags then open in
-   the app.
+3. Chrome menu ⋮ → *Add to Home screen* (or *Install app*).
+4. Tap «Разрешить чтение меток» (allow reading tags). While the site or app is
+   open, a tapped tag then opens its box right there. With the site closed, a
+   tag opens in Chrome: without HTTPS, Android doesn't hand links to the app.
 
 Write a tag: box page → «Настроить, наклейка» (setup, label) → «Записать на
 метку» (write to tag), hold the tag to the back of the phone. NTAG213 tags are

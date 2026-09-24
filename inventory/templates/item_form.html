@@ -7,7 +7,7 @@
   <button class="ghost">Сменить</button></form>
   <p class="mut">Поля, которых у нового типа нет, не удаляются — просто прячутся.</p></details>{% endif %}
 {% for e in errors %}<p class="err">{{ e }}</p>{% endfor %}
-<form method="post" enctype="multipart/form-data" action="{% if it %}/i/{{ it.id }}/edit{% else %}/items/new{% endif %}?type={{ type }}">
+<form data-draft method="post" enctype="multipart/form-data" action="{% if it %}/i/{{ it.id }}/edit{% else %}/items/new{% endif %}?type={{ type }}">
   <label>Название *</label><input name="name" value="{{ name }}" required>
   {% for fd in fields %}{% set v = vals[fd.key] %}
   <label>{{ fd.label }}{% if fd.required %} *{% endif %}</label>
@@ -27,4 +27,24 @@
   {% endif %}
   <p><button>Сохранить</button></p>
 </form>
+<script>{
+// Every edit goes to a local draft, so leaving the page (a label scanned, a call) loses nothing. Photos and files stay out.
+const f = document.querySelector("form[data-draft]"), key = "draft:" + location.pathname;
+const vals = () => Object.fromEntries([...f.elements].filter(e => e.name && e.type != "file" && e.type != "hidden").map(e => [e.name, e.value]));
+const shown = JSON.stringify(vals()), unsaved = !!document.querySelector(".err");  // errors: the values shown were not saved
+const store = () => { const v = vals();
+  if (JSON.stringify(v) === shown && !unsaved) localStorage.removeItem(key);
+  else localStorage[key] = JSON.stringify({t: Date.now(), name: v.name, url: location.pathname + location.search, v}); };
+const d = JSON.parse(localStorage[key] || "null");
+if (d && JSON.stringify(d.v) !== shown) {
+  for (const e of f.elements) if (e.name in d.v && e.type != "file" && e.type != "hidden") e.value = d.v[e.name];
+  store();
+  document.getElementById("drafts").insertAdjacentHTML("afterbegin", `<div class="card"><b>Есть несохранённый черновик от ${when(d.t)}</b> — он уже в форме. Фото и файлы в черновик не попадают: выберите их заново.
+    <p class="row"><button type="button" id="dsave">Сохранить</button><button type="button" class="ghost" id="dcancel">Отменить</button></p></div>`);
+  dsave.onclick = () => f.requestSubmit();
+  dcancel.onclick = () => { localStorage.removeItem(key); location.replace(location.pathname + location.search); };
+} else if (d || unsaved) store();
+f.addEventListener("input", store);
+f.addEventListener("submit", () => { if (localStorage[key]) localStorage[key] = JSON.stringify({...JSON.parse(localStorage[key]), sent: 1}); });
+}</script>
 {% endblock %}

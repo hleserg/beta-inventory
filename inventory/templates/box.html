@@ -38,10 +38,12 @@
     b.hidden = false;
     b.onclick = async () => {
       st.textContent = "Поднесите метку к задней крышке телефона…";
+      window.nfcBusy = true;  // base.html's scan would jump to the box the tag held before
       try {
         await new NDEFReader().write({records: [{recordType: "url", data: {{ nfc|tojson }}}]});
         st.textContent = "Записано ✓ Проверьте: коснитесь метки телефоном.";
       } catch (e) { st.textContent = "Не записалось: " + e.message; }
+      finally { window.nfcBusy = false; }
     };
   }
   </script>

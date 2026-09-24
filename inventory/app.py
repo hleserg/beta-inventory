@@ -287,7 +287,7 @@ def stock(box: str = Form(), item: int = Form(), action: str = Form(), qty: int 
 
 @app.get("/manifest.webmanifest")
 def manifest():
-    return JSONResponse({"name": PROFILE["name"], "short_name": PROFILE["name"], "start_url": "/", "display": "standalone",
+    return JSONResponse({"name": PROFILE["name"], "short_name": PROFILE["name"], "start_url": "/", "id": "/", "scope": "/", "display": "standalone",
                          "background_color": "#f7f6f2", "theme_color": "#1f6feb",
                          "icons": [{"src": f"/static/icon-{n}.png", "sizes": f"{n}x{n}", "type": "image/png",
                                     "purpose": "any maskable"} for n in (192, 512)]},

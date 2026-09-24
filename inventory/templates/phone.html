@@ -4,7 +4,9 @@
 <h1>Телефон: приложение и метки</h1>
 
 <div data-os="android">
-  <div class="card" id="ready" hidden>✓ Всё настроено. Откройте страницу коробки → «Настроить, наклейка» → «Записать на метку».</div>
+  <div class="card" id="ready" hidden>✓ Всё настроено. Откройте страницу коробки → «Настроить, наклейка» → «Записать на метку».
+    <p>Пока сайт открыт, метка может сразу открывать свою коробку. Разрешите это один раз:</p>
+    <p class="row"><button type="button" id="scan">Разрешить чтение меток</button><span id="scanst" class="mut"></span></p></div>
   <p>Сайт сам пишет NFC-метки, но Chrome разрешает это только «безопасным» сайтам. Домашний сайт работает без HTTPS,
     поэтому один раз впишите его в исключения Chrome:</p>
   <ol>
@@ -15,7 +17,8 @@
       <div class="row"><input readonly value="{{ origin }}"><button type="button" class="ghost copy">Копировать</button></div></li>
     <li>Нажмите <b>Relaunch</b> внизу экрана: Chrome перезапустится.</li>
     <li>Установите приложение: меню Chrome ⋮ → «Добавить на главный экран» (или «Установить приложение»).
-      Метки коробок тогда будут открываться сразу в нём.</li>
+      Метка, поднесённая к закрытому телефону, всё равно откроется в Chrome: без HTTPS Android не отдаёт ссылки приложению.
+      А при открытом сайте или приложении метка сразу откроет свою коробку — нажмите кнопку ниже.</li>
   </ol>
   <p class="mut">Кнопка «Записать на метку» так и не появилась? Откройте сайт именно в Chrome: Samsung Internet и Firefox метки не пишут.
     Адрес в пункте 3 должен совпадать с адресом сайта в строке браузера.</p>
@@ -42,6 +45,8 @@ const os = /iPhone|iPad|iPod/.test(ua) || (/Macintosh/.test(ua) && navigator.max
          : /Android/.test(ua) ? "android" : "other";
 document.querySelectorAll("[data-os]").forEach(e => e.hidden = e.dataset.os !== os);
 document.getElementById("ready").hidden = !("NDEFReader" in window);
+document.getElementById("scan").onclick = () => nfcScan().then(
+  () => scanst.textContent = "Готово ✓ Коснитесь метки любой коробки.", e => scanst.textContent = "Не вышло: " + e.message);
 document.querySelectorAll(".copy").forEach(b => b.onclick = () => {
   b.previousElementSibling.select();
   document.execCommand("copy");  // navigator.clipboard needs the secure context we are setting up here

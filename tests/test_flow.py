@@ -73,7 +73,10 @@ def test_meaning():
 
 def test_phone_app():
     """Installable app + writing NFC tags from the phone, with setup steps per platform."""
-    assert c.get("/manifest.webmanifest").json()["display"] == "standalone"
+    m = c.get("/manifest.webmanifest").json()
+    assert m["display"] == "standalone" and m["scope"] == "/"  # labels' /b/ links fall in the app's scope
+    assert "nfcScan" in c.get("/").text and "nfcScan()" in c.get("/phone").text  # a scanned label opens its box
+    assert "data-draft" in c.get("/items/new?type=module").text  # unsaved card edits survive leaving the page
     assert "serviceWorker" in c.get("/").text and "/offline" in c.get("/sw.js").text
     assert c.get("/offline").status_code == 200
     box = core.new_boxes(1)[0]
