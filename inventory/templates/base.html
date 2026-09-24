@@ -135,10 +135,12 @@ function askMove(label, card) {  // «больше не спрашивать» i
 function nfcScan() {  // one reader per page: two would both fire and the second would miss the armed field
   return scanning ||= (() => { const r = new NDEFReader();
     r.onreading = e => {
-      if (window.nfcBusy || document.querySelector("dialog[open]")) return;  // the box page is writing this tag; a question is open
+      if (window.nfcBusy || document.querySelector("dialog[open]")) return;  // this page is writing the tag; a question is open
       for (const rec of e.message.records) {
-        const m = ["url", "absolute-url"].includes(rec.recordType) && new TextDecoder().decode(rec.data).match(/\/b\/([A-Za-z0-9]+)\/?$/i);
-        if (m) return gotBox(m[1].toUpperCase());
+        const u = ["url", "absolute-url"].includes(rec.recordType) ? new TextDecoder().decode(rec.data) : "";
+        const b = u.match(/\/b\/([A-Za-z0-9]+)\/?$/i), i = u.match(/\/i\/(\d+)\/?$/i);
+        if (b) return gotBox(b[1].toUpperCase());
+        if (i) return location.pathname === "/i/" + i[1] || (location.href = "/i/" + i[1]);  // a thing's tag: its card (№37)
       }
     };
     return r.scan(); })().catch(e => { scanning = null; throw e; });
@@ -167,6 +169,22 @@ addEventListener("click", e => {
   if (!b) return;
   armed = b.parentElement.querySelector("[data-box]"); b.classList.add("on");
   qrScan().finally(() => b.classList.remove("on"));
+});
+addEventListener("click", async e => {  // «Записать на метку» (_box.html nfc_tag): Chrome on Android, site trusted as secure, see /phone
+  const b = e.target.closest("[data-nfcw]");
+  if (!b) return;
+  const st = b.parentElement.nextElementSibling;
+  if (!("NDEFReader" in window)) {  // say why, not nothing: most often the site is open under another address
+    st.innerHTML = `Этот браузер не пишет метки. Нужен Chrome на Android, и адрес <b>${location.origin}</b> должен стоять в исключениях Chrome, <a href="/phone">как здесь</a>.`;
+    return;
+  }
+  st.textContent = "Поднесите метку к задней крышке телефона…";
+  window.nfcBusy = true;  // the scan would jump to whatever the tag held before
+  try {
+    await new NDEFReader().write({records: [{recordType: "url", data: b.dataset.nfcw}]});
+    st.textContent = "Записано ✓ Проверьте: коснитесь метки телефоном.";
+  } catch (e) { st.textContent = "Не записалось: " + e.message; }
+  finally { window.nfcBusy = false; }
 });
 if ("NDEFReader" in window) navigator.permissions.query({name: "nfc"})
   .then(p => p.state === "granted" && nfcScan().catch(() => addEventListener("click", nfcScan, {once: true}))).catch(() => {});

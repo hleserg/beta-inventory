@@ -1,4 +1,4 @@
-{% extends "base.html" %}{% from "_stock.html" import stock_forms %}{% from "_box.html" import box_input, box_link %}
+{% extends "base.html" %}{% from "_stock.html" import stock_forms %}{% from "_box.html" import box_input, box_link, nfc_tag %}
 {% block title %}{{ b.name or b.id }}{% endblock %}
 {% block main %}
 <h1>{% if b.name %}{{ b.name }} <span class="mut">{{ b.id }}</span>{% else %}{{ b.id }}{% endif %}</h1>
@@ -72,25 +72,7 @@
   </script>
   <p><img src="/b/{{ b.id }}/label.png" alt="наклейка" style="width:240px;max-width:100%;background:#fff;border:1px solid var(--line)"><br>
   <a data-act href="/b/{{ b.id }}/label.png" download="{{ b.id }}.png">Скачать наклейку</a></p>
-  <label>Ссылка для NFC-метки</label><input readonly value="{{ nfc }}" onfocus="this.select()">
-  <p class="row"><button type="button" id="nfcw" data-act>Записать на метку</button><a href="/phone">Как записать метку с телефона</a></p>
-  <div id="nfcst" class="mut"></div>
-  <script>
-  document.getElementById("nfcw").onclick = async () => {  // Chrome on Android, site trusted as secure: see /phone
-    const st = document.getElementById("nfcst");
-    if (!("NDEFReader" in window)) {  // say why, not nothing: most often the site is open under another address
-      st.innerHTML = `Этот браузер не пишет метки. Нужен Chrome на Android, и адрес <b>${location.origin}</b> должен стоять в исключениях Chrome, <a href="/phone">как здесь</a>.`;
-      return;
-    }
-    st.textContent = "Поднесите метку к задней крышке телефона…";
-    window.nfcBusy = true;  // base.html's scan would jump to the box the tag held before
-    try {
-      await new NDEFReader().write({records: [{recordType: "url", data: {{ nfc|tojson }}}]});
-      st.textContent = "Записано ✓ Проверьте: коснитесь метки телефоном.";
-    } catch (e) { st.textContent = "Не записалось: " + e.message; }
-    finally { window.nfcBusy = false; }
-  };
-  </script>
+  {{ nfc_tag(nfc) }}
   {% if contents %}<form method="post" action="/b/{{ b.id }}/clear" onsubmit="return confirm('Всё содержимое спишется в историю. Освободить?')"><button class="bad">Освободить</button></form>{% endif %}
   <form method="post" action="/b/{{ b.id }}/delete" onsubmit='return confirm({{ ("Удалить " ~ (b.name or b.id) ~ "?"
     ~ ((" Вещей внутри: " ~ contents|length ~ " — уйдут в корзину вместе с ней.") if contents else "")

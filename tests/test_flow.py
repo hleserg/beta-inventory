@@ -164,7 +164,7 @@ def test_box_by_name():
     assert core.db().execute("SELECT parent_id FROM boxes WHERE id=?", (d,)).fetchone()[0] == b
 
     page = c.get(f"/b/{d}").text  # names first, the ID last; QR next to the field, NFC needs no button (№29)
-    assert f'value="Клеммники WAGO ({b})"' in page and "data-nfc" not in page and "data-qr" in page
+    assert f'value="Клеммники WAGO ({b})"' in page and "data-nfc>" not in page and "data-nfc " not in page and "data-qr" in page
     assert f'<option value="Клеммники Phoenix ({a})">' in c.get("/items/new?type=module").text
     assert f'<option value="Клеммники Phoenix ({a})">' in c.get(f"/i/{newest()}").text
 
@@ -280,3 +280,12 @@ def test_scan_moves_to_box():
         assert [tuple(r) for r in rows] == [(b, qty or None)]  # nothing left behind, the count travels as is
         assert kinds[-2:] == ["move", "move"]
     assert "переложил" in c.get(f"/i/{iid}").text
+
+
+def test_item_tag():
+    """№37: a thing's card writes its own link to an NFC tag, like a box page does."""
+    c.post("/items/new?type=resistor", data={"name": "мультиметр", "value": "x"})
+    iid = newest()
+    assert f'data-nfcw="http://testserver/i/{iid}"' in c.get(f"/i/{iid}").text
+    box = core.new_boxes(1)[0]
+    assert f'data-nfcw="http://testserver/b/{box.lower()}"' in c.get(f"/b/{box}").text

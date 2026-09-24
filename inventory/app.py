@@ -310,6 +310,7 @@ def item(req: Request, item_id: int):
         it = get_item(c, item_id)
         return page(req, "item.html", it=it, f=json.loads(it["fields"]), fields=core.fields_for(it["type"]),
                     stock=core.stock_of_item(c, item_id), projects=core.projects(c),
+                    nfc=f"{public_base(req)}/i/{item_id}".lower(),  # №37: the tag opens this card
                     history=c.execute(MOVES + " WHERE m.item_id=? ORDER BY m.id DESC LIMIT 50", (item_id,)).fetchall())
 
 

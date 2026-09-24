@@ -7,3 +7,9 @@
 <button type="button" class="ghost mini" data-qr title="Навести камеру на QR коробки">QR</button>
 <datalist id="boxlist">{% for b in boxes %}<option value="{{ label(b) }}">{% endfor %}</datalist>
 {%- endmacro %}
+
+{% macro nfc_tag(url) %}{# writing it: base.html #}
+<label>Ссылка для NFC-метки</label><input readonly value="{{ url }}" onfocus="this.select()">
+<p class="row"><button type="button" data-nfcw="{{ url }}" data-act>Записать на метку</button><a href="/phone">Как записать метку с телефона</a></p>
+<div class="mut" data-nfcst></div>
+{%- endmacro %}

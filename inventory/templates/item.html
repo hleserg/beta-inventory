@@ -1,4 +1,4 @@
-{% extends "base.html" %}{% from "_stock.html" import stock_forms, moves_table %}{% from "_box.html" import box_input, box_link %}
+{% extends "base.html" %}{% from "_stock.html" import stock_forms, moves_table %}{% from "_box.html" import box_input, box_link, nfc_tag %}
 {% block title %}{{ it.name }}{% endblock %}
 {% block main %}
 {% if pk and f[pk] %}<div class="car" id="car">
@@ -35,6 +35,7 @@ addEventListener("keydown", e => { if (e.key == "Escape" && full()) history.back
   <input type="hidden" name="item" value="{{ it.id }}"><input type="hidden" name="action" value="add"><input type="hidden" name="kind" value="put"><input type="hidden" name="back" value="/i/{{ it.id }}"><input type="hidden" name="src">
   {{ box_input(required=True) }}<input type="number" name="qty" min="1" placeholder="не считал"><button>Положить</button>
 </form></details>
+<details><summary>NFC-метка</summary>{{ nfc_tag(nfc) }}</details>
 
 {% for fd in fields if fd.type != "photo" and f[fd.key] %}
 <h2>{{ fd.label }}</h2>
