@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% block title %}Телефон{% endblock %}
+{% block main %}
+<h1>Телефон: приложение и метки</h1>
+
+<div data-os="android">
+  <div class="card" id="ready" hidden>✓ Всё настроено. Откройте страницу коробки → «Настроить, наклейка» → «Записать на метку».</div>
+  <p>Сайт сам пишет NFC-метки, но Chrome разрешает это только «безопасным» сайтам. Домашний сайт работает без HTTPS,
+    поэтому один раз впишите его в исключения Chrome:</p>
+  <ol>
+    <li>Включите NFC в настройках телефона (найдите «NFC» поиском по настройкам).</li>
+    <li>Скопируйте и вставьте в адресную строку Chrome — ссылкой такие страницы не открываются:
+      <div class="row"><input readonly value="chrome://flags/#unsafely-treat-insecure-origin-as-secure"><button type="button" class="ghost copy">Копировать</button></div></li>
+    <li>В пункте «Insecure origins treated as secure» впишите адрес сайта и выберите <b>Enabled</b>:
+      <div class="row"><input readonly value="{{ origin }}"><button type="button" class="ghost copy">Копировать</button></div></li>
+    <li>Нажмите <b>Relaunch</b> внизу экрана: Chrome перезапустится.</li>
+    <li>Установите приложение: меню Chrome ⋮ → «Добавить на главный экран» (или «Установить приложение»).
+      Метки коробок тогда будут открываться сразу в нём.</li>
+  </ol>
+  <p class="mut">Кнопка «Записать на метку» так и не появилась? Откройте сайт именно в Chrome: Samsung Internet и Firefox метки не пишут.
+    Адрес в пункте 3 должен совпадать с адресом сайта в строке браузера.</p>
+</div>
+
+<div data-os="ios">
+  <p>Увы: на iPhone сайты не могут записывать NFC-метки, Apple не даёт им такой возможности. Метку запишет бесплатное приложение NFC Tools.</p>
+  <p><a class="btn" href="https://apps.apple.com/app/nfc-tools/id1252962749">NFC Tools в App Store</a></p>
+  <ol>
+    <li>На странице коробки откройте «Настроить, наклейка» и скопируйте «Ссылку для NFC-метки».</li>
+    <li>В NFC Tools: Write (Запись) → Add a record (Добавить запись) → URL / URI → вставьте ссылку → OK.</li>
+    <li>Нажмите Write и поднесите метку к верхнему краю iPhone.</li>
+  </ol>
+  <p>Приложение на экран: Safari → «Поделиться» → «На экран „Домой“».</p>
+</div>
+
+<div data-os="other">
+  <p>Метки пишутся с телефона. Откройте эту страницу на телефоне: <b>{{ origin }}/phone</b></p>
+</div>
+
+<script>
+const ua = navigator.userAgent;
+const os = /iPhone|iPad|iPod/.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1) ? "ios"
+         : /Android/.test(ua) ? "android" : "other";
+document.querySelectorAll("[data-os]").forEach(e => e.hidden = e.dataset.os !== os);
+document.getElementById("ready").hidden = !("NDEFReader" in window);
+document.querySelectorAll(".copy").forEach(b => b.onclick = () => {
+  b.previousElementSibling.select();
+  document.execCommand("copy");  // navigator.clipboard needs the secure context we are setting up here
+  b.textContent = "Скопировано";
+});
+</script>
+{% endblock %}

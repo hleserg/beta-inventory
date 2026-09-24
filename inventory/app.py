@@ -4,11 +4,12 @@ import json
 import os
 import uuid
 from pathlib import Path
+from urllib.parse import urlsplit
 from types import SimpleNamespace
 
 import qrcode
 from fastapi import FastAPI, Form, Request
-from fastapi.responses import RedirectResponse, Response
+from fastapi.responses import FileResponse, JSONResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from markdown_it import MarkdownIt
@@ -26,6 +27,8 @@ app = FastAPI(title="beta-inventory", lifespan=lambda _: mcp_server.session_mana
 # off: agents come by LAN name, and the site has no auth by design (LAN only).
 app.router.routes.extend(mcp_server.streamable_http_app(stateless_http=True, json_response=True, host="0.0.0.0").routes)
 app.mount("/u", StaticFiles(directory=core.UPLOADS), name="uploads")
+STATIC = Path(__file__).parent / "static"
+app.mount("/static", StaticFiles(directory=STATIC), name="static")
 T = Jinja2Templates(directory=Path(__file__).parent / "templates")
 T.env.globals.update(
     # namespace, not dict: in Jinja t.items on a dict is dict.items, not the term
@@ -318,6 +321,34 @@ def stock(box: str = Form(), item: int = Form(), action: str = Form(), qty: int 
     else:
         core.move(item, box, qty, kind if kind in ("put", "return", "buy") else "put", AUTHOR)
     return go(back if back.startswith("/") and not back.startswith("//") else "/")
+
+
+# --- phone: installable app, NFC tags ---
+
+@app.get("/manifest.webmanifest")
+def manifest():
+    return JSONResponse({"name": PROFILE["name"], "short_name": PROFILE["name"], "start_url": "/", "display": "standalone",
+                         "background_color": "#f7f6f2", "theme_color": "#1f6feb",
+                         "icons": [{"src": f"/static/icon-{n}.png", "sizes": f"{n}x{n}", "type": "image/png",
+                                    "purpose": "any maskable"} for n in (192, 512)]},
+                        media_type="application/manifest+json")
+
+
+@app.get("/sw.js")
+def service_worker():  # served from the root: a worker only controls pages under its own path
+    return FileResponse(STATIC / "sw.js", media_type="text/javascript")
+
+
+@app.get("/offline")
+def offline(req: Request):
+    return page(req, "offline.html")
+
+
+@app.get("/phone")
+def phone(req: Request):
+    """Setup steps: Chrome writes NFC tags only on a 'secure' site, so plain-HTTP LAN needs one flag."""
+    u = urlsplit(public_base(req))
+    return page(req, "phone.html", origin=f"{u.scheme}://{u.netloc}".lower())
 
 
 # --- places, projects, history ---

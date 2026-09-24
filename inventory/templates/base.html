@@ -3,6 +3,10 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#1f6feb">
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="apple-touch-icon" href="/static/icon-192.png">
+<script>if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js")</script>
 <title>{% block title %}{{ t.items }}{% endblock %}</title>
 <style>
 :root{--bg:#f7f6f2;--fg:#1d1d1b;--mut:#6b6b66;--line:#e2e1dc;--card:#fff;--acc:#1f6feb;--bad:#c62828}
@@ -46,7 +50,7 @@ summary{cursor:pointer;color:var(--acc)}
 </style>
 </head>
 <body>
-<nav><a href="/">Поиск</a><a href="/boxes">{{ t.boxes }}</a><a href="/items">{{ t.items }}</a><a href="/places">{{ t.places }}</a><a href="/projects">Проекты</a><a href="/history">История</a></nav>
+<nav><a href="/">Поиск</a><a href="/boxes">{{ t.boxes }}</a><a href="/items">{{ t.items }}</a><a href="/places">{{ t.places }}</a><a href="/projects">Проекты</a><a href="/history">История</a><a href="/phone">Телефон</a></nav>
 <main>{% block main %}{% endblock %}</main>
 </body>
 </html>

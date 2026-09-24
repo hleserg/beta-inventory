@@ -63,3 +63,16 @@ def test_meaning():
         assert page.index("MP1584") < page.index("Похоже по смыслу")  # keyword hit (alias) ranks first
     finally:
         core._sem["model"] = None
+
+
+def test_phone_app():
+    """Installable app + writing NFC tags from the phone, with setup steps per platform."""
+    assert c.get("/manifest.webmanifest").json()["display"] == "standalone"
+    assert "serviceWorker" in c.get("/").text and "/offline" in c.get("/sw.js").text
+    assert c.get("/offline").status_code == 200
+    box = core.new_boxes(1)[0]
+    page = c.get(f"/b/{box}").text
+    assert "NDEFReader" in page and f"http://testserver/b/{box.lower()}" in page
+    phone = c.get("/phone").text
+    assert "chrome://flags/#unsafely-treat-insecure-origin-as-secure" in phone and "http://testserver" in phone
+    assert "apps.apple.com/app/nfc-tools/id1252962749" in phone
