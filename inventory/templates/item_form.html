@@ -29,7 +29,8 @@
   <label>Куда положить</label>
   <div class="row">{{ box_input(value=box, placeholder="название или скан, можно пусто") }}<input type="number" name="qty" value="{{ qty }}" min="0" placeholder="не считал"></div>
   {% endif %}
-  <p><button>Сохранить</button></p>
+  {% if it %}<p id="savest" class="mut">Изменения сохраняются сами.</p><p><button>Готово</button></p>
+  {% else %}<p><button>Сохранить</button></p>{% endif %}
 </form>
 <script>{
 // Photos: each pick adds to the ones before (a phone camera gives one shot per pick), ✕ drops one.
@@ -43,20 +44,20 @@ for (const inp of document.querySelectorAll("input[data-pics]")) {
       s.className = "pic new";
       s.innerHTML = '<img class="thumb" alt=""><button type="button" class="mini" aria-label="Убрать фото">✕</button>';
       s.firstChild.src = URL.createObjectURL(file);
-      s.lastChild.onclick = () => { dt.items.remove(i); sync(); };
+      s.lastChild.onclick = () => { dt.items.remove(i); sync(); inp.dispatchEvent(new Event("input", {bubbles: true})); };
       row.append(s);
     });
     inp.required = "req" in inp.dataset && !row.querySelector("input");  // new files count on their own
   };
   inp.addEventListener("change", () => { for (const file of inp.files) dt.items.add(file); sync(); });
   row.addEventListener("click", e => {
-    if (e.target.matches(".pic:not(.new) button")) { e.target.parentNode.remove(); sync(); }
+    if (e.target.matches(".pic:not(.new) button")) { e.target.parentNode.remove(); sync(); inp.dispatchEvent(new Event("input", {bubbles: true})); }
   });
 }
 // Every edit goes to a local draft, so leaving the page (a label scanned, a call) loses nothing. Photos and files stay out.
 const f = document.querySelector("form[data-draft]"), key = "draft:" + location.pathname;
 const vals = () => Object.fromEntries([...f.elements].filter(e => e.name && e.type != "file" && e.type != "hidden").map(e => [e.name, e.value]));
-const shown = JSON.stringify(vals()), unsaved = !!document.querySelector(".err");  // errors: the values shown were not saved
+let shown = JSON.stringify(vals()), unsaved = !!document.querySelector(".err");  // errors: the values shown were not saved
 const store = () => { const v = vals();
   if (JSON.stringify(v) === shown && !unsaved) localStorage.removeItem(key);
   else localStorage[key] = JSON.stringify({t: Date.now(), name: v.name, url: location.pathname + location.search, v}); };
@@ -70,6 +71,38 @@ if (d && JSON.stringify(d.v) !== shown) {
   dcancel.onclick = () => { localStorage.removeItem(key); location.replace(location.pathname + location.search); };
 } else if (d || unsaved) store();
 f.addEventListener("input", store);
+{% if it %}
+// №16: a card saves itself as it changes, like a box. New photos and files go up with the save that finds them,
+// then the page reloads to show them kept. «Готово» saves and opens the card.
+const st = document.getElementById("savest");
+let timer, dirty = false, queue = Promise.resolve(true);
+const save = to => { clearTimeout(timer); timer = null; dirty = false;
+  return queue = queue.then(async () => {
+    const fd = new FormData(f), v = JSON.stringify(vals()), up = [...fd.values()].some(x => x instanceof File && x.size);
+    const r = await fetch(f.action, {method: "POST", body: fd, redirect: "manual"});  // saved → 303 to the card
+    if (r.type != "opaqueredirect") {  // the form's own error lines
+      st.className = "err";
+      st.textContent = [...new DOMParser().parseFromString(await r.text(), "text/html").querySelectorAll(".err")].map(e => e.textContent).join(" ") || "Не сохранилось";
+      return false;
+    }
+    shown = v; unsaved = false; store();
+    document.querySelector("h1").textContent = f.elements.name.value;
+    st.className = "mut"; st.textContent = "Сохранено ✓";
+    if (to || up) location.assign(to || location.href);
+    return true;
+  }, () => false);
+};
+f.addEventListener("input", () => { dirty = true; clearTimeout(timer); timer = setTimeout(save, 700); });
+f.addEventListener("change", () => { if (dirty) save(); });
+f.addEventListener("submit", e => { e.preventDefault(); save("/i/{{ it.id }}"); });
+addEventListener("pagehide", () => {  // left mid-typing (a scan, a call): the text goes, photos wait for the next visit
+  if (!dirty || !f.checkValidity()) return;  // invalid: the server says no anyway, the local draft keeps it
+  const fd = new FormData(f);
+  for (const e of f.querySelectorAll("input[type=file]")) fd.delete(e.name);
+  if (navigator.sendBeacon(f.action, fd)) localStorage.removeItem(key);
+});
+{% else %}
 f.addEventListener("submit", () => { if (localStorage[key]) localStorage[key] = JSON.stringify({...JSON.parse(localStorage[key]), sent: 1}); });
+{% endif %}
 }</script>
 {% endblock %}
