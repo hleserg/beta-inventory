@@ -1,9 +1,9 @@
 {% extends "base.html" %}
-{% from "_box.html" import box_input %}
+{% from "_box.html" import box_input %}{% from "_bar.html" import ico %}
 {% block bar %}{% endblock %}{# №54: a new thing has its own .save and nothing else to reach for #}
 {% block main %}
 <h1>{% if it %}{{ it.name }}{% else %}+ {{ t.item }}{% endif %}</h1>
-<div class="mut">{{ type_label(type) or "тип не выбран" }}</div>
+<div class="mut">{% if it %}{{ type_label(type) or "тип не выбран" }}{% else %}Черновик сохраняется сам{% endif %}</div>
 {% if it %}<details><summary>сменить тип</summary><form class="row" action="/i/{{ it.id }}/edit">
   <select name="type">{% for c in categories %}<optgroup label="{{ c.label }}">{% for ty in c.types %}<option value="{{ ty.key }}" {% if ty.key == type %}selected{% endif %}>{{ ty.label }}</option>{% endfor %}</optgroup>{% endfor %}</select>
   <button class="ghost">Сменить</button></form>
@@ -12,51 +12,70 @@
 {% if dups %}<div class="card"><b class="err">Похоже, такой уже есть:</b>
   {% for i in dups %}<a class="line" href="/i/{{ i.id }}">{% if pk and i.fields[pk] %}<img class="thumb" src="/u/{{ i.fields[pk][0] }}" alt="">{% else %}<span class="thumb"></span>{% endif %}<span>{{ i.name }}<br><span class="mut">{% for s in i.stock %}{{ s.name or s.box_id }} — {{ s.qty|qty(unit=unit_of(i.type, i.fields)) }}{% if not loop.last %}; {% endif %}{% else %}ни в одной коробке{% endfor %}</span></span></a>{% endfor %}
   <p class="row"><button form="cardf" name="dup_ok" value="1">Всё равно создать</button></p></div>{% endif %}
-<form id="cardf" data-draft method="post" enctype="multipart/form-data" action="{% if it %}/i/{{ it.id }}/edit{% else %}/items/new{% endif %}?type={{ type }}">
-  <label>Название *</label><input name="name" value="{{ name }}" required>
-  {% if not it %}<input type="hidden" name="single" value="0"><label class="chk"><input type="checkbox" name="single" value="1"{% if single %} checked{% endif %}> {{ t.single }}</label>{% endif %}
-  {% for fd in fields %}{% set v = vals[fd.key] %}<div{% if fd.reorder or fd.unit %} data-many{% if single %} hidden{% endif %}{% endif %}>{# №48: one of a kind — nothing to count #}
-  <label>{{ fd.label }}{% if fd.required %} *{% endif %}</label>
-  {% if fd.hint %}<div class="mut">{{ fd.hint }}</div>{% endif %}
-  {% if fd.type == "photo" %}
-    <div class="row">{% for x in v or [] %}<span class="pic"><img class="thumb" src="/u/{{ x }}" alt=""><input type="hidden" name="{{ fd.key }}__keep" value="{{ x }}"><button type="button" class="mini" aria-label="Убрать фото">✕</button></span>{% endfor %}</div>
-    <input type="file" name="{{ fd.key }}" accept="image/*" multiple data-pics{% if fd.required %} data-req{% endif %}>
+{# One field of the card. A photo field: two tiles (camera, gallery) over its row of shots, all inside [data-pf]. #}
+{% macro fld(fd) %}{% set v = vals[fd.key] %}<div{% if fd.reorder or fd.unit %} data-many{% if single %} hidden{% endif %}{% endif %}>{# №48: one of a kind — nothing to count #}
+  {% if it or fd.key != pk %}<label>{{ fd.label }}{% if fd.required %} *{% endif %}</label>
+  {% if fd.hint %}<div class="mut">{{ fd.hint }}</div>{% endif %}{% endif %}
+  {% if fd.type == "photo" %}<div data-pf>
+    <div class="tiles"><label class="tile">{{ ico('<path d="M3 8h4l2-3h6l2 3h4v11H3z"/><circle cx="12" cy="13" r="3.5"/>') }}Снять<input type="file" accept="image/*" capture="environment" aria-label="Снять фото"></label>
+      <label class="tile">{{ ico('<rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="2"/><path d="M21 16l-5-5-9 9"/>') }}Галерея<input type="file" name="{{ fd.key }}" accept="image/*" multiple data-pics aria-label="Фото из галереи"{% if fd.required %} data-req{% endif %}></label></div>
+    <div class="row pics">{% for x in v or [] %}<span class="pic"><img class="thumb" src="/u/{{ x }}" alt=""><input type="hidden" name="{{ fd.key }}__keep" value="{{ x }}"><button type="button" class="mini" aria-label="Убрать фото">✕</button></span>{% endfor %}</div></div>
   {% elif fd.type == "markdown" %}<textarea name="{{ fd.key }}" {% if fd.required %}required data-req{% endif %}>{{ v or "" }}</textarea>
   {% elif fd.type == "links" %}<textarea name="{{ fd.key }}" placeholder="https://…" {% if fd.required %}required data-req{% endif %}>{{ v if v is string else (v or [])|join("\n") }}</textarea>
   {% elif fd.type == "files" %}{% for x in v or [] %}<div class="mut">{{ x.name }}</div>{% endfor %}<input type="file" name="{{ fd.key }}" multiple>
   {% elif fd.type == "choice" %}<select name="{{ fd.key }}" {% if fd.required %}required data-req{% endif %}><option value="">—</option>{% for o in fd.options %}<option {% if o == (v or fd.default) %}selected{% endif %}>{{ o }}</option>{% endfor %}</select>
   {% else %}<input name="{{ fd.key }}" value="{{ v if v is defined and v is not none else '' }}" {% if fd.type == "number" %}inputmode="decimal"{% elif fd.type == "link" %}type="url"{% endif %} {% if fd.required %}required data-req{% endif %}>
-  {% endif %}</div>
+  {% endif %}</div>{% endmacro %}
+<form id="cardf" data-draft method="post" enctype="multipart/form-data" action="{% if it %}/i/{{ it.id }}/edit{% else %}/items/new{% endif %}?type={{ type }}">
+{% if it %}
+  <label>Название *</label><input name="name" value="{{ name }}" required>
+  {% for fd in fields %}{{ fld(fd) }}{% endfor %}
+  <p id="savest" class="mut">Изменения сохраняются сами.</p><p><button>Готово</button></p>
+{% else %}
+  {# №54 screen 6, top to bottom as the thumb reaches: type, photo, name, what must be filled; the rest folds away #}
+  {% for c in categories if type in c.types|map(attribute="key")|list %}
+  <label>Тип · {{ c.label }}</label>
+  <div class="chips scroll" data-retype>{% for ty in c.types %}<a href="/items/new?type={{ ty.key }}{% if box %}&box={{ box }}{% endif %}"{% if ty.key == type %} class="on" aria-current="page"{% endif %}>{{ ty.label }}</a>{% endfor %}<a href="/items/new{% if box %}?box={{ box }}{% endif %}">Другое…</a></div>
   {% endfor %}
-  {% if not it %}
-  <label>Куда положить</label>
-  <div class="row">{{ box_input(value=box, placeholder="название или скан, можно пусто") }}</div>
-  <div data-many{% if single %} hidden{% endif %}><label>Сколько</label><input type="number" name="qty" value="{{ qty }}" min="0" placeholder="не считал"></div>
-  <label class="chk"><input type="checkbox" name="for_agent" value="1"{% if agent %} checked{% endif %}> {{ t.to_agent }}</label>
-  {% endif %}
-  {% if it %}<p id="savest" class="mut">Изменения сохраняются сами.</p><p><button>Готово</button></p>
-  {% else %}{% if nfc %}<input type="hidden" name="nfc" value="1">{% endif %}
-  <p class="row"><button>Сохранить</button><button name="nfc" value="1" class="ghost">Сохранить и записать метку</button></p>{% endif %}
+  {% for fd in fields if fd.type == "photo" %}{{ fld(fd) }}{% endfor %}
+  <label>Название *</label><input name="name" value="{{ name }}" required>
+  {% for fd in fields if fd.required and fd.type != "photo" %}{{ fld(fd) }}{% endfor %}
+  <input type="hidden" name="single" value="0"><label class="chk rt">{{ t.single }}<input type="checkbox" class="tgl" name="single" value="1"{% if single %} checked{% endif %}></label>
+  <div class="card acc"><b>Куда положить</b>
+    <div class="mut sm">{% if core.SCAN_NFC %}Поднесите телефон к метке коробки — или выберите{% elif core.SCAN_QR %}Наведите камеру на QR коробки — или выберите{% else %}Выберите коробку{% endif %}. Можно оставить пустым.</div>
+    <div class="row">{{ box_input(value=box, placeholder="коробка: название или ID") }}</div>
+    <div class="row" data-many{% if single %} hidden{% endif %}><span class="grow">Сколько, {{ unit_of(type, vals) }}</span><input type="number" name="qty" value="{{ qty }}" min="0" placeholder="не считал" aria-label="Сколько"></div>
+  </div>
+  {% set opt = fields|rejectattr("required")|rejectattr("type", "equalto", "photo")|list %}
+  <div class="card list lrows">
+    {% if opt %}<details{% if errors %} open{% endif %}><summary class="lrow"><span class="ell">Ещё поля<br><span class="mut sm">{{ opt|map(attribute="label")|join(", ") }}</span></span><span class="chev">{{ ico('<path d="M6 9l6 6 6-6"/>') }}</span></summary><div>
+      {% for fd in opt %}{{ fld(fd) }}{% endfor %}</div></details>{% endif %}
+    <label class="lrow"><span>{{ t.to_agent }}<br><span class="mut sm">заполнит остальное сам — нужно только название</span></span><input type="checkbox" class="tgl" name="for_agent" value="1"{% if agent %} checked{% endif %}></label>
+    {% if core.SCAN_NFC %}<label class="lrow"><span>Сразу записать метку<br><span class="mut sm">после сохранения — поднести к наклейке NFC</span></span><input type="checkbox" class="tgl" name="nfc" value="1"{% if nfc %} checked{% endif %}></label>{% endif %}
+  </div>
+  <div class="save"><button type="button" class="ghost" id="cancel">Отмена</button><button>✓ Сохранить</button></div>
+{% endif %}
 </form>
 <script>{
 // №66: a card handed to the agent needs only its name — the agent fills the rest. A photo field is met by photos in its row too.
 const f = document.getElementById("cardf"), need = () => {
   const off = f.elements.for_agent ? f.elements.for_agent.checked : {{ (it and it.for_agent)|tojson }};
-  for (const e of f.querySelectorAll("[data-req]")) e.required = !off && !(e.type == "file" && e.previousElementSibling.querySelector("input"));
+  for (const e of f.querySelectorAll("[data-req]")) e.required = !off && !e.closest("[hidden]") && !(e.type == "file" && e.closest("[data-pf]").querySelector(".pics input"));
 };
 f.addEventListener("change", need);
 // Photos: each pick adds to the ones before (a phone camera gives one shot per pick), ✕ drops one, a drag reorders (№64).
 // A new one sits in the row as new:N — the N-th picked file — so the server keeps the order the row shows.
-for (const inp of document.querySelectorAll("input[data-pics]")) {
-  const row = inp.previousElementSibling, k = inp.name + "__keep";
+// №54: two tiles feed one row — «Снять» opens the camera, «Галерея» the pictures; only the gallery input is sent.
+for (const pf of document.querySelectorAll("[data-pf]")) {
+  const row = pf.querySelector(".pics"), inp = pf.querySelector("input[data-pics]"), cam = pf.querySelector("input[capture]"), k = inp.name + "__keep";
   const sync = () => {
     const dt = new DataTransfer();
     row.querySelectorAll(".pic.new").forEach((s, i) => { dt.items.add(s.file); s.querySelector("input").value = "new:" + i; });
     inp.files = dt.files;
     need();
   };
-  inp.addEventListener("change", () => {
-    for (const file of inp.files) {
+  const add = files => {
+    for (const file of files) {
       const s = document.createElement("span");
       s.className = "pic new"; s.file = file;
       s.innerHTML = `<img class="thumb" alt=""><input type="hidden" name="${k}"><button type="button" class="mini" aria-label="Убрать фото">✕</button>`;
@@ -64,7 +83,9 @@ for (const inp of document.querySelectorAll("input[data-pics]")) {
       row.append(s);
     }
     sync();
-  });
+  };
+  inp.addEventListener("change", () => add(inp.files));
+  cam.addEventListener("change", () => { add(cam.files); cam.value = ""; });
   row.addEventListener("input", sync);  // a drag (base.html) moved one
   row.addEventListener("click", e => {
     if (e.target.matches(".pic button")) { e.target.parentNode.remove(); sync(); inp.dispatchEvent(new Event("input", {bubbles: true})); }
@@ -77,7 +98,15 @@ let shown = JSON.stringify(vals()), unsaved = !!document.querySelector(".err"); 
 const store = () => { const v = vals();
   if (JSON.stringify(v) === shown && !unsaved) localStorage.removeItem(key);
   else localStorage[key] = JSON.stringify({t: Date.now(), name: v.name, url: location.pathname + location.search, v}); };
-const d = JSON.parse(localStorage[key] || "null");
+let d = JSON.parse(localStorage[key] || "null");
+{% if not it %}// №54: a type chip carries what was typed to the new type's form — as a fresh start, not as a draft to restore
+const rt = JSON.parse(sessionStorage.retype || "null");
+sessionStorage.removeItem("retype");
+if (rt && Date.now() - rt.t < 120000) {
+  d = null; localStorage.removeItem(key);
+  for (const e of f.elements) if (e.name in rt.v && e.type != "file" && e.type != "hidden") e[e.type == "checkbox" ? "checked" : "value"] = rt.v[e.name];
+  store();
+}{% endif %}
 if (d && JSON.stringify(d.v) !== shown) {
   for (const e of f.elements) if (e.name in d.v && e.type != "file" && e.type != "hidden" && !(e.name == "box" && e.value)) e[e.type == "checkbox" ? "checked" : "value"] = d.v[e.name];  // opened from a box: that box wins
   store();
@@ -122,8 +151,20 @@ addEventListener("pagehide", () => {  // left mid-typing (a scan, a call): the t
 });
 {% else %}
 const one = f.querySelector("input[type=checkbox][name=single]");
-one.onchange = () => f.querySelectorAll("[data-many]").forEach(e => e.hidden = one.checked);
+one.onchange = () => { f.querySelectorAll("[data-many]").forEach(e => e.hidden = one.checked); need(); };
 one.onchange();  // a restored draft may have changed the tick
+document.querySelector(".chips .on")?.scrollIntoView({inline: "center", block: "nearest"});
+for (const a of document.querySelectorAll("[data-retype] a")) a.onclick = e => {
+  const was = JSON.parse(shown), v = vals();
+  delete v.single;  // one of a kind or not is the new type's own default
+  sessionStorage.retype = JSON.stringify({t: Date.now(), v: Object.fromEntries(Object.entries(v).filter(([k, x]) => x !== was[k]))});
+  if (a.search.includes("type=")) { e.preventDefault(); location.replace(a.href); }  // a sibling type replaces this form; «Другое…» is a step forward
+};
+document.getElementById("cancel").onclick = () => {
+  if (f.elements.name.value && !confirm("Выйти без сохранения? Черновик удалится.")) return;
+  localStorage.removeItem(key);
+  history.length > 1 ? history.back() : location.href = "/";
+};
 f.addEventListener("submit", () => { if (localStorage[key]) localStorage[key] = JSON.stringify({...JSON.parse(localStorage[key]), sent: 1}); });
 {% endif %}
 }</script>
