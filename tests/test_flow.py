@@ -506,3 +506,41 @@ def test_backup():
     db = Path(tempfile.mkdtemp()) / "inventory.db"
     db.write_bytes(z.read("inventory.db"))
     assert sqlite3.connect(db).execute("SELECT 1 FROM items WHERE name='Бэкапный'").fetchone()
+
+
+def test_reader():
+    """Manifesto «Умная коробка»: a reader sends what it read; a box becomes its current one, a thing goes in it."""
+    tap = lambda code, r="AA:01": c.post("/api/tap", json={"reader": r, "code": code})
+    stock = lambda iid: {r[0]: r[1] for r in core.db().execute("SELECT box_id, qty FROM stock WHERE item_id=?", (iid,))}
+    q = lambda sql, *a: core.db().execute(sql, a).fetchone()[0]
+    a, b = core.new_boxes(2)
+    r = tap(f"http://inv.lan/b/{a.lower()}")
+    assert r.status_code == 403 and not r.json()["ok"]  # new: shows up on the page, does nothing till accepted
+    assert "Новые считыватели" in c.get("/readers").text and "AA:01" in c.get("/readers").text
+    c.post("/places", data={"name": "Шкаф со считывателем"})
+    pid = q("SELECT id FROM places WHERE name='Шкаф со считывателем'")
+    c.post("/readers", data={"id": "AA:01", "name": "Шкаф", "place": pid})
+    c.post("/items/new?type=hand_tool", files=photo(), data={"name": "клещи", "box": b, "dup_ok": "1"})
+    tool = newest()
+
+    assert tap(f"HTTP://INV.LAN/I/{tool}").status_code == 409 and stock(tool) == {b: 1}  # no box yet: error beep
+    r = tap(f"HTTP://INV.LAN/B/{a}")
+    assert r.status_code == 200 and r.json()["box"] == a
+    assert q("SELECT place_id FROM boxes WHERE id=?", a) == pid  # put in the cabinet: the cabinet is written
+    r = tap(f"http://inv.lan/I/{tool}")
+    assert r.status_code == 200 and stock(tool) == {a: 1}  # one of a kind: moved, not a second one
+    assert q("SELECT author FROM movements WHERE item_id=? ORDER BY id DESC", tool) == "Шкаф"
+    page = c.get("/readers").text
+    assert "Новые считыватели" not in page and f'href="/b/{a}"' in page  # its current box
+    assert tap("http://inv.lan/i/999999").status_code == 404 and tap("что-то чужое").status_code == 404
+
+    def old():  # the last tap was 11 minutes ago
+        with core.db() as d:
+            d.execute("UPDATE readers SET tapped_at=datetime('now','localtime','-11 minutes') WHERE id='AA:01'")
+    old()
+    assert tap(f"http://inv.lan/I/{tool}").status_code == 200  # a stationary one never forgets
+    c.post("/readers", data={"id": "AA:01", "name": "Шкаф", "place": pid, "portable": "1"})
+    old()
+    assert tap(f"http://inv.lan/I/{tool}").status_code == 409  # a portable one forgets after READER_FORGET_MIN
+    c.post("/readers/delete", data={"id": "AA:01"})
+    assert "AA:01" not in c.get("/readers").text

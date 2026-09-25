@@ -3,6 +3,7 @@ import asyncio
 import io
 import json
 import os
+import re
 import tempfile
 from datetime import date
 from contextlib import asynccontextmanager
@@ -11,7 +12,7 @@ from urllib.parse import urlsplit
 from types import SimpleNamespace
 
 import qrcode
-from fastapi import FastAPI, Form, Header, Request
+from fastapi import Body, FastAPI, Form, Header, Request
 from fastapi.responses import FileResponse, JSONResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -473,6 +474,82 @@ def stock(box: str = Form(), item: int = Form(), action: str = Form(), qty: int 
             action = "count" if action == "set" else kind if kind in ("put", "return", "buy") else "put"
         core.change_stock(box, item, action, qty, AUTHOR, int(project) if project and action in ("take", "buy") else None)
     return go(back if back.startswith("/") and not back.startswith("//") else "/")
+
+
+# --- NFC readers (manifesto «Умная коробка»): a tap on a box makes it the reader's current one, a tap on a thing puts it there ---
+
+def readers(c, rid=None):
+    """Readers with the box each holds now: a portable one forgets it after READER_FORGET_MIN without a tap."""
+    return c.execute("SELECT r.*, b.name box_name, CASE WHEN r.portable AND r.tapped_at < datetime('now','localtime',?) "
+                     "THEN NULL ELSE r.box_id END box FROM readers r LEFT JOIN boxes b ON b.id=r.box_id "
+                     "WHERE ? IS NULL OR r.id=? ORDER BY r.accepted, r.name='', r.name, r.id",
+                     (f"-{core.READER_FORGET_MIN} minutes", rid, rid)).fetchall()
+
+
+@app.post("/api/tap")
+def tap(reader: str = Body(), code: str = Body()):
+    """What a reader read. 200 ok, 403 not accepted yet, 404 not ours, 409 no box yet: the firmware beeps by it."""
+    no = lambda status, error: JSONResponse({"ok": False, "error": error}, status)
+    rid = reader.strip()
+    if not rid or len(rid) > 64:
+        return no(400, "reader: id считывателя, до 64 символов")
+    with db() as c:
+        r = next(iter(readers(c, rid)), None)
+        if not r:  # a new one shows up on the page by itself
+            c.execute("INSERT INTO readers(id) VALUES (?)", (rid,))
+    if not r or not r["accepted"]:
+        return no(403, "Новый считыватель — примите его на странице «Считыватели»")
+    now = "UPDATE readers SET tapped_at=datetime('now','localtime') WHERE id=?"
+    if m := re.search(r"/b/([0-9a-z]{5})\b", code, re.I):
+        with db() as c:
+            b = c.execute("SELECT id, name, kind FROM boxes WHERE id=? AND kind IN ('box', 'shelf')", (m[1].upper(),)).fetchone()
+        if not b:
+            return no(404, f"Нет коробки {m[1].upper()}")
+        moved = r["place_id"] and b["kind"] == "box" and box_top(b["id"]) != r["place_id"]
+        with db() as c:
+            c.execute("UPDATE readers SET box_id=? WHERE id=?", (b["id"], rid))
+            c.execute(now, (rid,))
+            if moved:  # it stands where the reader is now
+                c.execute("UPDATE boxes SET place_id=?, parent_id=NULL WHERE id=?", (r["place_id"], b["id"]))
+        return {"ok": True, "box": b["id"], "name": b["name"]}
+    if m := re.search(r"/i/(\d+)", code, re.I):
+        with db() as c:
+            it = c.execute("SELECT id, name FROM items WHERE id=?", (int(m[1]),)).fetchone()
+        if not it:
+            return no(404, f"Нет вещи {m[1]}")
+        if not r["box"]:
+            return no(409, "Сначала коснитесь коробки")
+        core.tag_item(it["id"])
+        try:
+            core.change_stock(r["box"], it["id"], "put", None, r["name"] or rid)
+        except ValueError as e:
+            return no(400, str(e))
+        with db() as c:
+            c.execute(now, (rid,))
+        return {"ok": True, "box": r["box"], "item": it["id"], "name": it["name"]}
+    return no(404, "Это не метка коробки или вещи")
+
+
+@app.get("/readers")
+def readers_page(req: Request):
+    with db() as c:
+        return page(req, "readers.html", readers=readers(c), places=c.execute("SELECT * FROM places ORDER BY name").fetchall(),
+                    forget=core.READER_FORGET_MIN)
+
+
+@app.post("/readers")
+def reader_save(id: str = Form(), name: str = Form(""), place: str = Form(""), portable: str = Form("")):
+    with db() as c:
+        c.execute("UPDATE readers SET name=?, place_id=?, portable=?, accepted=1 WHERE id=?",
+                  (name.strip(), int(place) if place else None, int(bool(portable)), id))
+    return go("/readers")
+
+
+@app.post("/readers/delete")
+def reader_delete(id: str = Form()):
+    with db() as c:
+        c.execute("DELETE FROM readers WHERE id=?", (id,))
+    return go("/readers")
 
 
 # --- phone: installable app, NFC tags ---

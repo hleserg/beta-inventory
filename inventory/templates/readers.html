@@ -1,0 +1,22 @@
+{% extends "base.html" %}{% from "_box.html" import box_link %}
+{% block title %}Считыватели{% endblock %}
+{% block main %}
+{% macro reader(r) %}<div class="card">
+  <div class="row">{% if r.name %}<b>{{ r.name }}</b> {% endif %}<span class="mut">{{ r.id }}</span>
+    {% if r.accepted %}<span class="right">{% if r.box %}{{ box_link(r.box, r.box_name) }}{% else %}<span class="mut">коробки нет</span>{% endif %}</span>{% endif %}</div>
+  <form method="post" action="/readers"><input type="hidden" name="id" value="{{ r.id }}">
+    <input name="name" value="{{ r.name }}" placeholder="например: шкаф в мастерской" required>
+    <label>{{ t.place }} — сюда встанет коробка, которой коснулись</label><select name="place"><option value="">без места</option>
+      {% for p in places %}<option value="{{ p.id }}"{% if p.id == r.place_id %} selected{% endif %}>{{ p.name }}</option>{% endfor %}</select>
+    <label class="chk"><input type="checkbox" name="portable" value="1"{% if r.portable %} checked{% endif %}> Переносной — забывает коробку через {{ forget }} мин без касаний</label>
+    <p class="row"><button>{{ "Сохранить" if r.accepted else "Принять" }}</button></p></form>
+  <form method="post" action="/readers/delete" onsubmit="return confirm('Удалить считыватель? Коснётся метки — снова появится в новых.')">
+    <input type="hidden" name="id" value="{{ r.id }}"><button class="ghost">Удалить</button></form>
+</div>{% endmacro %}
+<h1>Считыватели</h1>
+<p class="mut">Коснитесь метки коробки — она станет текущей у считывателя. Потом метки вещи — вещь ляжет в эту коробку.</p>
+{% set new = readers|rejectattr("accepted")|list %}
+{% if new %}<h2>Новые считыватели</h2>{% for r in new %}{{ reader(r) }}{% endfor %}{% if new|length < readers|length %}<h2>Принятые</h2>{% endif %}{% endif %}
+{% for r in readers if r.accepted %}{{ reader(r) }}{% endfor %}
+{% if not readers %}<p class="mut">Пока нет. Считыватель появится здесь сам при первом касании.</p>{% endif %}
+{% endblock %}

@@ -59,6 +59,12 @@ CREATE TABLE IF NOT EXISTS movements(
 CREATE TABLE IF NOT EXISTS needs(
   project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE, item_id INTEGER NOT NULL REFERENCES items(id),
   qty INTEGER NOT NULL CHECK (qty > 0), PRIMARY KEY (project_id, item_id));
+CREATE TABLE IF NOT EXISTS readers(
+  id TEXT PRIMARY KEY, name TEXT NOT NULL DEFAULT '',
+  place_id INTEGER REFERENCES places(id) ON DELETE SET NULL,
+  portable INTEGER NOT NULL DEFAULT 0, accepted INTEGER NOT NULL DEFAULT 0,
+  box_id TEXT REFERENCES boxes(id) ON DELETE SET NULL, tapped_at TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now','localtime')));
 CREATE TABLE IF NOT EXISTS trash(
   id INTEGER PRIMARY KEY, kind TEXT NOT NULL, label TEXT NOT NULL, data TEXT NOT NULL,
   at TEXT NOT NULL DEFAULT (datetime('now','localtime')));
@@ -125,6 +131,7 @@ _sem = {"model": None, "vecs": {}}  # vecs: item_id -> (embedded text, unit vect
 PHOTO_MAX_PX = int(os.environ.get("PHOTO_MAX_PX", "2560"))
 PHOTO_QUALITY = int(os.environ.get("PHOTO_QUALITY", "90"))
 TRASH_DAYS = int(os.environ.get("TRASH_DAYS", "30"))  # deleted things wait this long for «Вернуть», then go for good
+READER_FORGET_MIN = int(os.environ.get("READER_FORGET_MIN", "10"))  # a portable NFC reader forgets its box after this long without a tap
 
 
 def db():

@@ -65,6 +65,13 @@ weight.
   movement with author and project. One-of-a-kind things (tools, anything
   with a tag) go without a count: scan its tag to take it, scan a box to put
   it back.
+- **NFC readers** at the shelves (`/readers`): a reader sends what it read,
+  `POST /api/tap {"reader": "<its id>", "code": "<tag URL>"}`. A box's tag
+  makes it the reader's current box and stands it where the reader is; a
+  thing's tag then puts the thing in that box. A new reader waits on the page
+  until you accept it; a portable one forgets its box after
+  `READER_FORGET_MIN` minutes. The answer is 200 done, 403 not accepted yet,
+  404 not a tag of ours, 409 touch a box first.
 - **Search** by name, other names, description and typed fields, ranked by
   relevance; box IDs and places too. Below the word matches, a small local
   model adds items close in meaning, so "step-down" finds a buck converter.
