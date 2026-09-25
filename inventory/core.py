@@ -550,7 +550,7 @@ def skip_project(git_url):
 
 
 def clean_fields(name, fields, f):
-    """Card check shared by the site and MCP: numbers parsed in place, required fields present. → errors."""
+    """Card check shared by the site and MCP: numbers and links parsed in place, required fields present. → errors."""
     errors = [] if name.strip() else ["Название: обязательно"]
     for fd in fields:
         k, v = fd["key"], f.get(fd["key"])
@@ -560,6 +560,8 @@ def clean_fields(name, fields, f):
                 f[k] = int(v) if v.is_integer() else v
             except ValueError:
                 errors.append(f"{fd['label']}: нужно число")
+        if fd["type"] == "links" and v is not None:  # one a line from the form, a list or a string from agents
+            f[k] = [s for s in (str(x).strip() for x in (v.splitlines() if isinstance(v, str) else v)) if s]
         if fd.get("required") and f.get(k) in (None, "", []):
             errors.append(f"{fd['label']}: обязательно")
     return errors

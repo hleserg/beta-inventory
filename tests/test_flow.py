@@ -53,9 +53,12 @@ def test_main_path():
     a, b = pics()  # several photos on one card
     r = c.post(f"/i/{iid}/edit?type=module", follow_redirects=False, files=photo(), data={
         "name": "MP1584 mini buck", "aliases": "понижайка", "pinout": "IN+ IN- OUT+ OUT-",
-        "photo__keep": [b, "../inventory.db"], "description": "до 3 А"})  # a removed, one added; only own uploads kept
+        "photo__keep": [b, "../inventory.db"], "description": "до 3 А",
+        "buy": "https://www.ozon.ru/product/1\n\n https://aliexpress.com/item/2 \n"})  # №63: links, one a line  # a removed, one added; only own uploads kept
     assert r.status_code == 303 and "до 3 А" in c.get(f"/i/{iid}").text
     assert pics()[0] == b and len(pics()) == 2 and a not in c.get(f"/i/{iid}").text
+    assert '>ozon.ru</a>' in c.get(f"/i/{iid}").text and '>aliexpress.com</a>' in c.get(f"/i/{iid}").text
+    assert "https://www.ozon.ru/product/1\nhttps://aliexpress.com/item/2</textarea>" in c.get(f"/i/{iid}/edit").text
     r = c.post(f"/i/{iid}/rotate", data={"photo": b, "deg": 90})  # №21: a turned photo is a new file, the old one may be cached
     assert r.json()["photo"] == pics()[0] != b and Image.open(core.UPLOADS / pics()[0]).size == (30, 40)
     assert c.post(f"/i/{iid}/rotate", data={"photo": a, "deg": -90}).status_code == 400  # not this card's photo

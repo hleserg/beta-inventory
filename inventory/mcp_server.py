@@ -266,6 +266,8 @@ async def fill(type_key, old, given):
                 name = x.get("name") if isinstance(x, dict) else ""
                 f.setdefault(k, []).append({"name": name or Path(urlparse(src).path).name or "file",
                                             "file": core.own_upload(src) or await upload(src, photo=False)})
+        elif fd["type"] == "links":
+            f[k] = v  # clean_fields makes it a list
         else:
             f[k] = v if isinstance(v, (int, float)) else str(v or "").strip()
     return f

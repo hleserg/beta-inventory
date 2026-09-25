@@ -22,6 +22,7 @@
     <div class="row">{% for x in v or [] %}<span class="pic"><img class="thumb" src="/u/{{ x }}" alt=""><input type="hidden" name="{{ fd.key }}__keep" value="{{ x }}"><button type="button" class="mini" aria-label="Убрать фото">✕</button></span>{% endfor %}</div>
     <input type="file" name="{{ fd.key }}" accept="image/*" multiple data-pics{% if fd.required %} data-req{% endif %}{% if fd.required and not v %} required{% endif %}>
   {% elif fd.type == "markdown" %}<textarea name="{{ fd.key }}" {% if fd.required %}required{% endif %}>{{ v or "" }}</textarea>
+  {% elif fd.type == "links" %}<textarea name="{{ fd.key }}" placeholder="https://…" {% if fd.required %}required{% endif %}>{{ v if v is string else (v or [])|join("\n") }}</textarea>
   {% elif fd.type == "files" %}{% for x in v or [] %}<div class="mut">{{ x.name }}</div>{% endfor %}<input type="file" name="{{ fd.key }}" multiple>
   {% elif fd.type == "choice" %}<select name="{{ fd.key }}" {% if fd.required %}required{% endif %}><option value="">—</option>{% for o in fd.options %}<option {% if o == (v or fd.default) %}selected{% endif %}>{{ o }}</option>{% endfor %}</select>
   {% else %}<input name="{{ fd.key }}" value="{{ v if v is defined and v is not none else '' }}" {% if fd.type == "number" %}inputmode="decimal"{% elif fd.type == "link" %}type="url"{% endif %} {% if fd.required %}required{% endif %}>

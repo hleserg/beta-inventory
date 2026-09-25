@@ -52,6 +52,7 @@
 {% set v = f[fd.key] %}
 {% if fd.type == "markdown" %}<div class="md">{{ v|md }}</div>
 {% elif fd.type == "link" %}{% if v.startswith(("http://", "https://")) %}<a href="{{ v }}" target="_blank" rel="noopener">{{ v }}</a>{% else %}{{ v }}{% endif %}
+{% elif fd.type == "links" %}{% for x in ([v] if v is string else v) %}<div>{% if x.startswith(("http://", "https://")) %}<a href="{{ x }}" target="_blank" rel="noopener">{{ x|host }}</a>{% else %}{{ x }}{% endif %}</div>{% endfor %}
 {% elif fd.type == "files" %}{% for x in v %}<div><a href="/u/{{ x.file }}" download="{{ x.name }}">{{ x.name }}</a></div>{% endfor %}
 {% else %}<p>{{ v }}</p>{% endif %}
 {% endfor %}

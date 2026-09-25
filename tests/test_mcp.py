@@ -106,10 +106,12 @@ def test_card_tools(monkeypatch):
     box = core.new_boxes(1)[0]
     card = call("create_item", type="module", name="INA219", agent="Claude", box_id=box, qty=2, fields={
         "photo": ["https://example.com/ina.png"], "pinout": "VCC GND SCL SDA", "aliases": "датчик тока",
-        "reorder_at": "1,5", "files": [{"name": "datasheet.pdf", "url": "https://example.com/ina.pdf"}]}
+        "reorder_at": "1,5", "buy": ["https://ozon.ru/a", " "], "files": [{"name": "datasheet.pdf", "url": "https://example.com/ina.pdf"}]}
     ).structured_content
     assert card["stock"][0]["qty"] == 2 and card["history"][0]["author"] == "Claude"
     assert card["fields"]["photo"][0].endswith(".jpg") and card["fields"]["reorder_at"] == 1.5
+    assert card["fields"]["buy"] == ["https://ozon.ru/a"]  # №63: a list of links; a string splits by lines
+    assert call("update_item", item_id=card["id"], fields={"buy": "https://a.ru\nhttps://b.ru"}).structured_content["fields"]["buy"] == ["https://a.ru", "https://b.ru"]
     assert "INA219" in call("search", query="датчик тока").structured_content["items"][0]["name"]
 
     n = len(os.listdir(core.UPLOADS))  # the card goes back as get_item gave it: own /u/ links are not fetched again
