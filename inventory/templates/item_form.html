@@ -105,7 +105,9 @@ const save = to => { clearTimeout(timer); timer = null; dirty = false;
     shown = v; unsaved = false; store();
     document.querySelector("h1").textContent = f.elements.name.value;
     st.className = "mut"; st.textContent = "Сохранено ✓";
-    if (to || up) location.assign(to || location.href);
+    if (to && document.referrer && new URL(document.referrer).pathname == to) history.back();  // №67: opened from the card — back to it, no second copy
+    else if (to) location.replace(to);
+    else if (up) location.reload();  // keeps the referrer: «Готово» still finds the card behind
     return true;
   }, () => false);
 };

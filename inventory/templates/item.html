@@ -9,9 +9,9 @@
     ~ ((" и пропадёт из мест, где лежит: " ~ stock|length) if stock else "") ~ ". Вернуть можно " ~ core.TRASH_DAYS
     ~ " дней из «Корзины».")|tojson }})'><button class="ghost">Удалить</button></form></span></div>
 <form method="post" action="/i/{{ it.id }}/agent"><label class="chk"><input type="checkbox" name="on" value="1"{% if it.for_agent %} checked{% endif %}
-  onchange="this.form.submit()"> {{ t.to_agent }}</label></form>
+  onchange="this.form.requestSubmit()"> {{ t.to_agent }}</label></form>
 <form method="post" action="/i/{{ it.id }}/single"><label class="chk"><input type="checkbox" name="on" value="1" id="single"{% if single %} checked{% endif %}{% if it.single is none %} data-auto{% endif %}
-  onchange="this.form.submit()"> {{ t.single }}</label></form>
+  onchange="this.form.requestSubmit()"> {{ t.single }}</label></form>
 
 <h2>Где лежит</h2>
 {% set h = stock|selectattr("box_id", "equalto", "HANDS")|first %}{# №28: in hand — put it away (back where it was taken from) or write it off #}

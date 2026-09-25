@@ -30,7 +30,7 @@
   {%- elif caller is defined %}{{ caller() }}{% endif %}</div>{% endmacro %}
 {% macro taken_box(b) %}<div class="line"><a href="/b/{{ b.id }}"><span class="thumb"></span><span class="grow">{{ b.name or b.id }}<br><span class="mut">{{ t.box }}{% if b.name %} ({{ b.id }}){% endif %}</span></span></a>
   <form method="post" action="/b/{{ b.id }}/back"><input type="hidden" name="back" value="{{ request.url.path }}{{ '?' ~ request.url.query if request.url.query }}"><button class="ghost">На место</button></form></div>{% endmacro %}
-<h1>Что где</h1>
+<div class="row" style="justify-content:space-between"><h1>Что где</h1><a class="btn ghost" href="/items/new">+ Новый предмет</a></div>
 <p class="mut">{{ t.items|lower }}: {{ n_items }} · {{ t.boxes|lower }}: {{ n_boxes }} · {{ t.places|lower }}: {{ places|length }}</p>
 {% set inhand = rows|selectattr("hands")|list if not filtered else [] %}
 {% if inhand or taken and not filtered %}<h2>{{ t.hands }} · {{ inhand|length + taken|length }}</h2>

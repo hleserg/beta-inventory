@@ -49,6 +49,26 @@ async def lifespan(_):
 
 
 app = FastAPI(title="beta-inventory", lifespan=lifespan)
+
+
+class ReplaceNav:
+    """№67: a form base.html sends by fetch (X-Replace) gets its 303 as 204 + X-Location, and the page replaces itself:
+    back goes where you came from, not through every form. fetch can't do it alone: it follows the redirect and drops #p12."""
+    def __init__(self, app):
+        self.app = app
+
+    async def __call__(self, scope, receive, send):
+        if scope["type"] != "http" or not any(k == b"x-replace" for k, _ in scope["headers"]):
+            return await self.app(scope, receive, send)
+
+        async def swap(m):
+            if m["type"] == "http.response.start" and m["status"] == 303:
+                m = {**m, "status": 204, "headers": [(b"x-location", v) for k, v in m["headers"] if k == b"location"]}
+            await send(m)
+        await self.app(scope, receive, swap)
+
+
+app.add_middleware(ReplaceNav)
 # Agents: MCP at /mcp, same port and data as the site. Host 0.0.0.0 turns the localhost-only Host check
 # off: agents come by LAN name, and the site has no auth by design (LAN only).
 app.router.routes.extend(mcp_server.streamable_http_app(stateless_http=True, json_response=True, host="0.0.0.0").routes)

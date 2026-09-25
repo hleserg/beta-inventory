@@ -689,3 +689,17 @@ def test_settings():
         core.save_settings(dict.fromkeys(saved() if f.exists() else [], None))
     r = c.get("/phone", follow_redirects=False)
     assert r.status_code == 302 and r.headers["location"] == "/settings#phone"
+
+
+def test_nav():
+    """№67: Домой in the bar, «+» under «Ещё»; a form sent by fetch gets its redirect as a header, so the page replaces itself."""
+    home = c.get("/").text
+    assert 'class="tab on" href="/"' in home and 'href="/items/new"' in home
+    assert 'href="/items/new"' in c.get("/more").text
+    pid = c.post("/places", data={"name": "Кладовка"}, headers={"X-Autosave": "1"}).json()["id"]
+    r = c.post(f"/places/{pid}/shelves", data={"name": "Полка"}, headers={"X-Replace": "1"}, follow_redirects=False)
+    assert r.status_code == 204 and r.headers["x-location"] == f"/places#p{pid}"  # the fragment survives: fetch would drop it
+    r = c.post(f"/places/{pid}/shelves", data={"name": "Полка"}, follow_redirects=False)
+    assert r.status_code == 303 and r.headers["location"] == f"/places#p{pid}"
+    r = c.post("/i/999999/edit", data={"name": "x"}, headers={"X-Replace": "1"}, follow_redirects=False)
+    assert r.status_code == 422 and "x-location" not in r.headers  # refusals pass through: the page resends natively to show why

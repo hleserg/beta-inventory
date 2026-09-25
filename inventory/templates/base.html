@@ -99,7 +99,6 @@ dialog video{width:min(80vw,480px);display:block;margin-bottom:8px}
 .pill input{flex:1;min-width:0;min-height:0;height:100%;border:0;padding:0;background:none;outline:none;font-size:16px;color:var(--fg)}
 .pill input::placeholder{color:var(--mut)}
 .pill.on{border:2px solid var(--acc);color:var(--fg)}.pill:focus-within{border:2px solid var(--acc)}
-.rnd{flex:none;width:48px;height:48px;border-radius:50%;border:1px solid var(--line);background:var(--card);color:var(--fg);display:grid;place-items:center}
 .fab{flex:none;width:60px;height:60px;min-height:0;border-radius:50%;padding:0;display:grid;place-items:center}
 .fab.on{box-shadow:0 0 0 4px var(--bg),0 0 0 7px var(--acc)}  /* NFC listens: a tag opens its box */
 body:has(main :is(input:not([type=checkbox],[type=radio],[type=file]),textarea):focus){--bar:0px}  /* the keyboard is up: the page's own field wins the space */
@@ -341,7 +340,7 @@ addEventListener("DOMContentLoaded", async () => {  // №43: a thing's tag scan
   const f = new URLSearchParams(location.search).has("scan") && document.querySelector("form[data-take]");
   if (!f) return;
   history.replaceState(null, "", location.pathname);  // a reload doesn't ask again
-  if (await ask(`Взять «${f.dataset.name}»?`, "Взять", "askTake")) f.submit();
+  if (await ask(`Взять «${f.dataset.name}»?`, "Взять", "askTake")) f.requestSubmit();
 });
 addEventListener("DOMContentLoaded", () => {  // №42: «Сохранить и записать метку» lands on the card with ?nfc=1
   const b = new URLSearchParams(location.search).has("nfc") && document.querySelector("[data-nfcw]");
@@ -504,6 +503,18 @@ document.addEventListener("submit", e => {
   if (e.defaultPrevented || f.method != "post") return;  // fetch-saved forms (box page) send as often as they like
   if (f.dataset.sent) return e.preventDefault();
   f.dataset.sent = 1;
+  // №67: sent by fetch, the page it lands on replaces this one — back goes where you came from, not through every form
+  e.preventDefault();
+  const by = e.submitter?.name && e.submitter;
+  fetch(f.getAttribute("action") || location.href, {method: "POST", body: new FormData(f, by || undefined), headers: {"X-Replace": "1"}})
+    .catch(() => null).then(r => {
+      const to = r?.headers.get("X-Location");
+      const u = to && new URL(to, location.href);
+      if (u && u.pathname + u.search == location.pathname + location.search) { history.replaceState(history.state, "", u); return location.reload(); }  // only #p3 differs: replace alone would just scroll
+      if (u) return location.replace(u);
+      if (by) f.append(Object.assign(document.createElement("input"), {type: "hidden", name: by.name, value: by.value}));
+      HTMLFormElement.prototype.submit.call(f);  // ponytail: refused (form errors, error page) — sent again the usual way to show why; photos go up twice on that rare path
+    });
 });
 // №27: a card with data-swipe slides left over the «Удалить» form under it; let go past 20% of its width and
 // that form asks and sends. Short of it, the card slides back.
