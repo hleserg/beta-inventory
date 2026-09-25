@@ -111,7 +111,7 @@ categories:
             label: Интерфейс
             type: text
             search: 2
-            hint: I2C, SPI, UART, 1-Wire, аналог
+            hint: I2C, SPI, UART, 1-Wire, цифровой, аналог
           - key: i2c_address
             label: Адрес I2C
             type: text

@@ -65,10 +65,12 @@ weight.
   `list_projects`; `create_item`, `update_item` (photos and files by URL, the
   server downloads them), `change_stock` (history names the agent as author),
   `accept_project` / `skip_project` for the GitHub inbox.
+  Tick «Передать агенту» on a card and it shows up in `agent_queue`, together
+  with the skill that says how to fill it in; `update_item` takes it off.
   Each field's `hint` in the profile tells agents what goes in it, so any MCP
-  client writes a full card. Claude Code and Codex also get a skill:
-  `ln -s "$PWD/skills/inventory-new-card" ~/.agents/skills/` (Claude Code:
-  `~/.claude/skills/`).
+  client writes a full card. Claude Code and Codex also get the skills:
+  `ln -s "$PWD/skills/inventory-new-card" "$PWD/skills/inventory-enrich-card" ~/.agents/skills/`
+  (Claude Code: `~/.claude/skills/`).
 
 ## Planned
 
