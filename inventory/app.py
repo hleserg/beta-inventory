@@ -368,7 +368,7 @@ def public_base(req):
     return (os.environ.get("PUBLIC_BASE_URL") or str(req.base_url)).rstrip("/")
 
 
-def label_png(path, text, base, w=0, h=0):
+def label_png(path, text, base, w=0, h=0, name=""):
     """w, h: the roll in the printer, mm (№61: «Печать» asks with the size the printer reported); 0 — from /settings."""
     w_mm, h_mm, dpi = core.LABEL
     if 5 <= w <= 200 and 5 <= h <= 200:
@@ -382,15 +382,59 @@ def label_png(path, text, base, w=0, h=0):
     img = Image.new("1", (W, H), 1)
     img.paste(code, (0, (H - code.height) // 2))
     d, room = ImageDraw.Draw(img), W - code.width
-    for size in range(H, 7, -2):
-        font = ImageFont.load_default(size=size)
-        l, t, r, bt = d.textbbox((0, 0), text, font=font)
-        if r - l <= room * 0.9 and bt - t <= H * 0.6:
-            break
-    d.text((code.width + (room - (r - l)) // 2 - l, (H - (bt - t)) // 2 - t), text, font=font, fill=0)
+    if name and room >= H * 0.4:  # №70: a thing's name goes on its label; a roll too narrow keeps the ID alone
+        name_text(d, name, text, code.width, room, H)
+    else:
+        for size in range(H, 7, -2):
+            font = ImageFont.load_default(size=size)
+            l, t, r, bt = d.textbbox((0, 0), text, font=font)
+            if r - l <= room * 0.9 and bt - t <= H * 0.6:
+                break
+        d.text((code.width + (room - (r - l)) // 2 - l, (H - (bt - t)) // 2 - t), text, font=font, fill=0)
     buf = io.BytesIO()
     img.save(buf, "PNG", dpi=(dpi, dpi))
     return buf.getvalue()
+
+
+LABEL_FONT = str(STATIC / "vendor/DejaVuSansCondensed-Bold.ttf")  # Pillow's own font has no Cyrillic
+
+
+def name_text(d, name, text, x, room, H):
+    """The name wrapped over the column as large as fits, down to ~1.5 mm, then cut with «…»; the ID small below it."""
+    pad, width = room * 0.03, room * 0.94
+    small = ImageFont.truetype(LABEL_FONT, max(18, H // 9))
+    d.text((x + room / 2, H - pad), text, font=small, fill=0, anchor="md")
+    top = H - 3 * pad - sum(small.getmetrics())  # the height above the ID, less a margin at each end
+    for size in range(max(H // 3, 18), 17, -1):  # a word broken between letters only at the smallest size
+        font, step = ImageFont.truetype(LABEL_FONT, size), round(size * 1.1)
+        lines, broke = wrap(d, name, font, width)
+        if not broke and len(lines) * step <= top:
+            break
+    if len(lines) * step > top:
+        lines = lines[:int(top // step)]
+        if lines:
+            last = lines[-1]
+            while last and d.textlength(last + "…", font=font) > width:
+                last = last[:-1]
+            lines[-1] = last.rstrip() + "…"
+    y = pad + (top - len(lines) * step) / 2
+    for i, line in enumerate(lines):
+        d.text((x + room / 2, y + i * step), line, font=font, fill=0, anchor="ma")
+
+
+def wrap(d, s, font, width):
+    """Greedy word wrap; a word wider than the line breaks with a hyphen. Returns the lines and whether one broke."""
+    lines, broke = [], False
+    for word in s.split():
+        if lines and d.textlength(f"{lines[-1]} {word}", font=font) <= width:
+            lines[-1] += " " + word
+            continue
+        while len(word) > 1 and d.textlength(word, font=font) > width:
+            n = max([i for i in range(1, len(word)) if d.textlength(word[:i] + "-", font=font) <= width] or [1])
+            lines.append(word[:n] + "-")
+            word, broke = word[n:], True
+        lines.append(word)
+    return lines, broke
 
 
 # --- items ---
@@ -536,7 +580,9 @@ def item_need(item_id: int, project: int = Form(), qty: int = Form(0)):
 
 @app.get("/i/{item_id}/label.png")
 def item_label(req: Request, item_id: int, w: float = 0, h: float = 0):  # №22: a box of screws is a thing, not a box, and still gets a label
-    return Response(label_png(f"I/{item_id}", str(item_id), public_base(req), w, h), media_type="image/png")
+    with db() as c:
+        name = get_item(c, item_id)["name"]
+    return Response(label_png(f"I/{item_id}", str(item_id), public_base(req), w, h, name), media_type="image/png")
 
 
 @app.post("/i/{item_id}/delete")

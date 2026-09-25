@@ -69,6 +69,8 @@ def test_main_path():
     assert f'data-print="/i/{iid}/label.png"' in c.get(f"/i/{iid}").text  # «Печать»
     assert f"/i/{iid}/label.png" in c.get(f"/i/{iid}").text  # №22: a thing gets its own printed label; its QR is upper case
     assert c.get(f"/i/{iid}/label.png").headers["content-type"] == "image/png"
+    from inventory.app import label_png  # №70: the thing's name is on its label, the box label stays the ID alone
+    assert c.get(f"/i/{iid}/label.png").content != label_png(f"I/{iid}", str(iid), "http://testserver")
     assert "MP1584" in c.get("/?q=ПОНИЖАЙКА").text
     assert "10k" in c.get("/?q=резистор").text  # type label is searchable
     assert "10k" in c.get("/items?cat=electronics").text and "10k" not in c.get("/items?cat=tools").text
