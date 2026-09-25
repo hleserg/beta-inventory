@@ -394,8 +394,8 @@ def photo_order(form, k):
     return out
 
 
-async def read_fields(req, old, fields):
-    """Card form → (name, fields, errors, form), driven entirely by the profile."""
+async def read_fields(req, old, fields, loose=False):
+    """Card form → (name, fields, errors, form), driven entirely by the profile. Loose or «Передать агенту»: required may wait."""
     form = await req.form()
     f = dict(old)
     for fd in fields:
@@ -409,7 +409,7 @@ async def read_fields(req, old, fields):
         else:
             f[k] = str(form.get(k, "")).strip()
     name = str(form.get("name", "")).strip()
-    return name, f, core.clean_fields(name, fields, f), form
+    return name, f, core.clean_fields(name, fields, f, loose or bool(form.get("for_agent"))), form
 
 
 @app.get("/items")
@@ -538,7 +538,7 @@ def item_edit(req: Request, item_id: int, type: str = ""):
 async def item_update(req: Request, item_id: int, type: str):
     with db() as c:
         it = get_item(c, item_id)
-    name, f, errors, _ = await read_fields(req, json.loads(it["fields"]), core.fields_for(check_type(type)))
+    name, f, errors, _ = await read_fields(req, json.loads(it["fields"]), core.fields_for(check_type(type)), bool(it["for_agent"]))
     if errors:
         return card_form(req, 400, it=it, type=type, name=name, vals=f, errors=errors)
     core.save_item(item_id, name, type, f)

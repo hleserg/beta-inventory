@@ -20,12 +20,12 @@
   {% if fd.hint %}<div class="mut">{{ fd.hint }}</div>{% endif %}
   {% if fd.type == "photo" %}
     <div class="row">{% for x in v or [] %}<span class="pic"><img class="thumb" src="/u/{{ x }}" alt=""><input type="hidden" name="{{ fd.key }}__keep" value="{{ x }}"><button type="button" class="mini" aria-label="Убрать фото">✕</button></span>{% endfor %}</div>
-    <input type="file" name="{{ fd.key }}" accept="image/*" multiple data-pics{% if fd.required %} data-req{% endif %}{% if fd.required and not v %} required{% endif %}>
-  {% elif fd.type == "markdown" %}<textarea name="{{ fd.key }}" {% if fd.required %}required{% endif %}>{{ v or "" }}</textarea>
-  {% elif fd.type == "links" %}<textarea name="{{ fd.key }}" placeholder="https://…" {% if fd.required %}required{% endif %}>{{ v if v is string else (v or [])|join("\n") }}</textarea>
+    <input type="file" name="{{ fd.key }}" accept="image/*" multiple data-pics{% if fd.required %} data-req{% endif %}>
+  {% elif fd.type == "markdown" %}<textarea name="{{ fd.key }}" {% if fd.required %}required data-req{% endif %}>{{ v or "" }}</textarea>
+  {% elif fd.type == "links" %}<textarea name="{{ fd.key }}" placeholder="https://…" {% if fd.required %}required data-req{% endif %}>{{ v if v is string else (v or [])|join("\n") }}</textarea>
   {% elif fd.type == "files" %}{% for x in v or [] %}<div class="mut">{{ x.name }}</div>{% endfor %}<input type="file" name="{{ fd.key }}" multiple>
-  {% elif fd.type == "choice" %}<select name="{{ fd.key }}" {% if fd.required %}required{% endif %}><option value="">—</option>{% for o in fd.options %}<option {% if o == (v or fd.default) %}selected{% endif %}>{{ o }}</option>{% endfor %}</select>
-  {% else %}<input name="{{ fd.key }}" value="{{ v if v is defined and v is not none else '' }}" {% if fd.type == "number" %}inputmode="decimal"{% elif fd.type == "link" %}type="url"{% endif %} {% if fd.required %}required{% endif %}>
+  {% elif fd.type == "choice" %}<select name="{{ fd.key }}" {% if fd.required %}required data-req{% endif %}><option value="">—</option>{% for o in fd.options %}<option {% if o == (v or fd.default) %}selected{% endif %}>{{ o }}</option>{% endfor %}</select>
+  {% else %}<input name="{{ fd.key }}" value="{{ v if v is defined and v is not none else '' }}" {% if fd.type == "number" %}inputmode="decimal"{% elif fd.type == "link" %}type="url"{% endif %} {% if fd.required %}required data-req{% endif %}>
   {% endif %}</div>
   {% endfor %}
   {% if not it %}
@@ -39,6 +39,12 @@
   <p class="row"><button>Сохранить</button><button name="nfc" value="1" class="ghost">Сохранить и записать метку</button></p>{% endif %}
 </form>
 <script>{
+// №66: a card handed to the agent needs only its name — the agent fills the rest. A photo field is met by photos in its row too.
+const f = document.getElementById("cardf"), need = () => {
+  const off = f.elements.for_agent ? f.elements.for_agent.checked : {{ (it and it.for_agent)|tojson }};
+  for (const e of f.querySelectorAll("[data-req]")) e.required = !off && !(e.type == "file" && e.previousElementSibling.querySelector("input"));
+};
+f.addEventListener("change", need);
 // Photos: each pick adds to the ones before (a phone camera gives one shot per pick), ✕ drops one, a drag reorders (№64).
 // A new one sits in the row as new:N — the N-th picked file — so the server keeps the order the row shows.
 for (const inp of document.querySelectorAll("input[data-pics]")) {
@@ -47,7 +53,7 @@ for (const inp of document.querySelectorAll("input[data-pics]")) {
     const dt = new DataTransfer();
     row.querySelectorAll(".pic.new").forEach((s, i) => { dt.items.add(s.file); s.querySelector("input").value = "new:" + i; });
     inp.files = dt.files;
-    inp.required = "req" in inp.dataset && !row.querySelector("input");  // new files count on their own
+    need();
   };
   inp.addEventListener("change", () => {
     for (const file of inp.files) {
@@ -65,7 +71,7 @@ for (const inp of document.querySelectorAll("input[data-pics]")) {
   });
 }
 // Every edit goes to a local draft, so leaving the page (a label scanned, a call) loses nothing. Photos and files stay out.
-const f = document.querySelector("form[data-draft]"), key = "draft:" + location.pathname;
+const key = "draft:" + location.pathname;
 const vals = () => Object.fromEntries([...f.elements].filter(e => e.name && e.type != "file" && e.type != "hidden").map(e => [e.name, e.type == "checkbox" ? e.checked : e.value]));  // a checkbox keeps its tick, not its value
 let shown = JSON.stringify(vals()), unsaved = !!document.querySelector(".err");  // errors: the values shown were not saved
 const store = () => { const v = vals();
@@ -81,6 +87,7 @@ if (d && JSON.stringify(d.v) !== shown) {
   dcancel.onclick = () => { localStorage.removeItem(key); location.replace(location.pathname + location.search); };
 } else if (d || unsaved) store();
 f.addEventListener("input", store);
+need();  // the page as served, or a restored draft's tick
 {% if it %}
 // №16: a card saves itself as it changes, like a box. New photos and files go up with the save that finds them,
 // then the page reloads to show them kept. «Готово» saves and opens the card.

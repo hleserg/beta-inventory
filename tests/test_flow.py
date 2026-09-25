@@ -167,6 +167,17 @@ def test_lookalike_asks():
     assert r.status_code == 303 and newest() != first
 
 
+def test_for_agent_needs_only_a_name():
+    """№66: a card handed to the agent may lack its required fields — the agent fills them; the name still counts."""
+    assert c.post("/items/new?type=module", data={"name": "ESP32-CAM"}).status_code == 400
+    assert c.post("/items/new?type=module", data={"name": "", "for_agent": "1"}).status_code == 400
+    r = c.post("/items/new?type=module", data={"name": "ESP32-CAM", "for_agent": "1", "dup_ok": "1"}, follow_redirects=False)
+    assert r.status_code == 303 and 'data-req' in c.get(f"/i/{newest()}/edit").text
+    assert c.post(f"/i/{newest()}/edit?type=module", data={"name": "ESP32-CAM AI-Thinker"}, follow_redirects=False).status_code == 303
+    c.post(f"/i/{newest()}/agent")  # off the agent's list: required again
+    assert c.post(f"/i/{newest()}/edit?type=module", data={"name": "ESP32-CAM"}).status_code == 400
+
+
 def test_box_by_name():
     """A box field takes what people know: part of the name in any case, «Name (ID)» from the list, or the ID."""
     a, b, d = core.new_boxes(3)

@@ -549,8 +549,9 @@ def skip_project(git_url):
         c.execute("UPDATE projects SET status='skipped' WHERE id=?", (p["id"],))
 
 
-def clean_fields(name, fields, f):
-    """Card check shared by the site and MCP: numbers and links parsed in place, required fields present. → errors."""
+def clean_fields(name, fields, f, loose=False):
+    """Card check shared by the site and MCP: numbers and links parsed in place, required fields present
+    unless loose (№66: a card handed to the agent, who fills them). → errors."""
     errors = [] if name.strip() else ["Название: обязательно"]
     for fd in fields:
         k, v = fd["key"], f.get(fd["key"])
@@ -562,7 +563,7 @@ def clean_fields(name, fields, f):
                 errors.append(f"{fd['label']}: нужно число")
         if fd["type"] == "links" and v is not None:  # one a line from the form, a list or a string from agents
             f[k] = [s for s in (str(x).strip() for x in (v.splitlines() if isinstance(v, str) else v)) if s]
-        if fd.get("required") and f.get(k) in (None, "", []):
+        if fd.get("required") and not loose and f.get(k) in (None, "", []):
             errors.append(f"{fd['label']}: обязательно")
     return errors
 
