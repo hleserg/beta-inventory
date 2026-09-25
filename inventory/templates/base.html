@@ -67,6 +67,9 @@ a.line,.line{display:flex;gap:10px;align-items:center;text-decoration:none;color
 .fbar label input{position:absolute;opacity:0;width:1px;height:1px}
 .fbar label:has(:focus-visible){outline:2px solid var(--acc);outline-offset:2px}
 body:has(.fbar) main{padding-bottom:calc(var(--bar) + 84px + env(safe-area-inset-bottom))}
+.put{position:fixed;z-index:9;left:0;right:0;bottom:calc(var(--bar) + env(safe-area-inset-bottom));background:var(--card);border-top:2px solid var(--acc);padding:8px 12px;max-height:calc(100dvh - var(--bar) - 60px);overflow-y:auto}
+.put form{flex-wrap:wrap;margin:6px 0 0}.put .row .pick{flex:1 1 100%}
+body:has(.put) main{padding-bottom:calc(var(--bar) + 150px + env(safe-area-inset-bottom))}
 table{border-collapse:collapse;width:100%}
 td{border-bottom:1px solid var(--line);padding:8px 4px;vertical-align:top;font-variant-numeric:tabular-nums}
 td a{color:inherit;text-decoration:none;font-weight:600}  /* a row of names, not a wall of blue: bold says «tap me» */
@@ -103,7 +106,7 @@ dialog video{width:min(80vw,480px);display:block;margin-bottom:8px}
 .fab.on{box-shadow:0 0 0 4px var(--bg),0 0 0 7px var(--acc)}  /* NFC listens: a tag opens its box */
 body:has(main :is(input:not([type=checkbox],[type=radio],[type=file]),textarea):focus){--bar:0px}  /* the keyboard is up: the page's own field wins the space */
 body:has(main :is(input:not([type=checkbox],[type=radio],[type=file]),textarea):focus) .bar{display:none}
-@media print{.bar,.fbar{display:none}}
+@media print{.bar,.fbar,.put{display:none}}
 .pick{position:relative;display:flex;width:100%}.row .pick{flex:1;width:auto;min-width:0}.stock .pick{grid-column:1/-1}
 .pick input{flex:1;min-width:0;padding-right:2.4em}
 .pick select{position:absolute;inset:0;opacity:0;pointer-events:none}
@@ -134,6 +137,9 @@ body:has(.save:not([hidden])) main{padding-bottom:calc(var(--bar) + 88px + env(s
 .tn{display:flex;align-items:center;gap:4px;min-height:56px;padding:6px 8px 6px 4px;border-bottom:1px solid var(--line)}
 .tn.l1{padding-left:24px}.tn.l2{padding-left:44px}
 summary.tn{list-style:none;color:inherit} summary.tn::-webkit-details-marker{display:none}
+summary.lrow{list-style:none;cursor:pointer} summary.lrow::-webkit-details-marker{display:none}
+.lrows>details+details{border-top:1px solid var(--line)}.lrows details>div{padding:0 14px 14px;overflow-x:auto}.lrows h2{font-size:15px;margin:12px 0 4px}
+.thumb.bx{display:grid;place-items:center;color:var(--mut);background:var(--bg);border:1px solid var(--line)}
 .tn .ti{flex:none;width:28px;display:grid;place-items:center;color:var(--mut)}
 .tn .grow{flex:1;min-width:0} .tn a.grow{color:inherit;text-decoration:none;display:flex;gap:10px;align-items:center}
 .tn .nm{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -142,7 +148,7 @@ summary.tn{list-style:none;color:inherit} summary.tn::-webkit-details-marker{dis
 .ib{flex:none;width:44px;height:44px;min-height:44px;padding:0;background:transparent;color:var(--mut);display:grid;place-items:center}
 details:not([open])>summary .chev{transform:rotate(-90deg)}
 .tacts{display:flex;flex-wrap:wrap;align-items:center;gap:6px;padding:8px 8px 10px 56px;background:var(--bg);border-bottom:1px solid var(--line)}
-.tacts form{margin:0}.tacts .row{flex:1 1 100%}.tacts .row input{flex:1 1 100%}.tacts details[open]{flex:1 1 100%}.tacts .btn,.tacts button{padding:0 10px;font-size:14px}
+.tacts form{margin:0}.tacts .stock{flex:1 1 100%}.tacts .row{flex:1 1 100%}.tacts .row input{flex:1 1 100%}.tacts details[open]{flex:1 1 100%}.tacts .btn,.tacts button{padding:0 10px;font-size:14px}
 </style>
 </head>
 <body>

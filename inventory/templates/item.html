@@ -1,53 +1,43 @@
-{% extends "base.html" %}{% from "_stock.html" import stock_forms, moves_table %}{% from "_box.html" import box_input, box_link, crumbs, nfc_tag, print_btn %}{% from "_photos.html" import carousel %}
+{% extends "base.html" %}{% from "_stock.html" import stock_forms, moves_table %}{% from "_box.html" import box_input, crumbs, nfc_tag, print_btn %}{% from "_photos.html" import carousel %}{% from "_bar.html" import ico %}
 {% block title %}{{ it.name }}{% endblock %}
 {% block main %}
+{% set I_BOX, I_DOWN = '<path d="M3 7.5L12 3l9 4.5v9L12 21l-9-4.5z"/><path d="M3 7.5l9 4.5 9-4.5M12 12v9"/>', '<path d="M6 9l6 6 6-6"/>' %}
+{% set u = unit_of(it.type, f) %}
 {% set home = stock|rejectattr("box_id", "in", ("HANDS", TRANSIT))|list %}{% if home|length == 1 %}<div class="crumbs">{{ crumbs(home[0].crumbs + [(home[0].name or home[0].box_id, "/b/" ~ home[0].box_id)]) }}</div>{% endif %}
 {% if pk and f[pk] %}{{ carousel(f[pk], "/i/" ~ it.id ~ "/rotate") }}{% endif %}
 <h1>{{ it.name }}</h1>
-<div class="row"><span class="mut" style="flex:1">{{ type_label(it.type) or "тип не выбран" }}</span><span class="row right" style="flex-wrap:nowrap"><a class="btn ghost" href="/i/{{ it.id }}/edit">Изменить</a>
-  <form method="post" action="/i/{{ it.id }}/delete" onsubmit='return confirm({{ ("«" ~ it.name ~ "» уйдёт в корзину"
-    ~ ((" и пропадёт из мест, где лежит: " ~ stock|length) if stock else "") ~ ". Вернуть можно " ~ core.TRASH_DAYS
-    ~ " дней из «Корзины».")|tojson }})'><button class="ghost">Удалить</button></form></span></div>
-<form method="post" action="/i/{{ it.id }}/agent"><label class="chk"><input type="checkbox" name="on" value="1"{% if it.for_agent %} checked{% endif %}
-  onchange="this.form.requestSubmit()"> {{ t.to_agent }}</label></form>
-<form method="post" action="/i/{{ it.id }}/single"><label class="chk"><input type="checkbox" name="on" value="1" id="single"{% if single %} checked{% endif %}{% if it.single is none %} data-auto{% endif %}
-  onchange="this.form.requestSubmit()"> {{ t.single }}</label></form>
+{% set counted = stock|map(attribute="qty")|reject("none")|list %}
+<div class="mut">{{ type_label(it.type) or "тип не выбран" }}{% if counted %} · всего {{ counted|sum|qty(unit=u) }}{% endif %}{% if home|length > 1 %} · в {{ home|length }} местах{% endif %}</div>
 
+{# №54 screen 5: where it lies, one line per place, «Взять» opens its form below (as on a box) #}
 <h2>Где лежит</h2>
 {% set h = stock|selectattr("box_id", "equalto", "HANDS")|first %}{# №28: in hand — put it away (back where it was taken from) or write it off #}
 {% for s in stock %}
-<div class="card">
-  {% if s.box_id == "HANDS" %}
-  <div class="row"><b>{{ s.name }}</b> <span class="mut">{{ s.where }}</span><span class="qty right">{{ s.qty|qty(unit=unit_of(it.type, f)) }}</span></div>
-  <form method="post" action="/stock" class="row" onsubmit="return confirm('Списать? Из учёта уйдёт, в истории останется.')">
-    <input type="hidden" name="box" value="HANDS"><input type="hidden" name="item" value="{{ it.id }}"><input type="hidden" name="action" value="take"><input type="hidden" name="back" value="/i/{{ it.id }}">
-    <input type="{{ 'hidden' if single else 'number' }}" name="qty" min="1" max="{{ s.qty }}" value="{{ s.qty }}" required><button class="bad">Списать</button>
-  </form>
-  {% else %}
-  <div class="row">{{ box_link(s.box_id, s.name) }} <span class="mut crumbs">{% if s.crumbs %}{{ crumbs(s.crumbs) }}{% else %}{{ s.where }}{% endif %}</span><span class="qty right">{{ s.qty|qty(unit=unit_of(it.type, f)) }}</span></div>
-  {{ stock_forms(s.box_id, it.id, s.qty, projects, "/i/" ~ it.id, single=single) }}
-  {% endif %}
-</div>
+{% if s.box_id == "HANDS" %}
+<div class="line"><span class="thumb bx"></span><span class="grow"><b>{{ s.name }}</b><br><span class="mut">{{ s.where }}</span></span><span class="qty">{{ s.qty|qty(unit=u) }}</span>
+  <button type="button" class="ghost dots" aria-expanded="false">Списать</button></div>
+<div class="tacts" hidden><form method="post" action="/stock" class="row" onsubmit="return confirm('Списать? Из учёта уйдёт, в истории останется.')">
+  <input type="hidden" name="box" value="HANDS"><input type="hidden" name="item" value="{{ it.id }}"><input type="hidden" name="action" value="take"><input type="hidden" name="back" value="/i/{{ it.id }}">
+  <input type="{{ 'hidden' if single else 'number' }}" name="qty" min="1" max="{{ s.qty }}" value="{{ s.qty }}" required><button class="bad">Списать</button>
+</form></div>
+{% else %}
+<div class="line"><a href="/b/{{ s.box_id }}"><span class="thumb bx">{% if s.box_id != TRANSIT %}{{ ico(I_BOX) }}{% endif %}</span>
+  <span class="grow">{{ s.name or s.box_id }}{% if s.name and s.box_id != TRANSIT %} <span class="mut sm">{{ s.box_id }}</span>{% endif %}
+  {% if s.crumbs or s.where %}<br><span class="mut sm">{{ s.crumbs|map("first")|join(" › ") if s.crumbs else s.where }}</span>{% endif %}</span>
+  <span class="qty">{{ s.qty|qty(unit=u) }}</span></a>
+  {% if s.box_id != TRANSIT %}<button type="button" class="ghost dots" aria-expanded="false">Взять</button>{% endif %}</div>
+{% if s.box_id != TRANSIT %}<div class="tacts" hidden>{{ stock_forms(s.box_id, it.id, s.qty, projects, "/i/" ~ it.id, single=single) }}</div>{% endif %}
+{% endif %}
 {% else %}<p class="mut">Нигде нет.</p>{% endfor %}
 {% if single and not h and stock|length == 1 and stock[0].box_id != TRANSIT %}{# №43: a scanned tag asks «Взять?» (base.html) #}
 <form method="post" action="/stock" data-take data-name="{{ it.name }}" hidden><input type="hidden" name="box" value="{{ stock[0].box_id }}"><input type="hidden" name="item" value="{{ it.id }}"><input type="hidden" name="action" value="take"><input type="hidden" name="qty" value="1"><input type="hidden" name="back" value="/i/{{ it.id }}"></form>{% endif %}
-{% set tr = none if h else stock|selectattr("box_id", "equalto", TRANSIT)|first %}{# manifesto 3: it came — the box it goes to takes it out of «в пути» #}
-<details{% if h or tr %} open{% endif %}><summary>{{ "Положить на место" if h else "Пришло — куда положить" if tr else "Куда положить" }}</summary>
-<form method="post" action="/stock" class="row" data-put{% if stock|length == 1 and not h and not tr %} data-from="{{ stock[0].box_id }}"{% endif %}>
-  <input type="hidden" name="item" value="{{ it.id }}"><input type="hidden" name="action" value="add"><input type="hidden" name="kind" value="{{ 'move' if tr else 'return' if h and h.src else 'put' }}"><input type="hidden" name="back" value="/i/{{ it.id }}"><input type="hidden" name="src"{% if tr %} value="{{ TRANSIT }}"{% endif %}>
-  {{ box_input(value=h.src if h else "", required=True, exclude=TRANSIT if tr else None) }}{% if single %}<input type="hidden" name="qty" value="1">{% else %}<input type="number" name="qty" min="1" placeholder="не считал" value="{{ (h or tr) and (h or tr).qty or 1 }}">{% endif %}<button>Положить</button>
-</form></details>
-<details><summary>Метка</summary>
-  <p><img src="/i/{{ it.id }}/label.png" alt="наклейка" style="width:240px;max-width:100%;background:#fff;border:1px solid var(--line)"><br>
-  <a data-act href="/i/{{ it.id }}/label.png" download="{{ it.id }}.png">Скачать наклейку</a> {{ print_btn("/i/" ~ it.id ~ "/label.png") }}</p>
-  {{ nfc_tag(nfc) }}</details>
-{% if projects %}<details{% if needs %} open{% endif %}><summary>Нужно для проекта</summary>
-{% for n in needs %}<div class="row"><a href="/p/{{ n.id }}">{{ n.name }}</a><span class="qty right">{{ n.qty|qty(unit=unit_of(it.type, f)) }}</span></div>{% endfor %}
-<form method="post" action="/i/{{ it.id }}/need" class="row"><select name="project">{% for p in projects %}<option value="{{ p.id }}">{{ p.name }}</option>{% endfor %}</select>
-  <input type="number" name="qty" min="0" value="1" required><button>Сохранить</button></form>
-<p class="mut">0 — больше не нужно.</p></details>{% endif %}
 
-{% for fd in fields if fd.type != "photo" and f[fd.key] %}
+{# The rest is one tap away: a row each, it opens in place #}
+<div class="card list lrows secs">
+{% set shown = fields|rejectattr("type", "equalto", "photo")|list %}
+{% set filled %}{% for fd in shown if f[fd.key] %}{{ fd.label }}{% if not loop.last %}, {% endif %}{% endfor %}{% endset %}
+{% if filled %}<details><summary class="lrow"><span>Описание и характеристики<br><span class="mut sm">{{ filled }}</span></span><span class="chev">{{ ico(I_DOWN) }}</span></summary><div>
+{% for fd in shown if f[fd.key] %}
 <h2>{{ fd.label }}</h2>
 {% set v = f[fd.key] %}
 {% if fd.type == "markdown" %}<div class="md">{{ v|md }}</div>
@@ -55,8 +45,34 @@
 {% elif fd.type == "links" %}{% for x in ([v] if v is string else v) %}<div>{% if x.startswith(("http://", "https://")) %}<a href="{{ x }}" target="_blank" rel="noopener">{{ x|host }}</a>{% else %}{{ x }}{% endif %}</div>{% endfor %}
 {% elif fd.type == "files" %}{% for x in v %}<div><a href="/u/{{ x.file }}" download="{{ x.name }}">{{ x.name }}</a></div>{% endfor %}
 {% else %}<p>{{ v }}</p>{% endif %}
-{% endfor %}
+{% endfor %}</div></details>{% endif %}
+<details><summary class="lrow"><span>Метка и NFC<br><span class="mut sm">наклейка, печать, запись на метку</span></span><span class="chev">{{ ico(I_DOWN) }}</span></summary><div>
+  <p><img src="/i/{{ it.id }}/label.png" alt="наклейка" style="width:240px;max-width:100%;background:#fff;border:1px solid var(--line)"><br>
+  <a data-act href="/i/{{ it.id }}/label.png" download="{{ it.id }}.png">Скачать наклейку</a> {{ print_btn("/i/" ~ it.id ~ "/label.png") }}</p>
+  {{ nfc_tag(nfc) }}</div></details>
+{% if projects %}<details><summary class="lrow"><span>Для проекта<br><span class="mut sm">{% for n in needs %}{{ n.name }} · нужно {{ n.qty|qty(unit=u) }}{% if not loop.last %}; {% endif %}{% else %}ни для одного{% endfor %}</span></span><span class="chev">{{ ico(I_DOWN) }}</span></summary><div>
+{% for n in needs %}<div class="row"><a href="/p/{{ n.id }}">{{ n.name }}</a><span class="qty right">{{ n.qty|qty(unit=u) }}</span></div>{% endfor %}
+<form method="post" action="/i/{{ it.id }}/need" class="row"><select name="project">{% for p in projects %}<option value="{{ p.id }}">{{ p.name }}</option>{% endfor %}</select>
+  <input type="number" name="qty" min="0" value="1" required><button>Сохранить</button></form>
+<p class="mut">0 — больше не нужно.</p></div></details>{% endif %}
+<details><summary class="lrow"><span>История<br><span class="mut sm">{% if history %}движений: {{ history|length }}{% if history|length == 50 %}+{% endif %}{% else %}пока пусто{% endif %}</span></span><span class="chev">{{ ico(I_DOWN) }}</span></summary><div>
+{{ moves_table(history) }}</div></details>
+<details><summary class="lrow"><span>Изменить или удалить<br><span class="mut sm">поля, одна штука, передать агенту</span></span><span class="chev">{{ ico(I_DOWN) }}</span></summary><div>
+<p><a class="btn ghost" href="/i/{{ it.id }}/edit">Изменить карточку</a></p>
+<form method="post" action="/i/{{ it.id }}/agent"><label class="chk"><input type="checkbox" name="on" value="1"{% if it.for_agent %} checked{% endif %}
+  onchange="this.form.requestSubmit()"> {{ t.to_agent }}</label></form>
+<form method="post" action="/i/{{ it.id }}/single"><label class="chk"><input type="checkbox" name="on" value="1" id="single"{% if single %} checked{% endif %}{% if it.single is none %} data-auto{% endif %}
+  onchange="this.form.requestSubmit()"> {{ t.single }}</label></form>
+<form method="post" action="/i/{{ it.id }}/delete" onsubmit='return confirm({{ ("«" ~ it.name ~ "» уйдёт в корзину"
+    ~ ((" и пропадёт из мест, где лежит: " ~ stock|length) if stock else "") ~ ". Вернуть можно " ~ core.TRASH_DAYS
+    ~ " дней из «Корзины».")|tojson }})'><p><button class="bad">Удалить</button></p></form></div></details>
+</div>
 
-<h2>История</h2>
-{{ moves_table(history) }}
+{# №54: «Куда положить» waits at the thumb; a scanned box label fills it and puts (gotBox, base.html) #}
+{% set tr = none if h else stock|selectattr("box_id", "equalto", TRANSIT)|first %}{# manifesto 3: it came — the box it goes to takes it out of «в пути» #}
+<section class="put"><b>{{ "Положить на место" if h else "Пришло — куда положить" if tr else "Куда положить" }}</b>
+<form method="post" action="/stock" class="row" data-put{% if stock|length == 1 and not h and not tr %} data-from="{{ stock[0].box_id }}"{% endif %}>
+  <input type="hidden" name="item" value="{{ it.id }}"><input type="hidden" name="action" value="add"><input type="hidden" name="kind" value="{{ 'move' if tr else 'return' if h and h.src else 'put' }}"><input type="hidden" name="back" value="/i/{{ it.id }}"><input type="hidden" name="src"{% if tr %} value="{{ TRANSIT }}"{% endif %}>
+  {{ box_input(value=h.src if h else "", placeholder="коробка: название или скан", required=True, exclude=TRANSIT if tr else None) }}{% if single %}<input type="hidden" name="qty" value="1">{% else %}<input type="number" name="qty" min="1" placeholder="не считал" value="{{ (h or tr) and (h or tr).qty or 1 }}">{% endif %}<button class="right">Положить</button>
+</form></section>
 {% endblock %}

@@ -570,7 +570,7 @@ def test_project_needs():
     b = newest()
     c.post("/projects", data={"name": "Часы с нуждами"})
     pid = core.db().execute("SELECT id FROM projects WHERE name='Часы с нуждами'").fetchone()[0]
-    assert "Нужно для проекта" in c.get(f"/i/{a}").text
+    assert f'action="/i/{a}/need"' in c.get(f"/i/{a}").text
     c.post(f"/i/{a}/need", data={"project": pid, "qty": 10})
     c.post(f"/i/{b}/need", data={"project": pid, "qty": 4})
     need = lambda: {r["item_id"]: (r["need"], r["have"], r["transit"], r["short"]) for r in core.project_needs(pid)}
