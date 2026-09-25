@@ -49,8 +49,10 @@ weight.
 
 ## What works
 
-- **Boxes** with printable labels (QR + short ID); boxes nest and stand in
-  places. An empty box asks what goes in.
+- **Boxes** with printable labels (QR + short ID), one at a time for a label
+  printer or a batch on one sheet at real size; each label's NFC link is
+  written from the phone or copied. Boxes nest and stand in places. An empty
+  box asks what goes in.
 - **Items** with photo, markdown description, files and per-type fields.
   Quantity lives on the box + item pair.
 - **Take / return / restock / recount / empty box** — every change is a
@@ -77,7 +79,7 @@ weight.
 
 ## Planned
 
-- Markdown editor with toolbar, batch label printing, English UI.
+- Markdown editor with toolbar, English UI.
 
 ## Non-goals
 

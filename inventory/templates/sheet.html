@@ -1,0 +1,6 @@
+<!doctype html><html lang="ru"><meta charset="utf-8"><title>Наклейки</title>
+<style>@page{margin:10mm}body{margin:0;font:14px sans-serif}p{margin:8px}@media print{p{display:none}}
+div{display:flex;flex-wrap:wrap;gap:2mm}img{border:.2mm dashed #999}</style>
+<p><button onclick="print()">Печать</button> <a href="/boxes">Назад</a> · каждая наклейка в натуральную величину, по пунктиру — резать.</p>
+<div>{% for id in ids %}<img src="/b/{{ id }}/label.png" alt="{{ id }}" style="width:{{ '%g'|format(w) }}mm;height:{{ '%g'|format(h) }}mm">{% endfor %}</div>
+</html>

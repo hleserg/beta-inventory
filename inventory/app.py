@@ -142,7 +142,15 @@ def boxes(req: Request, new: str = "", loose: str = ""):
             "WHERE b.kind='box' GROUP BY b.id ORDER BY b.created_at DESC, b.id")]
     if loose:  # №28: boxes standing nowhere — no place, theirs or their outer box's
         rows = [r for r in rows if not r["where"]]
-    return page(req, "boxes.html", boxes=rows, new=[x for x in new.split(",") if x], loose=loose)
+    return page(req, "boxes.html", boxes=rows, new=[x for x in new.split(",") if x], loose=loose,
+                nfc_base=public_base(req).lower())
+
+
+@app.get("/boxes/sheet")
+def label_sheet(req: Request, ids: str = ""):
+    """A batch on one sheet, each label at its real size: for a printer that takes paper, not a roll."""
+    w, h, _ = label_size()
+    return page(req, "sheet.html", ids=[valid_box_id(i) for i in ids.split(",") if i], w=w, h=h)
 
 
 @app.post("/boxes")
@@ -244,9 +252,12 @@ def public_base(req):
     return (os.environ.get("PUBLIC_BASE_URL") or str(req.base_url)).rstrip("/")
 
 
+def label_size():
+    return tuple(float(os.environ.get(k, d)) for k, d in (("LABEL_W_MM", 25), ("LABEL_H_MM", 15), ("LABEL_DPI", 300)))
+
+
 def label_png(path, text, base):
-    w_mm, h_mm, dpi = (float(os.environ.get(k, d)) for k, d in
-                       (("LABEL_W_MM", 25), ("LABEL_H_MM", 15), ("LABEL_DPI", 300)))
+    w_mm, h_mm, dpi = label_size()
     W, H = round(w_mm / 25.4 * dpi), round(h_mm / 25.4 * dpi)
     qr = qrcode.QRCode(error_correction=qrcode.constants.ERROR_CORRECT_L, border=1)
     qr.add_data(f"{base}/{path}".upper())  # upper case = alphanumeric mode = smaller QR

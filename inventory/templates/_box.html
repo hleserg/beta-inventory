@@ -10,6 +10,6 @@
 
 {% macro nfc_tag(url) %}{# writing it: base.html #}
 <label>Ссылка для NFC-метки</label><input readonly value="{{ url }}" onfocus="this.select()">
-<p class="row"><button type="button" data-nfcw="{{ url }}" data-act>Записать на метку</button><a href="/phone">Как записать метку с телефона</a></p>
+<p class="row"><button type="button" data-nfcw="{{ url }}" data-act>Записать на метку</button><button type="button" class="ghost" data-copy>Скопировать</button><a href="/phone">Как записать метку с телефона</a></p>
 <div class="mut" data-nfcst></div>
 {%- endmacro %}

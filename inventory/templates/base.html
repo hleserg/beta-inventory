@@ -188,6 +188,11 @@ addEventListener("click", async e => {  // «Записать на метку» 
   } catch (e) { st.textContent = e.name == "NotAllowedError" ? "Нажмите «Записать на метку» — телефон ждёт нажатия." : "Не записалось: " + e.message; }
   finally { window.nfcBusy = false; }
 });
+addEventListener("click", e => {  // «Скопировать» (nfc_tag), for NFC Tools: navigator.clipboard needs https, this is http
+  const b = e.target.closest("[data-copy]");
+  if (!b) return;
+  b.parentElement.previousElementSibling.select(); document.execCommand("copy"); b.textContent = "Скопировано ✓";
+});
 addEventListener("DOMContentLoaded", () => {  // №42: «Сохранить и записать метку» lands on the card with ?nfc=1
   const b = new URLSearchParams(location.search).has("nfc") && document.querySelector("[data-nfcw]");
   if (!b) return;

@@ -443,3 +443,14 @@ def test_project_needs():
     assert set(need()) == {a, b}  # the need came back with the thing
     c.post(f"/i/{b}/need", data={"project": pid, "qty": 0})
     assert list(need()) == [a]
+
+
+def test_label_sheet():
+    """A batch of labels: one sheet at the label's size to print, and each label's NFC link to copy or write."""
+    c = TestClient(app)
+    ids = c.post("/boxes", data={"n": 3}, follow_redirects=False).headers["location"].split("=")[1].split(",")
+    page = c.get("/boxes?new=" + ",".join(ids)).text
+    assert f'data-nfcw="http://testserver/b/{ids[0].lower()}"' in page and "data-copy" in page
+    sheet = c.get("/boxes/sheet?ids=" + ",".join(ids)).text
+    assert sheet.count("label.png") == 3 and "width:25mm;height:15mm" in sheet
+    assert c.get("/boxes/sheet?ids=../x").status_code == 404
