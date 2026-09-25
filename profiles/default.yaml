@@ -73,21 +73,119 @@ categories:
             label: Питание
             type: text
             hint: 3.3 В, 5 В через USB
+          - key: radio
+            label: Радио
+            type: text
+            search: 2
+            hint: Wi-Fi, BLE, LoRa
+          - key: flash_psram
+            label: Flash / PSRAM
+            type: text
+            hint: 4 МБ / 2 МБ
+          - key: usb
+            label: USB
+            type: text
+            hint: CH340, CP2102, нативный
           - key: pinout
             label: Распиновка
             type: markdown
             required: true
       - key: module
         label: Модуль
-        hint: датчики, драйверы, преобразователи, дисплеи, реле
+        hint: датчики, драйверы, дисплеи, реле
         fields:
+          - key: chip
+            label: Чип
+            type: text
+            search: 2
+            hint: BME280, INA219
           - key: voltage
             label: Питание
             type: text
+          - key: logic
+            label: Логический уровень
+            type: choice
+            options: [3.3 В, 5 В, оба]
+          - key: interface
+            label: Интерфейс
+            type: text
+            search: 2
+            hint: I2C, SPI, UART, 1-Wire, аналог
+          - key: i2c_address
+            label: Адрес I2C
+            type: text
+            search: 3
+            hint: "0x76"
           - key: pinout
             label: Распиновка
             type: markdown
             required: true
+          - key: firmware
+            label: ESPHome / Arduino
+            type: link
+            hint: страница компонента ESPHome или библиотека Arduino
+      - key: power_module
+        label: Модуль питания
+        hint: понижайка, повышайка, зарядка, защита аккумулятора
+        fields:
+          - key: chip
+            label: Чип
+            type: text
+            search: 2
+            hint: MP1584, LM2596, TP4056
+          - key: vin
+            label: Вход, В
+            type: text
+            required: true
+            hint: 4.5–28
+          - key: vout
+            label: Выход, В
+            type: text
+            required: true
+            hint: 0.8–20 или 5
+          - key: current
+            label: Ток, А
+            type: text
+            required: true
+            hint: "3"
+          - key: efficiency
+            label: КПД
+            type: text
+            hint: до 92%
+          - key: adjust
+            label: Регулировка
+            type: choice
+            options: [подстроечник, фиксированный]
+      - key: battery
+        label: Аккумулятор, батарейка
+        hint: 18650, LiPo, AA, CR2032
+        fields:
+          - key: photo
+            required: false
+          - key: chemistry
+            label: Химия
+            type: choice
+            required: true
+            search: 2
+            options: [Li-ion, LiPo, LiFePO4, NiMH, щелочная, литиевая]
+          - key: voltage
+            label: Напряжение
+            type: text
+            required: true
+            hint: 3.7 В, 1.5 В
+          - key: capacity
+            label: Ёмкость
+            type: text
+            required: true
+            hint: 2600 мА·ч
+          - key: connector
+            label: Разъём
+            type: text
+            hint: JST-PH 2.0, выводы под пайку, без разъёма
+          - key: protection
+            label: Защита встроена
+            type: choice
+            options: [да, нет]
       - key: resistor
         label: Резистор
         fields:
@@ -103,6 +201,10 @@ categories:
             label: Мощность
             type: text
             hint: 0.25 Вт
+          - key: tolerance
+            label: Допуск
+            type: text
+            hint: 1%, 5%
           - key: package
             label: Корпус
             type: choice
@@ -141,6 +243,10 @@ categories:
           - key: pins
             label: Контактов
             type: number
+          - key: gender
+            label: Папа / мама
+            type: choice
+            options: [папа, мама, пара]
       - key: electronics_other
         label: Другое
 

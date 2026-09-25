@@ -370,6 +370,16 @@ def test_unit():
     assert "100 г" in c.get("/items?q=припой").text
 
 
+def test_diy_fields():
+    """Manifesto 5: a module says its bus and I2C address and is found by them; power modules and batteries are types."""
+    box = core.new_boxes(1)[0]
+    assert "Адрес I2C" in c.get("/items/new?type=module").text and "Flash / PSRAM" in c.get("/items/new?type=mcu_module").text
+    assert "Выход, В" in c.get("/items/new?type=power_module").text and "Ёмкость" in c.get("/items/new?type=battery").text
+    c.post("/items/new?type=module", files=photo(), data={
+        "name": "BME280", "pinout": "VCC GND SCL SDA", "interface": "I2C, SPI", "i2c_address": "0x76", "box": box, "qty": 1})
+    assert "BME280" in c.get("/?q=0x76").text and "BME280" in c.get("/?q=spi").text
+
+
 def test_pick_new():
     """№19: a picker's «+ Место» / «+ Коробка» opens a page that makes one and hands its id back to the field."""
     new = c.get("/places/new?from=/b/K7M2Q&field=place&name=Антресоль").text
