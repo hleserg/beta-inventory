@@ -459,6 +459,8 @@ def test_take_box():
     c.post(f"/b/{box}/take")
     where = lambda bid: core.box_where(core.db(), bid)
     assert where(box) == "На руках" and f"/b/{box}" in c.get("/items?hands=1").text
+    places = c.get("/places").text  # №68: the box in hand stays in sight among the places
+    assert 'id="hands"' in places and f"/b/{box}" in places
     page = c.get(f"/b/{box}").text
     assert "Положить на место" in page and "антресоль" in page  # says where it goes back to
     r = c.post(f"/b/{box}", data={"name": "крепёж М3", "parent_id": core.HANDS}, headers={"X-Autosave": "1"})

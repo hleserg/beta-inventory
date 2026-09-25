@@ -728,7 +728,7 @@ def places(req: Request, new: str = ""):
                                     "WHERE b.place_id=? AND b.kind='shelf'", (p["id"],)).fetchone()[0])
                 for p in c.execute("SELECT * FROM places ORDER BY name")]
     nowhere = [b for b in under.get(None, []) if not b["place_id"]]
-    return page(req, "places.html", places=rows, shelves=len(shelves), boxes=len(boxes),
+    return page(req, "places.html", places=rows, shelves=len(shelves), boxes=len(boxes), hands=under.get(core.HANDS, []),
                 loose=[b for b in nowhere if b["n"] or b["kids"]], empty=[b for b in nowhere if not (b["n"] or b["kids"])],
                 new=[x for x in new.split(",") if x], nfc_base=public_base(req).lower())
 

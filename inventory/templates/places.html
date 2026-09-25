@@ -36,8 +36,11 @@
 {% for id in new %}<div><a href="/b/{{ id }}/label.png" download="{{ id }}.png"><img src="/b/{{ id }}/label.png" alt="{{ id }}" style="width:100%;background:#fff;border:1px solid var(--line)"></a>
 {{ nfc_tag(nfc_base ~ "/b/" ~ id|lower) }}</div>{% endfor %}
 </div></div>{% endif %}
-{% if not places and not loose and not empty %}<div class="card">Пусто. Добавьте первое место — шкаф, стеллаж, стол — кнопкой «+ {{ t.place }}» внизу.</div>{% endif %}
+{% if not places and not loose and not empty and not hands %}<div class="card">Пусто. Добавьте первое место — шкаф, стеллаж, стол — кнопкой «+ {{ t.place }}» внизу.</div>{% endif %}
 <div class="tree">
+{% if hands %}<details open id="hands"><summary class="tn l0 hd"><span class="ti chev">{{ ico(I_DOWN) }}</span><span class="ti">{{ ico(I_BOX) }}</span>
+  <span class="grow"><span class="nm">{{ t.hands }}</span><span class="path">{{ t.boxes|lower }}: {{ hands|length }}</span></span></summary>
+{% for b in hands %}{{ box_row(b, 1) }}{% endfor %}</details>{% endif %}{# №68: the box in hand first — it's the one in use #}
 {% for p in places %}
 {% set lost = p.boxes|length + p.shelves|map(attribute="boxes")|map("length")|sum %}
 <details open id="p{{ p.id }}"><summary class="tn l0 hd"><span class="ti chev">{{ ico(I_DOWN) }}</span><span class="ti">{{ ico(I_PLACE) }}</span>
