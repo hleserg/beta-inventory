@@ -585,6 +585,8 @@ def test_settings():
         for bad in ({"TRASH_DAYS": "abc"}, {"TRASH_DAYS": "-1"}, {"PUBLIC_BASE_URL": "inv.lan"}, {"SCAN_DEFAULT": "x"}):
             assert c.post("/settings", data=bad).status_code == 400
         assert core.TRASH_DAYS == 7 and saved() == {"TRASH_DAYS": "7"}  # a bad value changes nothing
+        assert c.post("/settings", data={"PUBLIC_BASE_URL": "HTTP://INV.LAN"}).status_code == 200  # capitals, as on a label
+        c.post("/settings", data={"reset": "PUBLIC_BASE_URL"})
         c.post("/settings", data={"reset": "TRASH_DAYS"})
         assert core.TRASH_DAYS == 30 and saved() == {}
         c.post("/settings", data={"TRASH_DAYS": "30", "PHOTO_QUALITY": "90"})  # the whole form comes back unchanged

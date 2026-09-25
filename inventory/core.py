@@ -63,7 +63,7 @@ def read_settings():
                SCAN_NFC=setting("SCAN_NFC") != "0", SCAN_QR=setting("SCAN_QR") != "0", SCAN_DEFAULT=setting("SCAN_DEFAULT"))
     if new["SCAN_DEFAULT"] not in ("auto", "nfc", "qr"):
         raise ValueError("SCAN_DEFAULT: auto, nfc или qr")
-    if not re.match(r"(https?://\S+)?$", setting("PUBLIC_BASE_URL")):
+    if not re.match(r"(https?://\S+)?$", setting("PUBLIC_BASE_URL"), re.I):  # HTTP://INV.LAN: capitals keep the QR small
         raise ValueError("PUBLIC_BASE_URL: пусто или адрес с http:// или https://")
     globals().update(new)
 
