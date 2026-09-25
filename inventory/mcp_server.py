@@ -1,6 +1,7 @@
 """MCP for agents: the same inventory as the site. Mounted by app.py at /mcp (streamable HTTP)."""
 import asyncio
 import io
+import json
 import os
 import urllib.request
 from pathlib import Path
@@ -102,6 +103,7 @@ def get_box(box_id: str) -> dict[str, Any]:
         if not b:
             raise ToolError(f"No box {box_id.upper()}. Find boxes with search (by id, name or place).")
         return dict(id=b["id"], name=b["name"], where=core.box_where(c, b["id"]), url=link(f"/b/{b['id']}"),
+                    photos=[link(f"/u/{x}") for x in json.loads(b["photos"])],
                     contents=[dict(item_id=r["id"], name=r["name"], type=core.type_label(r["type"]), qty=r["qty"],
                                    unit=core.unit_of(r["type"], r["fields"])) for r in core.box_contents(c, b["id"])],
                     boxes=[dict(id=x["id"], name=x["name"]) for x in

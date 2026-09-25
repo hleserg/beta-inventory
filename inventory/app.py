@@ -141,7 +141,7 @@ def index(req: Request, q: str = "", put: str = ""):
 @app.get("/boxes")
 def boxes(req: Request, new: str = "", loose: str = ""):
     with db() as c:
-        rows = [dict(b, where=core.box_where(c, b["id"])) for b in c.execute(
+        rows = [dict(b, where=core.box_where(c, b["id"]), pics=json.loads(b["photos"])) for b in c.execute(
             "SELECT b.*, COUNT(s.item_id) AS n FROM boxes b LEFT JOIN stock s ON s.box_id=b.id "
             "WHERE b.kind='box' GROUP BY b.id ORDER BY b.created_at DESC, b.id")]
     if loose:  # №28: boxes standing nowhere — no place, theirs or their outer box's
@@ -173,7 +173,7 @@ def boxes_create(n: int = Form(1)):
 @app.get("/boxes/new")
 def box_new(req: Request):
     """«+ Коробка»: the page of a box not made yet. Leave untouched and there is no box; box_save makes it."""
-    return box_page(req, dict(id=core.free_box_id(), name="", kind="box", place_id=None, parent_id=None), draft=True)
+    return box_page(req, dict(id=core.free_box_id(), name="", kind="box", place_id=None, parent_id=None, photos="[]"), draft=True)
 
 
 def valid_box_id(s):
@@ -198,7 +198,7 @@ def box_page(req, b, draft=False):
         contents = core.box_contents(c, b["id"])
         children = c.execute("SELECT * FROM boxes WHERE parent_id=? ORDER BY id", (b["id"],)).fetchall()
         places = c.execute("SELECT * FROM places ORDER BY name").fetchall()
-        return page(req, "box.html", b=b, where=core.box_where(c, b["id"]), contents=contents, top=box_top(b["id"]),
+        return page(req, "box.html", b=b, pics=json.loads(b["photos"]), where=core.box_where(c, b["id"]), contents=contents, top=box_top(b["id"]),
                     children=children, places=places, projects=core.projects(c), draft=draft, picking="from" in req.query_params,
                     nfc=f"{public_base(req)}/b/{b['id']}".lower())  # NFC Tools writes it as typed
 
@@ -208,9 +208,12 @@ def box_top(box_id):  # the place a box stands in: its own, or its top box's
 
 
 @app.post("/b/{box_id}")
-def box_save(box_id: str, name: str = Form(""), place: str = Form(""), parent_id: str = Form(""),
-             x_autosave: str = Header("")):
+async def box_save(req: Request, box_id: str, name: str = Form(""), place: str = Form(""), parent_id: str = Form(""),
+                   x_autosave: str = Header("")):
     bid = valid_box_id(box_id)
+    form = await req.form()  # photos only when the page's form sent them: a bare POST keeps what the box has
+    photos = None if not form.get("photos_on") else [x for x in map(core.own_upload, form.getlist("photos__keep")) if x] + [
+        save_upload(up, photo=True) for up in form.getlist("photos") if getattr(up, "filename", "")]
     parent = core.find_box(parent_id) if parent_id.strip() else None
     if parent == core.HANDS:  # «на руках» holds things, not boxes (№28)
         raise ValueError(f"«{PROFILE['terms'].get('hands', 'На руках')}» — не коробка")
@@ -231,10 +234,17 @@ def box_save(box_id: str, name: str = Form(""), place: str = Form(""), parent_id
             c.execute("UPDATE boxes SET name=? WHERE id=?", (name.strip() or b["name"], bid))
         else:
             c.execute("UPDATE boxes SET name=?, place_id=?, parent_id=? WHERE id=?", (name.strip(), place_id, parent, bid))
+        if photos is not None:
+            c.execute("UPDATE boxes SET photos=? WHERE id=?", (json.dumps(photos), bid))
         where = core.box_where(c, bid)
     if x_autosave:  # box.html saves as you type and redraws the heading
-        return {"id": bid, "name": name.strip(), "where": where, "parent": parent, "place": box_top(bid)}
+        return {"id": bid, "name": name.strip(), "where": where, "parent": parent, "place": box_top(bid), "photos": photos}
     return go(f"/b/{bid}")
+
+
+@app.post("/b/{box_id}/rotate")
+def box_rotate(box_id: str, photo: str = Form(), deg: int = Form()):
+    return {"photo": core.rotate_box_photo(valid_box_id(box_id), photo, deg)}
 
 
 @app.post("/b/{box_id}/clear")

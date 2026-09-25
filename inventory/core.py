@@ -41,6 +41,7 @@ CREATE TABLE IF NOT EXISTS boxes(
   kind TEXT NOT NULL DEFAULT 'box',
   place_id INTEGER REFERENCES places(id) ON DELETE SET NULL,
   parent_id TEXT REFERENCES boxes(id) ON DELETE SET NULL,
+  photos TEXT NOT NULL DEFAULT '[]',
   created_at TEXT NOT NULL DEFAULT (datetime('now','localtime')));
 CREATE TABLE IF NOT EXISTS items(
   id INTEGER PRIMARY KEY, name TEXT NOT NULL, type TEXT NOT NULL DEFAULT '', fields TEXT NOT NULL DEFAULT '{}',
@@ -151,6 +152,8 @@ def init():
                             "INSERT INTO stock SELECT * FROM stock_v0; DROP TABLE stock_v0; COMMIT;")
         if "kind" not in [r["name"] for r in c.execute("PRAGMA table_info(boxes)")]:  # boxes from before shelves
             c.execute("ALTER TABLE boxes ADD COLUMN kind TEXT NOT NULL DEFAULT 'box'")
+        if "photos" not in [r["name"] for r in c.execute("PRAGMA table_info(boxes)")]:  # boxes from before №45
+            c.execute("ALTER TABLE boxes ADD COLUMN photos TEXT NOT NULL DEFAULT '[]'")
         if "for_agent" not in [r["name"] for r in c.execute("PRAGMA table_info(items)")]:  # cards from before №41
             c.execute("ALTER TABLE items ADD COLUMN for_agent INTEGER NOT NULL DEFAULT 0")
         if "single" not in [r["name"] for r in c.execute("PRAGMA table_info(items)")]:  # cards from before №43
@@ -555,6 +558,29 @@ def save_bytes(data, ext, photo=False):
     (UPLOADS / name).write_bytes(data)
     return name
 
+def turn_photo(name, deg):
+    """Turn a stored photo by 90° (deg > 0 — clockwise). → the new file's name: the old one may sit in a cache."""
+    try:
+        im = Image.open(UPLOADS / name).transpose(Image.Transpose.ROTATE_270 if deg > 0 else Image.Transpose.ROTATE_90)
+    except OSError:
+        raise ValueError("Это фото не повернуть: формат не читается")
+    buf = io.BytesIO()
+    im.convert("RGB").save(buf, "JPEG", quality=PHOTO_QUALITY, optimize=True)
+    return save_bytes(buf.getvalue(), ".jpg")
+
+
+def rotate_box_photo(box_id, name, deg):
+    with db() as c:
+        b = c.execute("SELECT photos FROM boxes WHERE id=?", (box_id,)).fetchone()
+    pics = json.loads(b["photos"]) if b else []
+    if name not in pics:
+        raise ValueError("Нет такого фото у этой коробки")
+    new = turn_photo(name, deg)
+    with db() as c:
+        c.execute("UPDATE boxes SET photos=? WHERE id=?", (json.dumps([new if x == name else x for x in pics]), box_id))
+    return new
+
+
 def rotate_photo(item_id, name, deg):
     """Turn one photo of the card by 90° (deg > 0 — clockwise). → the new file's name: the old one may sit in a cache."""
     with db() as c:
@@ -563,13 +589,7 @@ def rotate_photo(item_id, name, deg):
     k = next((k for k, v in f.items() if isinstance(v, list) and name in v), None)
     if not k:
         raise ValueError("Нет такого фото у этой вещи")
-    try:
-        im = Image.open(UPLOADS / name).transpose(Image.Transpose.ROTATE_270 if deg > 0 else Image.Transpose.ROTATE_90)
-    except OSError:
-        raise ValueError("Это фото не повернуть: формат не читается")
-    buf = io.BytesIO()
-    im.convert("RGB").save(buf, "JPEG", quality=PHOTO_QUALITY, optimize=True)
-    new = save_bytes(buf.getvalue(), ".jpg")
+    new = turn_photo(name, deg)
     f[k] = [new if x == name else x for x in f[k]]
     with db() as c:
         c.execute("UPDATE items SET fields=?, updated_at=datetime('now','localtime') WHERE id=?",

@@ -1,28 +1,7 @@
-{% extends "base.html" %}{% from "_stock.html" import stock_forms, moves_table %}{% from "_box.html" import box_input, box_link, nfc_tag %}
+{% extends "base.html" %}{% from "_stock.html" import stock_forms, moves_table %}{% from "_box.html" import box_input, box_link, nfc_tag %}{% from "_photos.html" import carousel %}
 {% block title %}{{ it.name }}{% endblock %}
 {% block main %}
-{% if pk and f[pk] %}<div class="car" id="car">
-  <div class="strip">{% for x in f[pk] %}<img src="/u/{{ x }}" alt=""{% if not loop.first %} loading="lazy"{% endif %}>{% endfor %}</div>
-  {% if f[pk]|length > 1 %}<span class="cnt">1 / {{ f[pk]|length }}</span>{% endif %}
-  <button type="button" class="x" aria-label="Закрыть">✕</button>
-  <span class="rot"><button type="button" value="-90" aria-label="Повернуть влево">↺</button><button type="button" value="90" aria-label="Повернуть вправо">↻</button></span>
-</div>
-<script>{
-// Photos swipe like on a marketplace; a tap opens them full screen, «назад» or ✕ closes.
-const car = document.getElementById("car"), strip = car.firstElementChild, cnt = car.querySelector(".cnt");
-const at = () => Math.round(strip.scrollLeft / strip.clientWidth), full = () => car.classList.contains("full");
-strip.addEventListener("scroll", () => { if (cnt) cnt.textContent = `${at() + 1} / ${strip.children.length}`; }, {passive: true});
-const show = on => { const i = at(); car.classList.toggle("full", on); strip.scrollLeft = i * strip.clientWidth; };
-strip.onclick = () => { if (!full()) { history.pushState({pics: 1}, ""); show(true); } };
-car.querySelector(".x").onclick = () => history.back();
-for (const b of car.querySelectorAll(".rot button")) b.onclick = async () => {  // №21: saved at once, no «Изменить» needed
-  const img = strip.children[at()], r = await fetch("/i/{{ it.id }}/rotate", {method: "POST",
-    body: new URLSearchParams({photo: img.getAttribute("src").slice(3), deg: b.value})});
-  if (r.ok) img.src = "/u/" + (await r.json()).photo; else alert("Не вышло повернуть это фото");
-};
-addEventListener("popstate", () => { if (full()) show(false); });
-addEventListener("keydown", e => { if (e.key == "Escape" && full()) history.back(); });
-}</script>{% endif %}
+{% if pk and f[pk] %}{{ carousel(f[pk], "/i/" ~ it.id ~ "/rotate") }}{% endif %}
 <h1>{{ it.name }}</h1>
 <div class="row"><span class="mut" style="flex:1">{{ type_label(it.type) or "тип не выбран" }}</span><span class="row right" style="flex-wrap:nowrap"><a class="btn ghost" href="/i/{{ it.id }}/edit">Изменить</a>
   <form method="post" action="/i/{{ it.id }}/delete" onsubmit='return confirm({{ ("«" ~ it.name ~ "» уйдёт в корзину"

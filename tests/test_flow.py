@@ -241,6 +241,19 @@ def test_old_stock_table_migrates(tmp_path, monkeypatch):
         assert d.execute("SELECT kind FROM boxes").fetchone()[0] == "box"
 
 
+def test_box_photos():
+    """№45: a box has photos like an item; a POST without the form's marker keeps them."""
+    box = c.post("/boxes", data={"n": 1}, follow_redirects=False).headers["location"].split("=")[1]
+    c.post(f"/b/{box}", data={"name": "С фото", "photos_on": "1"}, files={"photos": photo()["photo"]})
+    [a] = json.loads(core.db().execute("SELECT photos FROM boxes WHERE id=?", (box,)).fetchone()[0])
+    assert f"/u/{a}" in c.get(f"/b/{box}").text and f"/u/{a}" in c.get("/boxes").text
+    c.post(f"/b/{box}", data={"name": "С фото"})  # tests and scripts post bare fields
+    b = c.post(f"/b/{box}/rotate", data={"photo": a, "deg": 90}).json()["photo"]
+    assert b != a and f"/u/{b}" in c.get(f"/b/{box}").text
+    c.post(f"/b/{box}", data={"name": "С фото", "photos_on": "1"})  # ✕ on the last one
+    assert f"/u/{b}" not in c.get(f"/b/{box}").text
+
+
 def test_old_single_photo():
     """Cards from before several photos held one name, not a list."""
     iid = core.save_item(None, "старое", "module", {"photo": "x.jpg", "pinout": "A"})

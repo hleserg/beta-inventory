@@ -1,0 +1,25 @@
+{% macro carousel(pics, rotate_url) %}<div class="car" id="car">
+  <div class="strip">{% for x in pics %}<img src="/u/{{ x }}" alt=""{% if not loop.first %} loading="lazy"{% endif %}>{% endfor %}</div>
+  {% if pics|length > 1 %}<span class="cnt">1 / {{ pics|length }}</span>{% endif %}
+  <button type="button" class="x" aria-label="Закрыть">✕</button>
+  <span class="rot"><button type="button" value="-90" aria-label="Повернуть влево">↺</button><button type="button" value="90" aria-label="Повернуть вправо">↻</button></span>
+</div>
+<script>{
+// Photos swipe like on a marketplace; a tap opens them full screen, «назад» or ✕ closes.
+const car = document.getElementById("car"), strip = car.firstElementChild, cnt = car.querySelector(".cnt");
+const at = () => Math.round(strip.scrollLeft / strip.clientWidth), full = () => car.classList.contains("full");
+strip.addEventListener("scroll", () => { if (cnt) cnt.textContent = `${at() + 1} / ${strip.children.length}`; }, {passive: true});
+const show = on => { const i = at(); car.classList.toggle("full", on); strip.scrollLeft = i * strip.clientWidth; };
+strip.onclick = () => { if (!full()) { history.pushState({pics: 1}, ""); show(true); } };
+car.querySelector(".x").onclick = () => history.back();
+for (const b of car.querySelectorAll(".rot button")) b.onclick = async () => {  // №21: saved at once, no «Изменить» needed
+  const img = strip.children[at()], r = await fetch({{ rotate_url|tojson }}, {method: "POST",
+    body: new URLSearchParams({photo: img.getAttribute("src").slice(3), deg: b.value})});
+  if (!r.ok) return alert("Не вышло повернуть это фото");
+  const was = img.getAttribute("src").slice(3), now = (await r.json()).photo;  // a thumb and a kept name on the page turn too
+  for (const e of document.querySelectorAll(`[src="/u/${was}"]`)) e.src = "/u/" + now;
+  for (const e of document.querySelectorAll(`input[name$="__keep"][value="${was}"]`)) e.value = now;
+};
+addEventListener("popstate", () => { if (full()) show(false); });
+addEventListener("keydown", e => { if (e.key == "Escape" && full()) history.back(); });
+}</script>{% endmacro %}

@@ -12,5 +12,5 @@
 {{ nfc_tag(nfc_base ~ "/b/" ~ id|lower) }}</div>{% endfor %}
 </div></div>{% endif %}
 <div class="chips seg"><a href="/boxes" class="{{ 'on' if not loose }}">все</a><a href="/boxes?loose=1" class="{{ 'on' if loose }}">без места</a></div>
-<table>{% for b in boxes %}<tr><td>{{ box_link(b.id, b.name) }}<div class="mut">{{ b.where }}</div></td><td class="mut">{{ b.n or "—" }}</td></tr>{% else %}<tr><td class="mut">{{ "Все стоят на местах." if loose else "Пока пусто." }}</td></tr>{% endfor %}</table>
+<table>{% for b in boxes %}<tr><td>{% if b.pics %}<img class="thumb" src="/u/{{ b.pics[0] }}" alt="" style="float:left;margin-right:8px">{% endif %}{{ box_link(b.id, b.name) }}<div class="mut">{{ b.where }}</div></td><td class="mut">{{ b.n or "—" }}</td></tr>{% else %}<tr><td class="mut">{{ "Все стоят на местах." if loose else "Пока пусто." }}</td></tr>{% endfor %}</table>
 {% endblock %}

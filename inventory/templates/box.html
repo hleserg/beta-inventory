@@ -1,6 +1,7 @@
-{% extends "base.html" %}{% from "_stock.html" import stock_forms %}{% from "_box.html" import box_input, box_link, nfc_tag %}
+{% extends "base.html" %}{% from "_stock.html" import stock_forms %}{% from "_box.html" import box_input, box_link, nfc_tag %}{% from "_photos.html" import carousel %}
 {% block title %}{{ b.name or b.id }}{% endblock %}
 {% block main %}
+{% if pics %}{{ carousel(pics, "/b/" ~ b.id ~ "/rotate") }}{% endif %}
 <h1>{% if b.name %}{{ b.name }} <span class="mut">{{ b.id }}</span>{% else %}{{ b.id }}{% endif %}</h1>
 <div class="mut" id="where">{{ where or "место не указано" }}</div>
 {% if not contents and not children %}
@@ -20,8 +21,11 @@
   <p class="row"><a class="btn" href="/?put={{ b.id }}">Положить сюда</a> <a class="btn ghost" href="/items/new?box={{ b.id }}">+ {{ t.item }}</a></p>
 {% endif %}
 <details{% if not contents and not children %} open{% endif %}><summary>Настроить, наклейка{% if contents %}, освободить{% endif %}</summary>
-  <form method="post" action="/b/{{ b.id }}" id="boxf">
+  <form method="post" action="/b/{{ b.id }}" id="boxf" enctype="multipart/form-data">
     <label>Название</label><input name="name" value="{{ b.name or draft and request.query_params.get('name') or '' }}" placeholder="например: разъёмы JST">
+    <label>Фото</label><input type="hidden" name="photos_on" value="1">
+    <div class="row" id="pics">{% for x in pics %}<span class="pic"><img class="thumb" src="/u/{{ x }}" alt=""><input type="hidden" name="photos__keep" value="{{ x }}"><button type="button" class="mini" aria-label="Убрать фото">✕</button></span>{% endfor %}</div>
+    <input type="file" name="photos" accept="image/*" multiple>
     {% if b.kind != "shelf" %}{# a shelf stays in its cabinet #}
     <label>{{ t.place }}</label>
     <div id="placesel"{% if b.parent_id %} hidden{% endif %}><select name="place" data-pick data-new="/places/new" data-term="{{ t.place }}"><option value="">—</option>{% for p in places %}<option value="{{ p.id }}"{% if p.id == top %} selected{% endif %}>{{ p.name }}</option>{% endfor %}</select></div>
@@ -62,9 +66,18 @@
         }
         st.className = "mut"; st.textContent = "Сохранено ✓";
         if (draft) { draft = false; history.replaceState(history.state, "", "/b/" + j.id + location.search); }
+        if (pin.files.length) {  // sent once: the saved names are kept from now on, the carousel shows them after a reload
+          pin.value = "";
+          document.getElementById("pics").innerHTML = j.photos.map(x => `<span class="pic"><img class="thumb" src="/u/${x}" alt=""><input type="hidden" name="photos__keep" value="${x}"><button type="button" class="mini" aria-label="Убрать фото">✕</button></span>`).join("");
+          if (!picking) location.reload();
+        }
         return true;
       }, () => false);
     };
+    const pin = f.elements.photos;
+    document.getElementById("pics").addEventListener("click", e => {
+      if (e.target.matches(".pic button")) { e.target.parentNode.remove(); pin.dispatchEvent(new Event("change", {bubbles: true})); }
+    });
     const sel = f.elements.place, only = document.getElementById("onlyplace");
     const filt = () => {  // boxes of the chosen place only, unless unticked
       document.getElementById("onlyrow").hidden = !sel.value;
@@ -83,7 +96,7 @@
     f.addEventListener("change", () => (picking && draft) || save());
     f.addEventListener("submit", e => { e.preventDefault(); save(); });
     if (picking) pickMade(f, async () => await save() ? "{{ b.id }}" : null, () => !draft && "{{ b.id }}");
-    addEventListener("pagehide", () => { if (dirty) navigator.sendBeacon(f.action, new FormData(f)); });
+    addEventListener("pagehide", () => { if (dirty) { const d = new FormData(f); d.delete("photos"); navigator.sendBeacon(f.action, d); } });
     document.addEventListener("click", async e => {  // a new box: printing, filling or tagging it makes it first
       const a = e.target.closest("[data-act]");
       if (!a || !draft) return;
