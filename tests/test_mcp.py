@@ -29,6 +29,7 @@ def test_read_tools():
     assert hit["id"] == iid and hit["stock"][0]["qty"] == 7
     card = call("get_item", item_id=iid).structured_content
     assert card["fields"]["value"] == "220 Ом" and card["stock"][0]["box_id"] == box
+    assert card["unit"] == hit["unit"] == "шт"  # what qty counts: the card's, its type's or the profile's unit
     assert call("get_box", box_id=box.lower()).structured_content["contents"][0]["qty"] == 7  # label id, any case
     err = call("get_box", box_id="ZZZZZ")
     assert err.is_error and "search" in err.content[0].text  # the error says what to do next

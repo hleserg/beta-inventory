@@ -356,6 +356,20 @@ def test_transit():
     assert c.get(f"/b/{core.TRANSIT}").status_code == 200
 
 
+def test_unit():
+    """Manifesto 4: a thing counts in its own unit — the card's choice, else its type's default, else the profile's."""
+    box = core.new_boxes(1)[0]
+    assert "<option selected>м</option>" in c.get("/items/new?type=wire").text  # wire: metres unless changed
+    c.post("/items/new?type=wire", data={"name": "МГТФ 0.12", "box": box, "qty": 7})  # left empty: still metres
+    wire = newest()
+    c.post("/items/new?type=solder", data={"name": "припой ПОС-61", "unit": "г", "box": box, "qty": 100})
+    c.post("/items/new?type=resistor", data={"name": "1к", "value": "1 кОм", "box": box, "qty": 3})
+    assert "7 м" in c.get(f"/i/{wire}").text and "7 м" in c.get("/?q=МГТФ").text
+    page = c.get(f"/b/{box}").text
+    assert "7 м" in page and "100 г" in page and "3 шт" in page
+    assert "100 г" in c.get("/items?q=припой").text
+
+
 def test_pick_new():
     """№19: a picker's «+ Место» / «+ Коробка» opens a page that makes one and hands its id back to the field."""
     new = c.get("/places/new?from=/b/K7M2Q&field=place&name=Антресоль").text

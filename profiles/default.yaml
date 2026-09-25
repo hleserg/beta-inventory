@@ -5,6 +5,7 @@
 # The same key at a deeper level overrides the upper one (e.g. photo optional for resistors).
 # Field types: text, markdown, number, link, choice (needs `options`), photo (one or more pictures), files.
 # `search`: weight in text search (name always weighs 3). `required`: must be filled.
+# `default`: a choice picked in until changed; the unit field's also stands for an empty one.
 # Type keys are stored in the database: rename labels freely, keep keys.
 
 name: Мастерская
@@ -44,6 +45,11 @@ item_fields:
     label: Докупить, когда останется меньше
     type: number
     reorder: true  # the list's «докупить» chip compares this with what is here and «в пути»
+  - key: unit
+    label: Единица
+    type: choice
+    options: [шт, м, см, г, мл]
+    unit: true  # what the thing's quantities count; empty: the type's `default`, else terms.unit
 
 categories:
   - key: electronics
@@ -166,6 +172,8 @@ categories:
         label: Провод
         hint: МГТФ, силиконовый, витая пара, термоусадка
         fields:
+          - key: unit
+            default: м
           - key: gauge
             label: Сечение
             type: text

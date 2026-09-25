@@ -14,7 +14,7 @@
   {% if i.similar and not ns.sim %}{% set ns.sim = true %}<h2>Похоже по смыслу</h2>{% endif %}
   <div class="card">
     <a class="row" href="/i/{{ i.id }}" style="text-decoration:none;color:inherit">{% if pk and i.fields[pk] %}<img class="thumb" src="/u/{{ i.fields[pk][0] }}" alt="">{% endif %}<span><b>{{ i.name }}</b><br><span class="mut">{{ type_label(i.type) }}</span></span></a>
-    {% for s in i.stock %}<div>{{ box_link(s.box_id, s.name) }} <span class="mut">{{ s.where }}</span> — <span class="qty">{{ s.qty|qty }}</span></div>
+    {% for s in i.stock %}<div>{{ box_link(s.box_id, s.name) }} <span class="mut">{{ s.where }}</span> — <span class="qty">{{ s.qty|qty(unit=unit_of(i.type, i.fields)) }}</span></div>
     {% else %}<div class="mut">Нигде нет</div>{% endfor %}
     {% if put %}<form method="post" action="/stock" class="row" style="margin-top:8px">
       <input type="hidden" name="box" value="{{ put }}"><input type="hidden" name="item" value="{{ i.id }}"><input type="hidden" name="action" value="add"><input type="hidden" name="kind" value="put"><input type="hidden" name="back" value="/b/{{ put }}">

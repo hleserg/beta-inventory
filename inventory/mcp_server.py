@@ -49,18 +49,19 @@ def with_links(fields, type_key):
 def search(query: str) -> dict[str, Any]:
     """Find items and boxes by words (name, other names, description, searchable card fields) and by meaning.
 
-    Items come with where they lie: box id, place path, qty (null: «есть, не считал»). Word matches rank first; `similar: true`
+    Items come with where they lie: box id, place path, qty (null: «есть, не считал») in the item's unit (шт, м, г…).
+    Word matches rank first; `similar: true`
     marks items found only by meaning. Take an item id to get_item for the full card.
     """
     items, boxes = core.search(query)
     return {"items": [dict(id=i["id"], name=i["name"], type=core.type_label(i["type"]), similar=i["similar"],
-                           stock=i["stock"], url=link(f"/i/{i['id']}")) for i in items],
+                           unit=core.unit_of(i["type"], i["fields"]), stock=i["stock"], url=link(f"/i/{i['id']}")) for i in items],
             "boxes": [dict(b, url=link(f"/b/{b['id']}")) for b in boxes]}
 
 
 @server.tool(annotations=READ)
 def get_item(item_id: int) -> dict[str, Any]:
-    """Full card of an item: fields (keys as in card_template), stock per box, last 10 movements.
+    """Full card of an item: fields (keys as in card_template), unit its qty counts, stock per box, last 10 movements.
     Box HANDS in stock: in hand, not put away; its where says the box it was taken from, if any.
     Box TRANS («в пути»): ordered, not come yet; its where says when it was put there («заказано ДД.ММ»)."""
     return card(item_id)
@@ -73,7 +74,8 @@ def card(item_id):
             raise ToolError(f"No item {item_id}. Find item ids with search.")
         moves = c.execute(core.MOVES + " AND m.item_id=? ORDER BY m.id DESC LIMIT 10", (item_id,))
         return dict(id=it["id"], name=it["name"], type=it["type"], type_label=core.type_label(it["type"]),
-                    fields=with_links(core.item_fields(it), it["type"]), stock=core.stock_of_item(c, item_id),
+                    fields=with_links(core.item_fields(it), it["type"]),
+                    unit=core.unit_of(it["type"], core.item_fields(it)), stock=core.stock_of_item(c, item_id),
                     history=[dict(m) for m in moves], url=link(f"/i/{item_id}"))
 
 
@@ -88,8 +90,8 @@ def get_box(box_id: str) -> dict[str, Any]:
         if not b:
             raise ToolError(f"No box {box_id.upper()}. Find boxes with search (by id, name or place).")
         return dict(id=b["id"], name=b["name"], where=core.box_where(c, b["id"]), url=link(f"/b/{b['id']}"),
-                    contents=[dict(item_id=r["id"], name=r["name"], type=core.type_label(r["type"]), qty=r["qty"])
-                              for r in core.box_contents(c, b["id"])],
+                    contents=[dict(item_id=r["id"], name=r["name"], type=core.type_label(r["type"]), qty=r["qty"],
+                                   unit=core.unit_of(r["type"], r["fields"])) for r in core.box_contents(c, b["id"])],
                     boxes=[dict(id=x["id"], name=x["name"]) for x in
                            c.execute("SELECT id, name FROM boxes WHERE parent_id=? ORDER BY id", (b["id"],))])
 
@@ -128,7 +130,8 @@ def change_stock(box_id: str, item_id: int, action: Literal["put", "return", "bu
     """Change how many of an item lie in a box. Every change goes to history with agent as the author.
 
     put / return / buy: qty more in the box; take: qty out, project_id says what for (list_projects);
-    count: the box holds exactly qty now (stocktaking). agent: your name as the user knows you.
+    count: the box holds exactly qty now (stocktaking). qty counts in the item's unit (get_item).
+    agent: your name as the user knows you.
     put / return / buy with qty null: some went in, not counted (loose resistors and the like); the box then
     holds qty null, «есть, не считал», left out of totals. take and count need a number.
     box_id "" or HANDS is «на руках»: a take from a box lands there, a put or return into a box takes from there

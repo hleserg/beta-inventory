@@ -32,6 +32,7 @@ T = Jinja2Templates(directory=Path(__file__).parent / "templates")
 T.env.globals.update(
     # namespace, not dict: in Jinja t.items on a dict is dict.items, not the term
     t=SimpleNamespace(**PROFILE["terms"]), categories=PROFILE["categories"], type_label=core.type_label, kinds=core.KINDS,
+    unit_of=core.unit_of,
     trash_days=core.TRASH_DAYS,
     pk=next((f["key"] for f in PROFILE["item_fields"] if f["type"] == "photo"), None), TRANSIT=core.TRANSIT,
     rk=(RK := next((f["key"] for f in PROFILE["item_fields"] if f.get("reorder")), None)))  # the «докупить» threshold
@@ -55,11 +56,11 @@ _md = MarkdownIt("commonmark", {"html": False}).enable("table")  # raw HTML off:
 T.env.filters["md"] = lambda s: Markup(_md.render(s or ""))
 
 
-def qty_text(q, uncounted=False):
-    """Stock as people read it. None is «есть, не считал»; uncounted: the sum left some piles out."""
+def qty_text(q, uncounted=False, unit=None):
+    """Stock as people read it. None is «есть, не считал»; uncounted: the sum left some piles out; unit: unit_of the thing."""
     if q is None or uncounted and not q:
         return "есть, не считал"
-    return f"{q} {PROFILE['terms']['unit']}" + (" + не считал" if uncounted else "")
+    return f"{q} {unit or PROFILE['terms']['unit']}" + (" + не считал" if uncounted else "")
 
 
 T.env.filters["qty"] = qty_text

@@ -90,6 +90,13 @@ def fields_for(type_key):
     return list(merged.values())
 
 
+def unit_of(type_key, fields):
+    """Manifesto 4: what a thing's qty counts — its field marked `unit`, else that field's `default` for the type
+    (wire: м), else the profile's terms.unit."""
+    fd = next((f for f in fields_for(type_key) if f.get("unit")), {})
+    return fields.get(fd.get("key")) or fd.get("default") or PROFILE["terms"]["unit"]
+
+
 def type_label(type_key):
     t = TYPES.get(type_key)
     return f"{t['category']['label']} › {t['label']}" if t else ""

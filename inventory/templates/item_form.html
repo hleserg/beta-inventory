@@ -9,7 +9,7 @@
   <p class="mut">Поля, которых у нового типа нет, не удаляются — просто прячутся.</p></details>{% endif %}
 {% for e in errors %}<p class="err">{{ e }}</p>{% endfor %}
 {% if dups %}<div class="card"><b class="err">Похоже, такой уже есть:</b>
-  {% for i in dups %}<a class="line" href="/i/{{ i.id }}">{% if pk and i.fields[pk] %}<img class="thumb" src="/u/{{ i.fields[pk][0] }}" alt="">{% else %}<span class="thumb"></span>{% endif %}<span>{{ i.name }}<br><span class="mut">{% for s in i.stock %}{{ s.name or s.box_id }} — {{ s.qty|qty }}{% if not loop.last %}; {% endif %}{% else %}ни в одной коробке{% endfor %}</span></span></a>{% endfor %}
+  {% for i in dups %}<a class="line" href="/i/{{ i.id }}">{% if pk and i.fields[pk] %}<img class="thumb" src="/u/{{ i.fields[pk][0] }}" alt="">{% else %}<span class="thumb"></span>{% endif %}<span>{{ i.name }}<br><span class="mut">{% for s in i.stock %}{{ s.name or s.box_id }} — {{ s.qty|qty(unit=unit_of(i.type, i.fields)) }}{% if not loop.last %}; {% endif %}{% else %}ни в одной коробке{% endfor %}</span></span></a>{% endfor %}
   <p class="row"><button form="cardf" name="dup_ok" value="1">Всё равно создать</button></p></div>{% endif %}
 <form id="cardf" data-draft method="post" enctype="multipart/form-data" action="{% if it %}/i/{{ it.id }}/edit{% else %}/items/new{% endif %}?type={{ type }}">
   <label>Название *</label><input name="name" value="{{ name }}" required>
@@ -21,7 +21,7 @@
     <input type="file" name="{{ fd.key }}" accept="image/*" multiple data-pics{% if fd.required %} data-req{% endif %}{% if fd.required and not v %} required{% endif %}>
   {% elif fd.type == "markdown" %}<textarea name="{{ fd.key }}" {% if fd.required %}required{% endif %}>{{ v or "" }}</textarea>
   {% elif fd.type == "files" %}{% for x in v or [] %}<div class="mut">{{ x.name }}</div>{% endfor %}<input type="file" name="{{ fd.key }}" multiple>
-  {% elif fd.type == "choice" %}<select name="{{ fd.key }}" {% if fd.required %}required{% endif %}><option value="">—</option>{% for o in fd.options %}<option {% if o == v %}selected{% endif %}>{{ o }}</option>{% endfor %}</select>
+  {% elif fd.type == "choice" %}<select name="{{ fd.key }}" {% if fd.required %}required{% endif %}><option value="">—</option>{% for o in fd.options %}<option {% if o == (v or fd.default) %}selected{% endif %}>{{ o }}</option>{% endfor %}</select>
   {% else %}<input name="{{ fd.key }}" value="{{ v if v is defined and v is not none else '' }}" {% if fd.type == "number" %}inputmode="decimal"{% elif fd.type == "link" %}type="url"{% endif %} {% if fd.required %}required{% endif %}>
   {% endif %}
   {% endfor %}

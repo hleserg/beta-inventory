@@ -34,13 +34,13 @@ addEventListener("keydown", e => { if (e.key == "Escape" && full()) history.back
 {% for s in stock %}
 <div class="card">
   {% if s.box_id == "HANDS" %}
-  <div class="row"><b>{{ s.name }}</b> <span class="mut">{{ s.where }}</span><span class="qty right">{{ s.qty|qty }}</span></div>
+  <div class="row"><b>{{ s.name }}</b> <span class="mut">{{ s.where }}</span><span class="qty right">{{ s.qty|qty(unit=unit_of(it.type, f)) }}</span></div>
   <form method="post" action="/stock" class="row" onsubmit="return confirm('Списать? Из учёта уйдёт, в истории останется.')">
     <input type="hidden" name="box" value="HANDS"><input type="hidden" name="item" value="{{ it.id }}"><input type="hidden" name="action" value="take"><input type="hidden" name="back" value="/i/{{ it.id }}">
     <input type="number" name="qty" min="1" max="{{ s.qty }}" value="{{ s.qty }}" required><button class="bad">Списать</button>
   </form>
   {% else %}
-  <div class="row">{{ box_link(s.box_id, s.name) }} <span class="mut">{{ s.where }}</span><span class="qty right">{{ s.qty|qty }}</span></div>
+  <div class="row">{{ box_link(s.box_id, s.name) }} <span class="mut">{{ s.where }}</span><span class="qty right">{{ s.qty|qty(unit=unit_of(it.type, f)) }}</span></div>
   {{ stock_forms(s.box_id, it.id, s.qty, projects, "/i/" ~ it.id) }}
   {% endif %}
 </div>

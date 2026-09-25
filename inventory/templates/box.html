@@ -12,7 +12,7 @@
 {% else %}
   {% for i in contents %}
   <div class="card">
-    <div class="row">{% if pk and i.fields[pk] %}<img class="thumb" src="/u/{{ i.fields[pk][0] }}" alt="">{% endif %}<a href="/i/{{ i.id }}"><b>{{ i.name }}</b></a><span class="qty right">{{ i.qty|qty }}</span></div>
+    <div class="row">{% if pk and i.fields[pk] %}<img class="thumb" src="/u/{{ i.fields[pk][0] }}" alt="">{% endif %}<a href="/i/{{ i.id }}"><b>{{ i.name }}</b></a><span class="qty right">{{ i.qty|qty(unit=unit_of(i.type, i.fields)) }}</span></div>
     {{ stock_forms(b.id, i.id, i.qty, projects, "/b/" ~ b.id, folded=True) }}
   </div>
   {% endfor %}
