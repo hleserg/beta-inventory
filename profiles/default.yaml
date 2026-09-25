@@ -7,6 +7,7 @@
 # `search`: weight in text search (name always weighs 3). `required`: must be filled.
 # `default`: a choice picked in until changed; the unit field's also stands for an empty one.
 # Type keys are stored in the database: rename labels freely, keep keys.
+# `single` on a category or type: one of a kind (a tool) — taken and put back without a count, lies in one place.
 
 name: Мастерская
 
@@ -22,6 +23,7 @@ terms:
   hands: На руках
   transit: В пути
   reorder: Докупить
+  single: Одна штука — брать и класть без счёта  # №43, a tag ticks it
   to_agent: Передать агенту  # the card waits for an agent to fill it in (MCP agent_queue)
   unit: шт
 
@@ -253,6 +255,7 @@ categories:
 
   - key: tools
     label: Инструменты
+    single: true
     types:
       - key: hand_tool
         label: Ручной инструмент

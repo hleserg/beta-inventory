@@ -77,7 +77,8 @@ def card(item_id):
         return dict(id=it["id"], name=it["name"], type=it["type"], type_label=core.type_label(it["type"]),
                     fields=with_links(core.item_fields(it), it["type"]),
                     unit=core.unit_of(it["type"], core.item_fields(it)), stock=core.stock_of_item(c, item_id),
-                    history=[dict(m) for m in moves], url=link(f"/i/{item_id}"), for_agent=bool(it["for_agent"]))
+                    history=[dict(m) for m in moves], url=link(f"/i/{item_id}"), for_agent=bool(it["for_agent"]),
+                    single=core.single_of(it))
 
 
 @server.tool(annotations=READ)
@@ -119,7 +120,7 @@ def card_template(type: str = "") -> dict[str, Any]:
                                for c in PROFILE["categories"]]}
     if type not in core.TYPES:
         raise ToolError(f"Unknown type {type!r}. Call card_template without type for the list.")
-    return {"type": type, "label": core.type_label(type), "fields": core.fields_for(type)}
+    return {"type": type, "label": core.type_label(type), "fields": core.fields_for(type), "single": core.TYPES[type]["single"]}
 
 
 def author(agent):
@@ -201,6 +202,8 @@ def change_stock(box_id: str, item_id: int, action: Literal["put", "return", "bu
     agent: your name as the user knows you.
     put / return / buy with qty null: some went in, not counted (loose resistors and the like); the box then
     holds qty null, «есть, не считал», left out of totals. take and count need a number.
+    single: true on get_item (a tool, anything with a tag): one of a kind — qty is ignored and may be null;
+    take moves it to HANDS, put / return into a box moves it there from wherever it lies.
     box_id "" or HANDS is «на руках»: a take from a box lands there, a put or return into a box takes from there
     first, a take from HANDS writes it off (used up, gone), put/buy on HANDS: brought home, not put away yet.
     box_id TRANS is «в пути»: ordered — put there; it came — take from TRANS, then put into the real box.
@@ -279,7 +282,7 @@ async def create_item(type: str, name: str, fields: dict[str, Any], agent: str, 
     """New card. Fields by card_template(type), keys as there; photo: a list of direct image URLs (one string is fine), the server downloads them;
     files: [{name, url}]. With box_id and qty, puts qty into that box (history author: agent, your name);
     qty null puts some in uncounted, «есть, не считал». With qty and no box_id, the qty is in hand (box HANDS),
-    not put away yet.
+    not put away yet. A type whose card_template says single (tools): one lies there, whatever qty says.
 
     Search first: the item may already exist. Returns the card as get_item does.
     """
@@ -293,10 +296,11 @@ async def create_item(type: str, name: str, fields: dict[str, Any], agent: str, 
     agent, f = author(agent), await fill(type, {}, fields)
     check(name, type, f)
     iid = core.save_item(None, name.strip(), type, f)
-    if box_id and (qty is None or qty > 0):
-        core.move(iid, box_id, qty, "put", agent)
+    one = core.TYPES[type]["single"]  # №43: one of a kind is one, whatever qty says
+    if box_id and (one or qty is None or qty > 0):
+        core.move(iid, box_id, None if one else qty, "put", agent)
     elif not box_id and qty:  # no box yet: in hand until put away
-        core.move(iid, core.HANDS, qty, "buy", agent)
+        core.move(iid, core.HANDS, None if one else qty, "buy", agent)
     return card(iid)
 
 

@@ -62,7 +62,9 @@ weight.
 - **Items** with photo, markdown description, files and per-type fields.
   Quantity lives on the box + item pair.
 - **Take / return / restock / recount / empty box** — every change is a
-  movement with author and project.
+  movement with author and project. One-of-a-kind things (tools, anything
+  with a tag) go without a count: scan its tag to take it, scan a box to put
+  it back.
 - **Search** by name, other names, description and typed fields, ranked by
   relevance; box IDs and places too. Below the word matches, a small local
   model adds items close in meaning, so "step-down" finds a buck converter.

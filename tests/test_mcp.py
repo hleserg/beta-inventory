@@ -87,6 +87,19 @@ def test_project_needs():
     assert "list_projects" in call("project_needs", project_id=9999).content[0].text
 
 
+def test_single(monkeypatch):
+    """№43: an agent takes and puts back a unique thing without a number."""
+    monkeypatch.setattr(mcp_server, "fetch", lambda url: photo()["photo"][1])
+    a, b = core.new_boxes(2)
+    card = call("create_item", type="meter", name="мультиметр", agent="Мара", box_id=a,
+                fields={"photo": ["https://example.com/m.png"]}).structured_content
+    assert card["single"] and card["stock"][0]["qty"] == 1
+    iid = card["id"]
+    assert call("change_stock", box_id=a, item_id=iid, action="take", qty=None, agent="Мара").structured_content["qty"] == 0
+    assert call("change_stock", box_id=b, item_id=iid, action="put", qty=None, agent="Мара").structured_content["qty"] == 1
+    assert [(s["box_id"], s["qty"]) for s in call("get_item", item_id=iid).structured_content["stock"]] == [(b, 1)]
+
+
 def test_card_tools(monkeypatch):
     got = []
     monkeypatch.setattr(mcp_server, "fetch", lambda url: got.append(url) or photo()["photo"][1])

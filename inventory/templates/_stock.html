@@ -1,11 +1,12 @@
 {% from "_box.html" import box_link %}
-{# Stock form for one box×item pair: one number (−/+ from base.html), and what to do with it. folded=True: box page with many items. #}
-{% macro stock_forms(box_id, item_id, qty, projects, back, folded=False) %}
+{# Stock form for one box×item pair: one number (−/+ from base.html), and what to do with it. folded=True: box page with many items.
+   single (№43): one of a kind — no number, nothing to recount. #}
+{% macro stock_forms(box_id, item_id, qty, projects, back, folded=False, single=False) %}
 {% if folded %}<details><summary>взять / вернуть / пересчитать</summary>{% endif %}
 <form method="post" action="/stock" class="stock">
   <input type="hidden" name="box" value="{{ box_id }}"><input type="hidden" name="item" value="{{ item_id }}"><input type="hidden" name="back" value="{{ back }}"><input type="hidden" name="kind" value="return">
-  <input type="number" name="qty" value="1" min="0" inputmode="numeric" required>
-  <div class="acts"><button name="action" value="take">Взять</button><button name="action" value="add" class="ghost">Вернуть</button><button name="action" value="set" class="ghost">Пересчитать</button></div>
+  {% if single %}<input type="hidden" name="qty" value="1">{% else %}<input type="number" name="qty" value="1" min="0" inputmode="numeric" required>{% endif %}
+  <div class="acts"><button name="action" value="take">Взять</button>{% if not single %}<button name="action" value="add" class="ghost">Вернуть</button><button name="action" value="set" class="ghost">Пересчитать</button>{% endif %}</div>
   {% if projects %}<select name="project"><option value="">взять: без проекта</option>{% for p in projects %}<option value="{{ p.id }}">взять на {{ p.name }}</option>{% endfor %}</select>{% endif %}
 </form>
 {% if folded %}</details>{% endif %}

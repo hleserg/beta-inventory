@@ -121,17 +121,20 @@ async function gotBox(id) {
   if (from) { f.form.elements.kind.value = "move"; f.form.elements.src.value = from; }
   if (put) f.form.requestSubmit();
 }
-function askMove(label, card) {  // «больше не спрашивать» is for a thing's card only (№30), stays on this phone; /phone turns it back on
-  try { if (card && localStorage.askMove === "no") return true; } catch {}
+function askMove(label, card) {  // «больше не спрашивать» is for a thing's card only (№30)
+  return ask(`Переложить в ${label}?`, "Переложить", card && "askMove");
+}
+function ask(text, yes, key) {  // key: «больше не спрашивать» offered, kept on this phone under it; /phone turns it back on
+  try { if (key && localStorage[key] === "no") return true; } catch {}
   const d = document.createElement("dialog");
-  d.innerHTML = `<form method="dialog"><p></p>${card ? `<label class="chk"><input type="checkbox"> больше не спрашивать</label>` : ""}
-    <p class="row"><button value="y">Переложить</button><button value="" class="ghost">Отмена</button></p></form>`;
-  d.querySelector("p").textContent = `Переложить в ${label}?`;
+  d.innerHTML = `<form method="dialog"><p></p>${key ? `<label class="chk"><input type="checkbox"> больше не спрашивать</label>` : ""}
+    <p class="row"><button value="y"></button><button value="" class="ghost">Отмена</button></p></form>`;
+  d.querySelector("p").textContent = text; d.querySelector("[value=y]").textContent = yes;
   document.body.append(d); d.showModal();
   return new Promise(done => d.onclose = () => {
-    const yes = d.returnValue === "y";
-    if (yes && d.querySelector("input")?.checked) try { localStorage.askMove = "no"; } catch {}
-    d.remove(); done(yes);
+    const ok = d.returnValue === "y";
+    if (ok && d.querySelector("input")?.checked) try { localStorage[key] = "no"; } catch {}
+    d.remove(); done(ok);
   });
 }
 function nfcScan() {  // one reader per page: two would both fire and the second would miss the armed field
@@ -142,7 +145,7 @@ function nfcScan() {  // one reader per page: two would both fire and the second
         const u = ["url", "absolute-url"].includes(rec.recordType) ? new TextDecoder().decode(rec.data) : "";
         const b = u.match(/\/b\/([A-Za-z0-9]+)\/?$/i), i = u.match(/\/i\/(\d+)\/?$/i);
         if (b) return gotBox(b[1].toUpperCase());
-        if (i) return location.pathname === "/i/" + i[1] || (location.href = "/i/" + i[1]);  // a thing's tag: its card (№37)
+        if (i) return location.href = "/I/" + i[1];  // a thing's tag: its card as scanned (№37, №43)
       }
     };
     return r.scan(); })().catch(e => { scanning = null; throw e; });
@@ -185,6 +188,8 @@ addEventListener("click", async e => {  // «Записать на метку» 
   try {
     await new NDEFReader().write({records: [{recordType: "url", data: b.dataset.nfcw}]});
     st.textContent = "Записано ✓ Проверьте: коснитесь метки телефоном.";
+    const i = b.dataset.nfcw.match(/\/I\/(\d+)$/), s = document.getElementById("single");  // №43: a thing with a tag is one of a kind
+    if (i && (await fetch(`/i/${i[1]}/tag`, {method: "POST"})).ok && s && "auto" in s.dataset) s.checked = true;
   } catch (e) { st.textContent = e.name == "NotAllowedError" ? "Нажмите «Записать на метку» — телефон ждёт нажатия." : "Не записалось: " + e.message; }
   finally { window.nfcBusy = false; }
 });
@@ -192,6 +197,12 @@ addEventListener("click", e => {  // «Скопировать» (nfc_tag), for N
   const b = e.target.closest("[data-copy]");
   if (!b) return;
   b.parentElement.previousElementSibling.select(); document.execCommand("copy"); b.textContent = "Скопировано ✓";
+});
+addEventListener("DOMContentLoaded", async () => {  // №43: a thing's tag scanned (/I/N → ?scan=1): take it out of its box
+  const f = new URLSearchParams(location.search).has("scan") && document.querySelector("form[data-take]");
+  if (!f) return;
+  history.replaceState(null, "", location.pathname);  // a reload doesn't ask again
+  if (await ask(`Взять «${f.dataset.name}»?`, "Взять", "askTake")) f.submit();
 });
 addEventListener("DOMContentLoaded", () => {  // №42: «Сохранить и записать метку» lands on the card with ?nfc=1
   const b = new URLSearchParams(location.search).has("nfc") && document.querySelector("[data-nfcw]");

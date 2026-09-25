@@ -383,8 +383,13 @@ async def item_create(req: Request, type: str):
     return go(f"/b/{box_id}" if box_id else f"/i/{iid}")  # filling a box: back to it for the next item
 
 
-@app.get("/i/{item_id}")
 @app.get("/I/{item_id}")
+def item_scan(item_id: int):  # №43: what a thing's tag and label hold — a scan makes it one of a kind
+    core.tag_item(item_id)
+    return go(f"/i/{item_id}?scan=1")
+
+
+@app.get("/i/{item_id}")
 def item(req: Request, item_id: int):
     with db() as c:
         it = get_item(c, item_id)
@@ -392,13 +397,25 @@ def item(req: Request, item_id: int):
                     stock=core.stock_of_item(c, item_id), projects=core.projects(c),
                     needs=c.execute("SELECT p.id, p.name, n.qty FROM needs n JOIN projects p ON p.id=n.project_id "
                                     "WHERE n.item_id=? ORDER BY p.name", (item_id,)).fetchall(),
-                    nfc=f"{public_base(req)}/i/{item_id}".lower(),  # №37: the tag opens this card
+                    nfc=f"{public_base(req).lower()}/I/{item_id}", single=core.single_of(it),  # №37, №43: a scan
                     history=c.execute(MOVES + " AND m.item_id=? ORDER BY m.id DESC LIMIT 50", (item_id,)).fetchall())
 
 
 @app.post("/i/{item_id}/agent")
 async def item_for_agent(req: Request, item_id: int):
     core.set_for_agent(item_id, bool((await req.form()).get("on")))
+    return go(f"/i/{item_id}")
+
+
+@app.post("/i/{item_id}/single")
+async def item_single(req: Request, item_id: int):
+    core.set_single(item_id, bool((await req.form()).get("on")))
+    return go(f"/i/{item_id}")
+
+
+@app.post("/i/{item_id}/tag")
+def item_tag(item_id: int):  # the card wrote its tag (base.html)
+    core.tag_item(item_id)
     return go(f"/i/{item_id}")
 
 

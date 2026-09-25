@@ -39,6 +39,10 @@
 <label class="chk"><input type="checkbox" id="askmove" checked> Спрашивать «Переложить в …?», если вещь уже лежит в другой коробке</label>
 <p class="mut">Без вопроса вещь сразу переедет в отсканированную коробку. Настройка своя на каждом телефоне.</p>
 
+<h2>Скан метки вещи</h2>
+<label class="chk"><input type="checkbox" id="asktake" checked> Спрашивать перед тем как взять уникальный предмет из коробки</label>
+<p class="mut">Без вопроса вещь с меткой сразу окажется «на руках»; следующий скан коробки положит её туда.</p>
+
 <div data-os="other">
   <p>Метки пишутся с телефона. Откройте эту страницу на телефоне: <b>{{ origin }}/phone</b></p>
 </div>
@@ -51,9 +55,11 @@ document.querySelectorAll("[data-os]").forEach(e => e.hidden = e.dataset.os !== 
 document.getElementById("ready").hidden = !("NDEFReader" in window);
 document.getElementById("scan").onclick = () => nfcScan().then(
   () => scanst.textContent = "Готово ✓ Коснитесь метки любой коробки.", e => scanst.textContent = "Не вышло: " + e.message);
-const am = document.getElementById("askmove");
-try { am.checked = localStorage.askMove !== "no"; } catch {}
-am.onchange = () => { try { am.checked ? localStorage.removeItem("askMove") : localStorage.askMove = "no"; } catch {} };
+for (const [id, key] of [["askmove", "askMove"], ["asktake", "askTake"]]) {
+  const x = document.getElementById(id);
+  try { x.checked = localStorage[key] !== "no"; } catch {}
+  x.onchange = () => { try { x.checked ? localStorage.removeItem(key) : localStorage[key] = "no"; } catch {} };
+}
 document.querySelectorAll(".copy").forEach(b => b.onclick = () => {
   b.previousElementSibling.select();
   document.execCommand("copy");  // navigator.clipboard needs the secure context we are setting up here

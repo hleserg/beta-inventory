@@ -44,7 +44,7 @@ CREATE TABLE IF NOT EXISTS boxes(
   created_at TEXT NOT NULL DEFAULT (datetime('now','localtime')));
 CREATE TABLE IF NOT EXISTS items(
   id INTEGER PRIMARY KEY, name TEXT NOT NULL, type TEXT NOT NULL DEFAULT '', fields TEXT NOT NULL DEFAULT '{}',
-  for_agent INTEGER NOT NULL DEFAULT 0,
+  for_agent INTEGER NOT NULL DEFAULT 0, single INTEGER,
   created_at TEXT NOT NULL DEFAULT (datetime('now','localtime')),
   updated_at TEXT NOT NULL DEFAULT (datetime('now','localtime')));
 """ + STOCK + """
@@ -82,7 +82,8 @@ def load_profile():
 
 PROFILE = load_profile()
 # type key -> type with its category; keys are what items.type stores
-TYPES = {t["key"]: dict(t, category=c) for c in PROFILE["categories"] for t in c.get("types", [])}
+TYPES = {t["key"]: dict({"single": c.get("single", False)}, **t, category=c)  # a category's `single` goes to its types
+         for c in PROFILE["categories"] for t in c.get("types", [])}
 assert len(TYPES) == sum(len(c.get("types", [])) for c in PROFILE["categories"]), "type keys must be unique"
 
 
@@ -145,6 +146,10 @@ def init():
             c.execute("ALTER TABLE boxes ADD COLUMN kind TEXT NOT NULL DEFAULT 'box'")
         if "for_agent" not in [r["name"] for r in c.execute("PRAGMA table_info(items)")]:  # cards from before №41
             c.execute("ALTER TABLE items ADD COLUMN for_agent INTEGER NOT NULL DEFAULT 0")
+        if "single" not in [r["name"] for r in c.execute("PRAGMA table_info(items)")]:  # cards from before №43
+            c.execute("ALTER TABLE items ADD COLUMN single INTEGER")
+            one = [k for k, t in TYPES.items() if t["single"]]  # a tool put in «не считал» is one
+            c.execute(f"UPDATE stock SET qty=1 WHERE qty IS NULL AND item_id IN (SELECT id FROM items WHERE type IN ({','.join('?' * len(one))}))", one)
         for bid, kind, name in ((HANDS, "hands", "На руках"), (TRANSIT, "transit", "В пути")):
             c.execute("INSERT INTO boxes(id, name, kind) VALUES (?, ?, ?) ON CONFLICT(id) DO UPDATE SET name=excluded.name",
                       (bid, PROFILE["terms"].get(kind, name), kind))
@@ -274,10 +279,13 @@ def move(item_id, box_id, delta, kind, author, project_id=None, note=""):
     with db() as c:
         if not c.execute("SELECT 1 FROM boxes WHERE id=?", (box_id,)).fetchone():
             raise ValueError(f"нет коробки {box_id}")
-        if not c.execute("SELECT 1 FROM items WHERE id=?", (item_id,)).fetchone():
+        it = c.execute("SELECT single, type FROM items WHERE id=?", (item_id,)).fetchone()
+        if not it:
             raise ValueError(f"нет позиции {item_id}")
         row = c.execute("SELECT qty FROM stock WHERE box_id=? AND item_id=?", (box_id, item_id)).fetchone()
         old = row["qty"] if row else 0
+        if single_of(it):  # №43: one of a kind is counted by being there — never «не считал»
+            old, delta = 1 if old is None else old, 1 if delta is None else delta
         if old is None and kind == "return" and delta:
             old = 0
         # count and clear say how many are left, and so does moving all of an uncounted pile out
@@ -309,6 +317,13 @@ def change_stock(box_id, item_id, action, qty, author, project_id=None):
     box_id = find_box(box_id)
     if action not in ("put", "return", "buy", "take", "count"):
         raise ValueError(f"нет действия {action}: put, return, buy, take, count")
+    with db() as c:
+        it = c.execute("SELECT single, type FROM items WHERE id=?", (item_id,)).fetchone()
+        rows = {r["box_id"]: r["qty"] for r in c.execute("SELECT box_id, qty FROM stock WHERE item_id=?", (item_id,))}
+    if it and single_of(it) and action != "count":  # №43: one of a kind — no count asked, and it lies in one place
+        qty = 1
+        if action in ("put", "return") and box_id != HANDS and HANDS not in rows and rows:
+            return (rows[box_id] or 1) if box_id in rows else transfer(item_id, next(iter(rows)), box_id, author)
     if qty is None and action in ("take", "count"):
         raise ValueError("Сколько? Нужно число")
     if action == "count":
@@ -345,10 +360,13 @@ def transfer(item_id, src, dst, author, qty=None):
         return
     with db() as c:
         row = c.execute("SELECT qty FROM stock WHERE box_id=? AND item_id=?", (src, item_id)).fetchone()
+        it = c.execute("SELECT single, type FROM items WHERE id=?", (item_id,)).fetchone()
     if not row:
         raise ValueError(f"в {src} этого нет")
     # ponytail: two transactions like clear_box; both boxes are checked first, so a half-move needs a crash between
     took = row["qty"] if qty is None or row["qty"] is None else min(qty, row["qty"])
+    if took is None and single_of(it):  # №43: an uncounted unique thing is one
+        took = 1
     move(item_id, src, -(took or 0), "move", author)
     return move(item_id, dst, qty if qty is not None and src == TRANSIT else took, "move", author)
 
@@ -469,6 +487,25 @@ def save_item(item_id, name, type_key, f):
         c.execute("UPDATE items SET name=?, type=?, fields=?, updated_at=datetime('now','localtime') WHERE id=?",
                   (name, type_key, json.dumps(f, ensure_ascii=False), item_id))
         return item_id
+
+
+def single_of(it):
+    """№43 one of a kind: ticked or unticked on the card, else as its type says (profile `single`, e.g. tools)."""
+    return bool(it["single"]) if it["single"] is not None else TYPES.get(it["type"], {}).get("single", False)
+
+
+def set_single(item_id, on):
+    with db() as c:
+        c.execute("UPDATE items SET single=? WHERE id=?", (int(on), item_id))
+        if on:  # one of a kind is never «не считал»
+            c.execute("UPDATE stock SET qty=1 WHERE qty IS NULL AND item_id=?", (item_id,))
+
+
+def tag_item(item_id):
+    """A tag got written or scanned (№43): the thing is one of a kind from now on, unless unticked by hand before."""
+    with db() as c:
+        if c.execute("UPDATE items SET single=1 WHERE id=? AND single IS NULL", (item_id,)).rowcount:
+            c.execute("UPDATE stock SET qty=1 WHERE qty IS NULL AND item_id=?", (item_id,))
 
 
 def set_for_agent(item_id, on):
@@ -697,7 +734,7 @@ def lookalikes(name):
 
 
 def box_contents(c, box_id):
-    return [dict(r, fields=item_fields(r)) for r in c.execute(
+    return [dict(r, fields=item_fields(r), single=single_of(r)) for r in c.execute(
         "SELECT s.qty, i.* FROM stock s JOIN items i ON i.id=s.item_id WHERE s.box_id=? ORDER BY i.name", (box_id,))]
 
 

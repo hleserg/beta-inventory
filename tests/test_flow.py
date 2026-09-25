@@ -59,7 +59,7 @@ def test_main_path():
     r = c.post(f"/i/{iid}/rotate", data={"photo": b, "deg": 90})  # №21: a turned photo is a new file, the old one may be cached
     assert r.json()["photo"] == pics()[0] != b and Image.open(core.UPLOADS / pics()[0]).size == (30, 40)
     assert c.post(f"/i/{iid}/rotate", data={"photo": a, "deg": -90}).status_code == 400  # not this card's photo
-    assert f"/i/{iid}/label.png" in c.get(f"/I/{iid}").text  # №22: a thing gets its own printed label; its QR is upper case
+    assert f"/i/{iid}/label.png" in c.get(f"/i/{iid}").text  # №22: a thing gets its own printed label; its QR is upper case
     assert c.get(f"/i/{iid}/label.png").headers["content-type"] == "image/png"
     assert "MP1584" in c.get("/?q=ПОНИЖАЙКА").text
     assert "10k" in c.get("/?q=резистор").text  # type label is searchable
@@ -113,7 +113,7 @@ def test_phone_app():
     assert "NDEFReader" in page and f"http://testserver/b/{box.lower()}" in page
     phone = c.get("/phone").text
     assert "chrome://flags/#unsafely-treat-insecure-origin-as-secure" in phone and "http://testserver" in phone
-    assert "apps.apple.com/app/nfc-tools/id1252962749" in phone
+    assert "apps.apple.com/app/nfc-tools/id1252962749" in phone and 'id="asktake"' in phone  # №43: «Взять?» can be turned back on
 
 
 def test_address_by_ip(monkeypatch):
@@ -303,7 +303,7 @@ def test_item_tag():
     """№37: a thing's card writes its own link to an NFC tag, like a box page does."""
     c.post("/items/new?type=resistor", data={"name": "мультиметр", "value": "x"})
     iid = newest()
-    assert f'data-nfcw="http://testserver/i/{iid}"' in c.get(f"/i/{iid}").text
+    assert f'data-nfcw="http://testserver/I/{iid}"' in c.get(f"/i/{iid}").text  # №43: a tag lands on /I/ = a scan
     box = core.new_boxes(1)[0]
     assert f'data-nfcw="http://testserver/b/{box.lower()}"' in c.get(f"/b/{box}").text
     # №42: a tag at creation too — to the card, not back to the box, and the card starts writing (base.html)
@@ -312,6 +312,40 @@ def test_item_tag():
     assert r.headers["location"] == f"/i/{newest()}?nfc=1"
     r = c.post("/items/new?type=resistor", follow_redirects=False, data={"name": "шуруповёрт", "value": "x", "nfc": "1"})
     assert r.status_code == 409 and 'name="nfc" value="1"' in r.text  # «Всё равно создать» keeps the wish
+
+
+def test_single():
+    """№43: a one-of-a-kind thing (a tool, anything with a tag) is taken and put back without a count, and lies in one place."""
+    def stock(iid):
+        with core.db() as db:
+            return {r[0]: r[1] for r in db.execute("SELECT box_id, qty FROM stock WHERE item_id=?", (iid,))}
+    flag = lambda iid: core.db().__enter__().execute("SELECT single FROM items WHERE id=?", (iid,)).fetchone()[0]
+    a, b = core.new_boxes(2)
+    c.post("/items/new?type=hand_tool", files=photo(), data={"name": "бокорезы", "box": a})
+    iid = newest()
+    assert stock(iid) == {a: 1}  # tools are one of a kind by the profile: no count is still one
+    card = c.get(f"/i/{iid}").text
+    assert 'value="1" min="0"' not in card and "Пересчитать" not in card and 'id="single" checked' in card
+    c.post("/stock", data={"box": a, "item": iid, "action": "take"})
+    assert stock(iid) == {core.HANDS: 1}
+    c.post("/stock", data={"box": b, "item": iid, "action": "add", "kind": "put"})
+    assert stock(iid) == {b: 1}
+    c.post("/stock", data={"box": a, "item": iid, "action": "add", "kind": "put"})
+    assert stock(iid) == {a: 1}  # put elsewhere = moved, not a second one
+    c.post("/stock", data={"box": a, "item": iid, "action": "add", "kind": "put"})
+    assert stock(iid) == {a: 1}
+    assert 'data-take' in c.get(f"/i/{iid}?scan=1").text
+
+    c.post("/items/new?type=resistor", data={"name": "паяльник из коробки", "value": "x", "box": a})
+    rid = newest()
+    assert flag(rid) is None and stock(rid) == {a: None}
+    r = c.get(f"/I/{rid}", follow_redirects=False)  # a scanned tag: the thing is one of a kind from now on
+    assert r.headers["location"] == f"/i/{rid}?scan=1" and flag(rid) == 1 and stock(rid) == {a: 1}
+    c.post(f"/i/{rid}/single")  # unticked by hand
+    assert flag(rid) == 0
+    c.get(f"/I/{rid}")
+    assert flag(rid) == 0  # a rescan keeps the hand's choice
+    assert c.post(f"/i/{rid}/tag").status_code == 200 and flag(rid) == 0  # written from the site: same rule
 
 
 def test_for_agent():

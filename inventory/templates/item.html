@@ -30,6 +30,8 @@ addEventListener("keydown", e => { if (e.key == "Escape" && full()) history.back
     ~ " дней из «Корзины».")|tojson }})'><button class="ghost">Удалить</button></form></div>
 <form method="post" action="/i/{{ it.id }}/agent"><label class="chk"><input type="checkbox" name="on" value="1"{% if it.for_agent %} checked{% endif %}
   onchange="this.form.submit()"> {{ t.to_agent }}</label></form>
+<form method="post" action="/i/{{ it.id }}/single"><label class="chk"><input type="checkbox" name="on" value="1" id="single"{% if single %} checked{% endif %}{% if it.single is none %} data-auto{% endif %}
+  onchange="this.form.submit()"> {{ t.single }}</label></form>
 
 <h2>Где лежит</h2>
 {% set h = stock|selectattr("box_id", "equalto", "HANDS")|first %}{# №28: in hand — put it away (back where it was taken from) or write it off #}
@@ -39,19 +41,21 @@ addEventListener("keydown", e => { if (e.key == "Escape" && full()) history.back
   <div class="row"><b>{{ s.name }}</b> <span class="mut">{{ s.where }}</span><span class="qty right">{{ s.qty|qty(unit=unit_of(it.type, f)) }}</span></div>
   <form method="post" action="/stock" class="row" onsubmit="return confirm('Списать? Из учёта уйдёт, в истории останется.')">
     <input type="hidden" name="box" value="HANDS"><input type="hidden" name="item" value="{{ it.id }}"><input type="hidden" name="action" value="take"><input type="hidden" name="back" value="/i/{{ it.id }}">
-    <input type="number" name="qty" min="1" max="{{ s.qty }}" value="{{ s.qty }}" required><button class="bad">Списать</button>
+    <input type="{{ 'hidden' if single else 'number' }}" name="qty" min="1" max="{{ s.qty }}" value="{{ s.qty }}" required><button class="bad">Списать</button>
   </form>
   {% else %}
   <div class="row">{{ box_link(s.box_id, s.name) }} <span class="mut">{{ s.where }}</span><span class="qty right">{{ s.qty|qty(unit=unit_of(it.type, f)) }}</span></div>
-  {{ stock_forms(s.box_id, it.id, s.qty, projects, "/i/" ~ it.id) }}
+  {{ stock_forms(s.box_id, it.id, s.qty, projects, "/i/" ~ it.id, single=single) }}
   {% endif %}
 </div>
 {% else %}<p class="mut">Нигде нет.</p>{% endfor %}
+{% if single and not h and stock|length == 1 and stock[0].box_id != TRANSIT %}{# №43: a scanned tag asks «Взять?» (base.html) #}
+<form method="post" action="/stock" data-take data-name="{{ it.name }}" hidden><input type="hidden" name="box" value="{{ stock[0].box_id }}"><input type="hidden" name="item" value="{{ it.id }}"><input type="hidden" name="action" value="take"><input type="hidden" name="qty" value="1"><input type="hidden" name="back" value="/i/{{ it.id }}"></form>{% endif %}
 {% set tr = none if h else stock|selectattr("box_id", "equalto", TRANSIT)|first %}{# manifesto 3: it came — the box it goes to takes it out of «в пути» #}
 <details{% if h or tr %} open{% endif %}><summary>{{ "Положить на место" if h else "Пришло — куда положить" if tr else "Куда положить" }}</summary>
 <form method="post" action="/stock" class="row" data-put{% if stock|length == 1 and not h and not tr %} data-from="{{ stock[0].box_id }}"{% endif %}>
   <input type="hidden" name="item" value="{{ it.id }}"><input type="hidden" name="action" value="add"><input type="hidden" name="kind" value="{{ 'move' if tr else 'return' if h and h.src else 'put' }}"><input type="hidden" name="back" value="/i/{{ it.id }}"><input type="hidden" name="src"{% if tr %} value="{{ TRANSIT }}"{% endif %}>
-  {{ box_input(value=h.src if h else "", required=True, exclude=TRANSIT if tr else None) }}<input type="number" name="qty" min="1" placeholder="не считал"{% if h or tr and tr.qty %} value="{{ (h or tr).qty }}"{% endif %}><button>Положить</button>
+  {{ box_input(value=h.src if h else "", required=True, exclude=TRANSIT if tr else None) }}{% if single %}<input type="hidden" name="qty" value="1">{% else %}<input type="number" name="qty" min="1" placeholder="не считал"{% if h or tr and tr.qty %} value="{{ (h or tr).qty }}"{% endif %}>{% endif %}<button>Положить</button>
 </form></details>
 <details><summary>Метка</summary>
   <p><img src="/i/{{ it.id }}/label.png" alt="наклейка" style="width:240px;max-width:100%;background:#fff;border:1px solid var(--line)"><br>
