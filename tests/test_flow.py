@@ -52,6 +52,9 @@ def test_main_path():
         "photo__keep": [b, "../inventory.db"], "description": "до 3 А"})  # a removed, one added; only own uploads kept
     assert r.status_code == 303 and "до 3 А" in c.get(f"/i/{iid}").text
     assert pics()[0] == b and len(pics()) == 2 and a not in c.get(f"/i/{iid}").text
+    r = c.post(f"/i/{iid}/rotate", data={"photo": b, "deg": 90})  # №21: a turned photo is a new file, the old one may be cached
+    assert r.json()["photo"] == pics()[0] != b and Image.open(core.UPLOADS / pics()[0]).size == (30, 40)
+    assert c.post(f"/i/{iid}/rotate", data={"photo": a, "deg": -90}).status_code == 400  # not this card's photo
     assert "MP1584" in c.get("/?q=ПОНИЖАЙКА").text
     assert "10k" in c.get("/?q=резистор").text  # type label is searchable
     assert "10k" in c.get("/items?cat=electronics").text and "10k" not in c.get("/items?cat=tools").text

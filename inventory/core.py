@@ -381,6 +381,28 @@ def save_bytes(data, ext, photo=False):
     (UPLOADS / name).write_bytes(data)
     return name
 
+def rotate_photo(item_id, name, deg):
+    """Turn one photo of the card by 90° (deg > 0 — clockwise). → the new file's name: the old one may sit in a cache."""
+    with db() as c:
+        r = c.execute("SELECT * FROM items WHERE id=?", (item_id,)).fetchone()
+    f = item_fields(r) if r else {}
+    k = next((k for k, v in f.items() if isinstance(v, list) and name in v), None)
+    if not k:
+        raise ValueError("Нет такого фото у этой вещи")
+    try:
+        im = Image.open(UPLOADS / name).transpose(Image.Transpose.ROTATE_270 if deg > 0 else Image.Transpose.ROTATE_90)
+    except OSError:
+        raise ValueError("Это фото не повернуть: формат не читается")
+    buf = io.BytesIO()
+    im.convert("RGB").save(buf, "JPEG", quality=PHOTO_QUALITY, optimize=True)
+    new = save_bytes(buf.getvalue(), ".jpg")
+    f[k] = [new if x == name else x for x in f[k]]
+    with db() as c:
+        c.execute("UPDATE items SET fields=?, updated_at=datetime('now','localtime') WHERE id=?",
+                  (json.dumps(f, ensure_ascii=False), item_id))
+    return new
+
+
 def clear_box(box_id, author):
     """Empty the box for reuse: stock out with 'clear' movements, child boxes move up a level."""
     with db() as c:

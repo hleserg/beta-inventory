@@ -361,6 +361,11 @@ async def item_update(req: Request, item_id: int, type: str):
     return go(f"/i/{item_id}")
 
 
+@app.post("/i/{item_id}/rotate")
+def item_rotate(item_id: int, photo: str = Form(), deg: int = Form()):
+    return {"photo": core.rotate_photo(item_id, photo, deg)}
+
+
 # --- stock ---
 
 @app.post("/stock")
