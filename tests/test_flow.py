@@ -669,6 +669,7 @@ def test_settings():
     try:
         page = c.post("/settings", data={"TRASH_DAYS": "7"}).text
         assert core.TRASH_DAYS == 7 and saved() == {"TRASH_DAYS": "7"} and "изменено здесь" in page
+        assert 'href="/more"' in page and 'id="lblimg" src="/b/K7M2Q/label.png?w=' in page  # №54 screen 8: back to «Ещё», a test label
         assert "здесь 7 дней" in c.get("/trash").text
         for bad in ({"TRASH_DAYS": "abc"}, {"TRASH_DAYS": "-1"}, {"PUBLIC_BASE_URL": "inv.lan"}, {"SCAN_DEFAULT": "x"}):
             assert c.post("/settings", data=bad).status_code == 400

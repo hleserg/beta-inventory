@@ -1,14 +1,15 @@
 {% extends "base.html" %}
+{% from "_bar.html" import ico %}
 {% block title %}Настройки{% endblock %}
 {% block main %}
 {# №53: one row per setting; «изменено здесь» wins over .env, «Сбросить» brings .env (or the default) back #}
 {% macro src(k) %}{% if k in over %}<span class="src ch">изменено здесь</span>{% elif k in env0 %}<span class="src">из .env</span>{% endif %}{% endmacro %}
 {% macro bad(k) %}{% if err and err[0] == k %} aria-invalid="true" autofocus{% endif %}{% endmacro %}
 {% macro was(k) %}{% set v = env0.get(k, core.DEFAULTS[k]) %}{{ "в .env" if k in env0 else "по умолчанию" }}: {% if k == "GITHUB_TOKEN" %}{{ "задан" if v else "не задан" }}{% elif v == "" %}не задано{% elif k in ("SCAN_NFC", "SCAN_QR", "PRINT_BT") %}{{ "выкл" if v == "0" else "вкл" }}{% elif k == "SCAN_DEFAULT" %}{{ {"auto": "Авто", "nfc": "NFC", "qr": "QR"}.get(v, v) }}{% else %}{{ v }}{% endif %}{% endmacro %}
-{% macro row(k, name, hint="", inline=False) %}<div class="set">
+{% macro row(k, name, hint="", inline=False, side=False) %}<div class="set">
   <div class="seth"><label for="{{ k }}" id="{{ k }}-n" class="nm">{{ name }}</label>{{ src(k) }}{% if k in over %}<button name="reset" value="{{ k }}" class="ghost">Сбросить</button>{% endif %}{% if inline %}{{ caller() }}{% endif %}</div>
-  {% if not inline %}<div class="setc">{{ caller() }}</div>{% endif %}
-  {% if hint or k in over %}<p class="mut sm">{{ hint }}{% if k in over %}{{ " · " if hint }}{{ was(k) }}{% endif %}</p>{% endif %}
+  {% set note %}{% if hint or k in over %}<p class="mut sm">{{ hint }}{% if k in over %}{{ " · " if hint }}{{ was(k) }}{% endif %}</p>{% endif %}{% endset %}
+  {% if side %}<div class="setc side">{{ note }}{{ caller() }}</div>{% else %}{% if not inline %}<div class="setc">{{ caller() }}</div>{% endif %}{{ note }}{% endif %}
   {% if err and err[0] == k %}<p class="err">{{ err[1] }}</p>{% endif %}
 </div>{% endmacro %}
 {% macro choice(k, values, names={}) %}<div class="choice" role="radiogroup" aria-labelledby="{{ k }}-n">{% for v in values %}<label><input type="radio" name="{{ k }}" value="{{ v }}"{% if vals[k] == v %} checked{% endif %}>{{ names.get(v, v) }}</label>{% endfor %}</div>{% endmacro %}
@@ -16,6 +17,7 @@
 {% macro num(k, lo, hi="", step="") %}<input type="number" id="{{ k }}" name="{{ k }}" value="{{ vals[k] }}" min="{{ lo }}"{% if hi %} max="{{ hi }}"{% endif %}{% if step %} step="{{ step }}"{% endif %}{{ bad(k) }}>{% endmacro %}
 {% macro plural(n, one, few, many) %}{{ one if n % 10 == 1 and n % 100 != 11 else few if n % 10 in (2, 3, 4) and n % 100 not in (12, 13, 14) else many }}{% endmacro %}
 
+<div class="crumbs"><a href="/more">‹ Ещё</a></div>
 <h1>Настройки</h1>
 <p class="mut"><span class="src">из .env</span> — значение из файла .env. <span class="src ch">изменено здесь</span> — задано на этой странице, важнее .env; «Сбросить» вернёт значение из .env.</p>
 
@@ -84,39 +86,43 @@
 <div class="card list">
   {% call row("PUBLIC_BASE_URL", "Адрес сайта", "Адрес в QR и NFC-метке. Пусто — адрес, по которому открыт сайт") %}<input id="PUBLIC_BASE_URL" name="PUBLIC_BASE_URL" value="{{ vals["PUBLIC_BASE_URL"] }}" inputmode="url" autocomplete="off" placeholder="{{ origin }}"{{ bad("PUBLIC_BASE_URL") }}>{% endcall %}
   <p class="warn set">⚠ Уже напечатанные наклейки не поменяются: старый адрес должен работать и дальше.</p>
-  {% call row("LABEL_W_MM", "Ширина наклейки, мм") %}{{ num("LABEL_W_MM", 5, step="any") }}{% endcall %}
-  {% call row("LABEL_H_MM", "Высота наклейки, мм") %}{{ num("LABEL_H_MM", 5, step="any") }}{% endcall %}
+  {% call row("LABEL_W_MM", "Ширина наклейки, мм", side=True) %}{{ num("LABEL_W_MM", 5, step="any") }}{% endcall %}
+  {% call row("LABEL_H_MM", "Высота наклейки, мм", side=True) %}{{ num("LABEL_H_MM", 5, step="any") }}{% endcall %}
+  {% set lbl = "/b/K7M2Q/label.png?w=" ~ vals["LABEL_W_MM"] ~ "&h=" ~ vals["LABEL_H_MM"] %}
+  <div class="set lbl"><div class="seth"><span class="nm">Пробная наклейка · <span id="lblsz">{{ vals["LABEL_W_MM"] }} × {{ vals["LABEL_H_MM"] }}</span> мм</span></div>
+    <div class="setc"><img id="lblimg" src="{{ lbl }}" alt="Пробная наклейка"><a id="lbldl" class="ib" href="{{ lbl }}" download="label-K7M2Q.png" aria-label="Скачать пробную наклейку" title="Скачать">{{ ico('<path d="M12 4v11M7 10l5 5 5-5M5 20h14"/>', 22) }}</a></div>
+    <p class="mut sm">Разрешение применится после «Сохранить»</p></div>
   {% set dpis = ["203", "300", "600"] %}
   {% call row("LABEL_DPI", "Разрешение принтера, DPI") %}{{ choice("LABEL_DPI", dpis if vals["LABEL_DPI"] in dpis else dpis + [vals["LABEL_DPI"]]) }}{% endcall %}
   {% call row("PRINT_BT", "Кнопка «Печать»", "Niimbot по Bluetooth, в Chrome. Размер — с рулона, если принтер его сообщил, иначе ширина × высота выше", inline=True) %}{{ tgl("PRINT_BT") }}{% endcall %}
   {% call row("PRINT_ROTATE", "Поворот картинки") %}{{ choice("PRINT_ROTATE", ["0", "90", "180", "270"], {"0": "0°", "90": "90°", "180": "180°", "270": "270°"}) }}{% endcall %}
-  {% call row("PRINT_DX_MM", "Сдвиг вправо, мм", "минус — влево") %}{{ num("PRINT_DX_MM", -5, 5, "0.5") }}{% endcall %}
-  {% call row("PRINT_DY_MM", "Сдвиг вниз, мм", "минус — вверх") %}{{ num("PRINT_DY_MM", -5, 5, "0.5") }}{% endcall %}
-  {% call row("PRINT_DENSITY", "Плотность печати", "1 — светлее, 5 — темнее") %}{{ num("PRINT_DENSITY", 1, 5, "1") }}{% endcall %}
+  {% call row("PRINT_DX_MM", "Сдвиг вправо, мм", "минус — влево", side=True) %}{{ num("PRINT_DX_MM", -5, 5, "0.5") }}{% endcall %}
+  {% call row("PRINT_DY_MM", "Сдвиг вниз, мм", "минус — вверх", side=True) %}{{ num("PRINT_DY_MM", -5, 5, "0.5") }}{% endcall %}
+  {% call row("PRINT_DENSITY", "Плотность печати", "1 — светлее, 5 — темнее", side=True) %}{{ num("PRINT_DENSITY", 1, 5, "1") }}{% endcall %}
 </div>
 
 <h2 class="gh">Поиск по смыслу</h2>
 {% if not core.SEM_MODEL %}<p class="mut sm">Выключен: в .env пуст SEMANTIC_MODEL</p>{% endif %}
 <div class="card list">
-  {% call row("SEMANTIC_MIN", "Порог похожести", "ниже — не показываем") %}{{ num("SEMANTIC_MIN", 0, 1, "0.01") }}{% endcall %}
-  {% call row("SEMANTIC_MARGIN", "Отступ от лучшего", "насколько хуже лучшего ещё показывать") %}{{ num("SEMANTIC_MARGIN", 0, 1, "0.01") }}{% endcall %}
-  {% call row("SEMANTIC_TOP", "Максимум совпадений", "по смыслу, сверх точных") %}{{ num("SEMANTIC_TOP", 0) }}{% endcall %}
+  {% call row("SEMANTIC_MIN", "Порог похожести", "ниже — не показываем", side=True) %}{{ num("SEMANTIC_MIN", 0, 1, "0.01") }}{% endcall %}
+  {% call row("SEMANTIC_MARGIN", "Отступ от лучшего", "насколько хуже лучшего ещё показывать", side=True) %}{{ num("SEMANTIC_MARGIN", 0, 1, "0.01") }}{% endcall %}
+  {% call row("SEMANTIC_TOP", "Максимум совпадений", "по смыслу, сверх точных", side=True) %}{{ num("SEMANTIC_TOP", 0) }}{% endcall %}
 </div>
 
 <h2 class="gh">Фото</h2>
 <div class="card list">
-  {% call row("PHOTO_MAX_PX", "Длинная сторона, px", "больше — уменьшаем при загрузке") %}{{ num("PHOTO_MAX_PX", 100) }}{% endcall %}
-  {% call row("PHOTO_QUALITY", "Качество, %", "JPEG") %}{{ num("PHOTO_QUALITY", 1, 100) }}{% endcall %}
+  {% call row("PHOTO_MAX_PX", "Длинная сторона, px", "больше — уменьшаем при загрузке", side=True) %}{{ num("PHOTO_MAX_PX", 100) }}{% endcall %}
+  {% call row("PHOTO_QUALITY", "Качество, %", "JPEG", side=True) %}{{ num("PHOTO_QUALITY", 1, 100) }}{% endcall %}
 </div>
 
 <h2 class="gh">Корзина</h2>
 <div class="card list">
-  {% call row("TRASH_DAYS", "Хранить удалённое, дней", "потом удаляется насовсем") %}{{ num("TRASH_DAYS", 1) }}{% endcall %}
+  {% call row("TRASH_DAYS", "Хранить удалённое, дней", "потом удаляется насовсем", side=True) %}{{ num("TRASH_DAYS", 1) }}{% endcall %}
 </div>
 
 <h2 class="gh">Считыватели</h2>
 <div class="card list">
-  {% call row("READER_FORGET_MIN", "Забывать коробку через, мин", "после скана коробки считыватель ждёт вещь") %}{{ num("READER_FORGET_MIN", 1) }}{% endcall %}
+  {% call row("READER_FORGET_MIN", "Забывать коробку через, мин", "после скана коробки считыватель ждёт вещь", side=True) %}{{ num("READER_FORGET_MIN", 1) }}{% endcall %}
   <div class="set"><a href="/readers">Список считывателей · {{ n["readers"] }}</a></div>
 </div>
 
@@ -125,7 +131,7 @@
 <div class="card list">
   {% call row("GITHUB_OWNER", "Аккаунт") %}<input id="GITHUB_OWNER" name="GITHUB_OWNER" value="{{ vals["GITHUB_OWNER"] }}" autocomplete="off"{{ bad("GITHUB_OWNER") }}>{% endcall %}
   {% call row("GITHUB_TOKEN", "Токен", "Значение не показываем — только заменить") %}<input type="password" id="GITHUB_TOKEN" name="GITHUB_TOKEN" value="" autocomplete="new-password" placeholder="{{ 'задан — введите новый, чтобы заменить' if core.setting('GITHUB_TOKEN') else 'не задан' }}"{{ bad("GITHUB_TOKEN") }}>{% endcall %}
-  {% call row("GITHUB_SYNC_MIN", "Проверять раз в, мин", "новые репозитории — во «Входящие» проектов") %}{{ num("GITHUB_SYNC_MIN", 1, step="any") }}{% endcall %}
+  {% call row("GITHUB_SYNC_MIN", "Проверять раз в, мин", "новые репозитории — во «Входящие» проектов", side=True) %}{{ num("GITHUB_SYNC_MIN", 1, step="any") }}{% endcall %}
 </div>
 </form>
 
@@ -136,7 +142,7 @@
                         ("Claude Code", "claude mcp add --transport http inventory " ~ base ~ "/mcp"),
                         ("Codex · ~/.codex/config.toml", '[mcp_servers.inventory]\nurl = "' ~ base ~ '/mcp"'),
                         ("Hermes · config.yaml, пример", "mcp_servers:\n  inventory:\n    url: " ~ base ~ "/mcp")] %}
-  <div class="set"><b>{{ name }}</b><div class="code"><pre>{{ code }}</pre><button type="button" class="ghost copy">Копировать</button></div></div>
+  <div class="set"><b>{{ name }}</b><div class="code"><pre>{{ code }}</pre><button type="button" class="ib copy" aria-label="Копировать" title="Копировать">{{ ico('<rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a1 1 0 0 1 1-1h10"/>', 20) }}</button></div></div>
   {% endfor %}
 </div>
 
@@ -179,8 +185,15 @@ document.querySelectorAll(".copy").forEach(b => b.onclick = () => {
   if (x.select) x.select();
   else { const r = document.createRange(); r.selectNodeContents(x); getSelection().removeAllRanges(); getSelection().addRange(r); }
   document.execCommand("copy");  // navigator.clipboard needs the secure context the phone steps set up
-  b.textContent = "Скопировано";
+  if (b.classList.contains("ib")) b.title = b.ariaLabel = "Скопировано", b.textContent = "✓";
+  else b.textContent = "Скопировано";
 });
+const lw = document.getElementById("LABEL_W_MM"), lh = document.getElementById("LABEL_H_MM");
+const lbl = () => {  // the server keeps the saved size when these are out of 5..200 mm, so a half-typed number is harmless
+  const u = "/b/K7M2Q/label.png?w=" + encodeURIComponent(lw.value) + "&h=" + encodeURIComponent(lh.value);
+  lblimg.src = lbldl.href = u; lblsz.textContent = lw.value + " × " + lh.value;
+};
+lw.addEventListener("change", lbl); lh.addEventListener("change", lbl);
 const how = () => location.hash === "#phone" && document.getElementById("howto")?.setAttribute("open", "");
 how(); addEventListener("hashchange", how);
 // The save bar shows what is not saved yet; after a rejected save the page holds the posted values, so it stays up
