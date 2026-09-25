@@ -164,7 +164,7 @@ label.lrow{margin:0;font-weight:400;cursor:pointer}.lrows>details+.lrow{border-t
 details:not([open])>summary .chev{transform:rotate(-90deg)}
 .tacts{display:flex;flex-wrap:wrap;align-items:center;gap:6px;padding:8px 8px 10px 56px;background:var(--bg);border-bottom:1px solid var(--line)}
 .tacts form{margin:0}.tacts .stock{flex:1 1 100%}.tacts .row{flex:1 1 100%}.tacts .row input{flex:1 1 100%}.tacts details[open]{flex:1 1 100%}.tacts .btn,.tacts button{padding:0 10px;font-size:14px}
-.dt{display:none}
+.dt,.thd{display:none}
 /* №58 desktop: the bottom bar becomes a left column, search runs across the top, bottom panels start after the column */
 @media (min-width:1024px){
 :root{--bar:0px;--nav:220px;--top:73px;--detail:clamp(300px,28vw,360px)}
@@ -185,6 +185,13 @@ body:has(.fbar) main{padding-top:calc(var(--top) + 77px);padding-bottom:32px}
 .put{left:auto;top:var(--top);width:var(--detail);max-height:none;padding:24px;border-top:0;border-left:1px solid var(--line)}
 body:has(.put) main{max-width:none;margin-right:var(--detail);padding-bottom:32px}
 .more{min-height:0}.more>h1{flex:none}
+html{scroll-padding-top:calc(var(--top) + 16px)}html:has(.fbar){scroll-padding-top:calc(var(--top) + 77px)}
+/* the main list as a table: name · type · where · qty, fixed qty width so the columns line up */
+.thd{display:flex;color:var(--mut);font-size:13px;padding:4px 0}.line.thd .thumb{height:0;visibility:hidden}.thd .qty{font-weight:400}
+.line>a>.grow:has(>.nm),.thd>.grow{display:grid;grid-template-columns:minmax(0,2fr) minmax(0,1fr) minmax(0,1.2fr);column-gap:16px;align-items:center}
+.line .grow:has(>.nm)>br{display:none}.line .grow:has(>.nm)>.src{grid-column:1;justify-self:start}
+.line .grow:has(>.nm)>span:not(.src){overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.line:has(.nm) .qty{width:7rem;max-width:none;flex:none}.line:has(.nm) .thumb{width:40px;height:40px}
 }
 </style>
 </head>
@@ -626,6 +633,16 @@ addEventListener("pointerdown", e => {
     if ([...row.children].indexOf(p) != at) for (const ev of ["input", "change"]) row.dispatchEvent(new Event(ev, {bubbles: true}));
   };
   for (const [n, f] of [["pointermove", move], ["pointerup", up], ["pointercancel", up]]) addEventListener(n, f);
+});
+// №58 keyboard: «/» goes to search, ↑↓ walk the list rows (from search too), Enter opens the row — a link does that itself
+addEventListener("keydown", e => {
+  const q = document.querySelector("form[role=search] input");
+  if (e.ctrlKey || e.metaKey || e.altKey || e.target.closest?.("input,textarea,select,[contenteditable],.pickl,.pickm") && !(e.target === q && e.key == "ArrowDown")) return;
+  if (e.key == "/" && q) { e.preventDefault(); q.focus(); return; }
+  if (e.key != "ArrowDown" && e.key != "ArrowUp") return;
+  const rows = [...document.querySelectorAll("main .line>a, main .card>a.row")], i = rows.indexOf(document.activeElement);
+  const n = rows[i < 0 ? 0 : Math.max(0, Math.min(rows.length - 1, i + (e.key == "ArrowDown" ? 1 : -1)))];
+  if (n) { e.preventDefault(); n.focus(); }
 });
 </script>
 {% block main %}{% endblock %}</main>
