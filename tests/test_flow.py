@@ -102,6 +102,7 @@ def test_phone_app():
     m = c.get("/manifest.webmanifest").json()
     assert m["display"] == "standalone" and m["scope"] == "/"  # labels' /b/ links fall in the app's scope
     assert "nfcScan" in c.get("/").text and "nfcScan()" in c.get("/phone").text  # a scanned label opens its box
+    assert all('id="scan"' in c.get(u).text for u in ("/", "/boxes", "/history"))  # the QR scan button on every page
     assert "data-draft" in c.get("/items/new?type=module").text  # unsaved card edits survive leaving the page
     box = core.new_boxes(1)[0]
     new = c.get(f"/items/new?type=module&box={box}").text

@@ -13,7 +13,7 @@
 @media (prefers-color-scheme:dark){:root{--bg:#161615;--fg:#ecebe6;--mut:#9a9993;--line:#34342f;--card:#1f1f1d;--acc:#58a6ff;--bad:#ef5350}}
 *{box-sizing:border-box}
 body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.45 system-ui,-apple-system,sans-serif}
-main{max-width:720px;margin:0 auto;padding:8px 16px 64px}
+main{max-width:720px;margin:0 auto;padding:8px 16px 96px}
 nav{display:flex;gap:2px;overflow-x:auto;padding:6px 8px;border-bottom:1px solid var(--line);background:var(--card)}
 nav a{padding:8px 10px;border-radius:8px;text-decoration:none;color:var(--fg);white-space:nowrap}
 nav a:hover{background:var(--line)}
@@ -70,7 +70,11 @@ label.chk{display:flex;gap:8px;align-items:center;font-weight:400}.chk input{fle
 .stock .num{flex-direction:column-reverse}.stock .num input{font-size:1.2em;padding:6px 2px}.stock .num button{padding:4px 0}
 .stock select{grid-column:1/-1}
 .mini{padding:6px 9px;font-size:.85em}.mini.on{background:var(--acc);color:#fff}
+dialog{border:1px solid var(--line);border-radius:12px;background:var(--card);color:var(--fg)}dialog::backdrop{background:#0008}
 dialog video{width:min(80vw,480px);display:block;margin-bottom:8px}
+#scan{position:fixed;z-index:10;right:max(16px,env(safe-area-inset-right));bottom:max(16px,env(safe-area-inset-bottom));width:56px;height:56px;padding:0;border-radius:50%;display:grid;place-items:center;box-shadow:0 4px 12px #0004}
+body:has(:is(input:not([type=checkbox],[type=radio],[type=file]),textarea):focus) #scan{display:none}  /* the keyboard is up: not over the field */
+@media print{ #scan{display:none}}
 .pick{position:relative;display:flex;width:100%}.row .pick{flex:1;width:auto;min-width:0}.stock .pick{grid-column:1/-1}
 .pick input{flex:1;min-width:0;padding-right:2.4em}
 .pick select{position:absolute;inset:0;opacity:0;pointer-events:none}
@@ -105,6 +109,7 @@ function when(t) { return new Date(t).toLocaleString("ru", {day: "numeric", mont
 // On a page with a visible box field (_box.html) it fills the field instead; on an item card it puts the item there.
 document.documentElement.classList.toggle("qr", "BarcodeDetector" in window && !!navigator.mediaDevices);
 let armed = null, scanning = null;  // armed: the field whose QR button was pressed
+const BOX = /\/b\/([A-Za-z0-9]+)\/?$/i, ITEM = /\/i\/(\d+)\/?$/i;  // a label's or a tag's URL, any host
 const boxField = () => armed || [...document.querySelectorAll("[data-box]")]
   .find(e => e.checkVisibility ? e.checkVisibility() : e.offsetParent) || document.querySelector("form[data-put] [data-box]");
 async function gotBox(id) {
@@ -143,37 +148,53 @@ function nfcScan() {  // one reader per page: two would both fire and the second
       if (window.nfcBusy || document.querySelector("dialog[open]")) return;  // this page is writing the tag; a question is open
       for (const rec of e.message.records) {
         const u = ["url", "absolute-url"].includes(rec.recordType) ? new TextDecoder().decode(rec.data) : "";
-        const b = u.match(/\/b\/([A-Za-z0-9]+)\/?$/i), i = u.match(/\/i\/(\d+)\/?$/i);
+        const b = u.match(BOX), i = u.match(ITEM);
         if (b) return gotBox(b[1].toUpperCase());
         if (i) return location.href = "/I/" + i[1];  // a thing's tag: its card as scanned (№37, №43)
       }
     };
     return r.scan(); })().catch(e => { scanning = null; throw e; });
 }
-async function qrScan() {
-  const f = armed, d = document.createElement("dialog"), v = document.createElement("video"), x = document.createElement("button");
+async function qrScan(f) {  // f: the box field whose QR button was pressed; none: the corner button, it opens what it reads
+  if (!("BarcodeDetector" in window && navigator.mediaDevices)) {
+    if (await ask(`Этот браузер не читает QR с сайта. Наведите на наклейку камеру телефона — страница откроется сама. `
+      + `Сканер на сайте работает в Chrome на Android, когда адрес ${location.origin} добавлен в исключения Chrome.`, "Как настроить")) location.href = "/phone";
+    return;
+  }
+  const d = document.createElement("dialog"), p = document.createElement("p"), v = document.createElement("video"), x = document.createElement("button");
   let s;
+  p.textContent = f ? "Наведите на QR коробки" : "Наведите на QR наклейки";
   v.playsInline = v.muted = true;
   x.type = "button"; x.className = "ghost"; x.textContent = "Закрыть"; x.onclick = () => d.close();
   d.onclose = () => { s?.getTracks().forEach(t => t.stop()); d.remove(); };
-  d.append(v, x); document.body.append(d); d.showModal();
+  d.append(p, v, x); document.body.append(d); d.showModal();
   try {
     s = await navigator.mediaDevices.getUserMedia({video: {facingMode: "environment"}});
     if (!d.open) return s.getTracks().forEach(t => t.stop());
     v.srcObject = s; await v.play();
     const det = new BarcodeDetector({formats: ["qr_code"]});
     while (d.open) {
-      const m = (await det.detect(v).catch(() => [])).map(c => c.rawValue.match(/\/b\/([A-Za-z0-9]+)\/?$/i)).find(Boolean);
-      if (m) { d.close(); armed = f; return gotBox(m[1].toUpperCase()); }  // a label read: straight into the field, no questions
+      const codes = (await det.detect(v).catch(() => [])).map(c => c.rawValue);
+      const u = codes.find(u => BOX.test(u) || !f && ITEM.test(u));  // a field takes boxes only: a thing's label would leave the form
+      if (u) {
+        d.close();
+        const b = u.match(BOX)?.[1].toUpperCase(), i = u.match(ITEM)?.[1];
+        if (f) { armed = f; return gotBox(b); }  // a label read: straight into the field, no questions
+        if (i) return location.href = "/I/" + i;  // a thing: its card as scanned, «Взять?» (№37, №43)
+        if (location.pathname.toLowerCase() !== "/b/" + b.toLowerCase()) location.href = "/b/" + b;
+        return;
+      }
+      if (codes.length) p.textContent = "Это не наша наклейка";
       await new Promise(r => setTimeout(r, 200));
     }
   } catch (e) { d.close(); alert("Камера недоступна: " + e.message); }
 }
 addEventListener("click", e => {
+  if (e.target.closest("#scan")) return qrScan();
   const b = e.target.closest("[data-qr]");
   if (!b) return;
   armed = b.parentElement.querySelector("[data-box]"); b.classList.add("on");
-  qrScan().finally(() => b.classList.remove("on"));
+  qrScan(armed).finally(() => b.classList.remove("on"));
 });
 addEventListener("click", async e => {  // «Записать на метку» (_box.html nfc_tag): Chrome on Android, site trusted as secure, see /phone
   const b = e.target.closest("[data-nfcw]");
@@ -406,5 +427,6 @@ addEventListener("DOMContentLoaded", () => {
 });
 </script>
 {% block main %}{% endblock %}</main>
+<button id="scan" type="button" aria-label="Сканировать QR" title="Сканировать QR"><svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 8V5a1 1 0 0 1 1-1h3M16 4h3a1 1 0 0 1 1 1v3M20 16v3a1 1 0 0 1-1 1h-3M8 20H5a1 1 0 0 1-1-1v-3M7 12h10"/></svg></button>
 </body>
 </html>
