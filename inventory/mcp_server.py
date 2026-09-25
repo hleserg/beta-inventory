@@ -61,7 +61,8 @@ def search(query: str) -> dict[str, Any]:
 @server.tool(annotations=READ)
 def get_item(item_id: int) -> dict[str, Any]:
     """Full card of an item: fields (keys as in card_template), stock per box, last 10 movements.
-    Box HANDS in stock: in hand, not put away; its where says the box it was taken from, if any."""
+    Box HANDS in stock: in hand, not put away; its where says the box it was taken from, if any.
+    Box TRANS («в пути»): ordered, not come yet; its where says when it was put there («заказано ДД.ММ»)."""
     return card(item_id)
 
 
@@ -132,6 +133,7 @@ def change_stock(box_id: str, item_id: int, action: Literal["put", "return", "bu
     holds qty null, «есть, не считал», left out of totals. take and count need a number.
     box_id "" or HANDS is «на руках»: a take from a box lands there, a put or return into a box takes from there
     first, a take from HANDS writes it off (used up, gone), put/buy on HANDS: brought home, not put away yet.
+    box_id TRANS is «в пути»: ordered — put there; it came — take from TRANS, then put into the real box.
     Returns the new qty in the box.
     """
     if project_id is not None:

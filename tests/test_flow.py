@@ -334,6 +334,28 @@ def test_hands():
     assert c.post("/stock", data={"box": "руках", "item": iid, "action": "add", "qty": 1}).status_code == 400  # not by name
 
 
+def test_transit():
+    """Manifesto 3: ordered things lie «в пути» — out of the total, in the «докупить» check; «пришло» moves them in."""
+    def stock(iid):
+        with core.db() as db:
+            return {r[0]: r[1] for r in db.execute("SELECT box_id, qty FROM stock WHERE item_id=?", (iid,))}
+    box = core.new_boxes(1)[0]
+    c.post("/items/new?type=resistor", data={"name": "защита АКБ", "value": "x", "reorder_at": "5", "box": box, "qty": 3})
+    iid = newest()
+    assert "защита АКБ" in c.get("/items?reorder=1").text
+    c.post("/stock", data={"box": "в пути", "item": iid, "action": "add", "kind": "put", "qty": 10})
+    assert stock(iid) == {box: 3, core.TRANSIT: 10}
+    assert "защита АКБ" not in c.get("/items?reorder=1").text  # ordered: no need to buy again
+    assert "3 шт" in c.get("/items?q=защита").text  # not 13: it is not here yet
+    card = c.get(f"/i/{iid}").text
+    assert "В пути" in card and "заказано" in card and "Пришло" in card
+    c.post("/stock", data={"box": box, "item": iid, "action": "add", "kind": "move", "src": core.TRANSIT, "qty": 12})
+    assert stock(iid) == {box: 15}  # 12 came of the 10 ordered
+    assert core.TRANSIT not in c.get("/boxes").text
+    c.post(f"/b/{core.TRANSIT}/delete")
+    assert c.get(f"/b/{core.TRANSIT}").status_code == 200
+
+
 def test_pick_new():
     """№19: a picker's «+ Место» / «+ Коробка» opens a page that makes one and hands its id back to the field."""
     new = c.get("/places/new?from=/b/K7M2Q&field=place&name=Антресоль").text

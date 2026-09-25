@@ -19,6 +19,8 @@ terms:
   shelf: Полка
   shelves: Полки
   hands: На руках
+  transit: В пути
+  reorder: Докупить
   unit: шт
 
 item_fields:
@@ -41,6 +43,7 @@ item_fields:
   - key: reorder_at
     label: Докупить, когда останется меньше
     type: number
+    reorder: true  # the list's «докупить» chip compares this with what is here and «в пути»
 
 categories:
   - key: electronics

@@ -33,7 +33,8 @@ T.env.globals.update(
     # namespace, not dict: in Jinja t.items on a dict is dict.items, not the term
     t=SimpleNamespace(**PROFILE["terms"]), categories=PROFILE["categories"], type_label=core.type_label, kinds=core.KINDS,
     trash_days=core.TRASH_DAYS,
-    pk=next((f["key"] for f in PROFILE["item_fields"] if f["type"] == "photo"), None))
+    pk=next((f["key"] for f in PROFILE["item_fields"] if f["type"] == "photo"), None), TRANSIT=core.TRANSIT,
+    rk=(RK := next((f["key"] for f in PROFILE["item_fields"] if f.get("reorder")), None)))  # the «докупить» threshold
 
 
 def all_boxes():  # for box fields: named first, by name; each with its place — the top box's (№39: filter, grey hint)
@@ -268,21 +269,25 @@ async def read_fields(req, old, fields):
 
 
 @app.get("/items")
-def items(req: Request, type: str = "", cat: str = "", q: str = "", hands: str = ""):
+def items(req: Request, type: str = "", cat: str = "", q: str = "", hands: str = "", reorder: str = ""):
     if type in core.TYPES:
         cat = core.TYPES[type]["category"]["key"]
-    with db() as c:
+    with db() as c:  # total leaves «в пути» out (not here yet); have counts it, so an ordered thing leaves «докупить»
         rows = [dict(r, fields=json.loads(r["fields"])) for r in c.execute(
-            "SELECT i.*, COALESCE(SUM(s.qty), 0) AS total, MAX(s.box_id IS NOT NULL AND s.qty IS NULL) AS uncounted, MAX(s.box_id=?) AS hands FROM items i LEFT JOIN stock s ON s.item_id=i.id "
-            "WHERE ?='' OR i.type=? GROUP BY i.id ORDER BY i.name", (core.HANDS, type, type))]
+            "SELECT i.*, COALESCE(SUM(CASE WHEN s.box_id!=? THEN s.qty END), 0) AS total, COALESCE(SUM(s.qty), 0) AS have, "
+            "MAX(s.box_id IS NOT NULL AND s.qty IS NULL) AS uncounted, MAX(s.box_id=?) AS hands FROM items i LEFT JOIN stock s ON s.item_id=i.id "
+            "WHERE ?='' OR i.type=? GROUP BY i.id ORDER BY i.name", (core.TRANSIT, core.HANDS, type, type))]
     if hands:  # №28: taken and not put back, or not put away yet
         rows = [r for r in rows if r["hands"]]
+    if reorder and RK:  # manifesto 3: fewer than the card's threshold; «не считал» is never flagged
+        rows = [r for r in rows if not r["uncounted"] and str(r["fields"].get(RK, "")).isdigit()
+                and r["have"] < int(r["fields"][RK])]
     if cat:
         rows = [r for r in rows if r["type"] in core.TYPES and core.TYPES[r["type"]]["category"]["key"] == cat]
     if q.strip():  # same search as the main page, kept in its rank order
         rank = {i["id"]: n for n, i in enumerate(core.search(q)[0])}
         rows = sorted((r for r in rows if r["id"] in rank), key=lambda r: rank[r["id"]])
-    return page(req, "items.html", items=rows, type=type, cat=cat, q=q, hands=hands)
+    return page(req, "items.html", items=rows, type=type, cat=cat, q=q, hands=hands, reorder=reorder)
 
 
 def card_form(req, status=200, it=None, type="", name="", vals=None, errors=(), box="", qty="", dups=()):
@@ -378,8 +383,8 @@ def item_rotate(item_id: int, photo: str = Form(), deg: int = Form()):
 @app.post("/stock")
 def stock(box: str = Form(), item: int = Form(), action: str = Form(), qty: int | None = Form(None),
           kind: str = Form("put"), project: str = Form(""), back: str = Form("/"), src: str = Form("")):
-    if kind == "move" and src:  # the item card: a scanned box takes all of it from the one box it lay in
-        core.transfer(item, src, box, AUTHOR)
+    if kind == "move" and src:  # the item card: a scanned box takes it from the one box it lay in, or «пришло»
+        core.transfer(item, src, box, AUTHOR, qty)
     else:
         if action != "take":
             action = "count" if action == "set" else kind if kind in ("put", "return", "buy") else "put"

@@ -45,10 +45,11 @@ addEventListener("keydown", e => { if (e.key == "Escape" && full()) history.back
   {% endif %}
 </div>
 {% else %}<p class="mut">Нигде нет.</p>{% endfor %}
-<details{% if h %} open{% endif %}><summary>{{ "Положить на место" if h else "Куда положить" }}</summary>
-<form method="post" action="/stock" class="row" data-put{% if stock|length == 1 and not h %} data-from="{{ stock[0].box_id }}"{% endif %}>
-  <input type="hidden" name="item" value="{{ it.id }}"><input type="hidden" name="action" value="add"><input type="hidden" name="kind" value="{{ 'return' if h and h.src else 'put' }}"><input type="hidden" name="back" value="/i/{{ it.id }}"><input type="hidden" name="src">
-  {{ box_input(value=h.src if h else "", required=True) }}<input type="number" name="qty" min="1" placeholder="не считал"{% if h %} value="{{ h.qty }}"{% endif %}><button>Положить</button>
+{% set tr = none if h else stock|selectattr("box_id", "equalto", TRANSIT)|first %}{# manifesto 3: it came — the box it goes to takes it out of «в пути» #}
+<details{% if h or tr %} open{% endif %}><summary>{{ "Положить на место" if h else "Пришло — куда положить" if tr else "Куда положить" }}</summary>
+<form method="post" action="/stock" class="row" data-put{% if stock|length == 1 and not h and not tr %} data-from="{{ stock[0].box_id }}"{% endif %}>
+  <input type="hidden" name="item" value="{{ it.id }}"><input type="hidden" name="action" value="add"><input type="hidden" name="kind" value="{{ 'move' if tr else 'return' if h and h.src else 'put' }}"><input type="hidden" name="back" value="/i/{{ it.id }}"><input type="hidden" name="src"{% if tr %} value="{{ TRANSIT }}"{% endif %}>
+  {{ box_input(value=h.src if h else "", required=True, exclude=TRANSIT if tr else None) }}<input type="number" name="qty" min="1" placeholder="не считал"{% if h or tr and tr.qty %} value="{{ (h or tr).qty }}"{% endif %}><button>Положить</button>
 </form></details>
 <details><summary>Метка</summary>
   <p><img src="/i/{{ it.id }}/label.png" alt="наклейка" style="width:240px;max-width:100%;background:#fff;border:1px solid var(--line)"><br>

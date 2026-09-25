@@ -20,6 +20,9 @@ ID_ALPHABET = "23456789ABCDEFGHJKLMNPQRSTUVWXYZ"  # no 0/O/1/I
 # №28: things taken and not put back, or brought home and not put away yet, lie «на руках» — a box of kind
 # 'hands' that no box list shows; stock and history work on it as on any box
 HANDS = "HANDS"
+# manifesto 3: ordered and not come yet lies «в пути» — a box of kind 'transit'; a thing's total leaves it out,
+# its «докупить» counts it. Five letters of ID_ALPHABET, so its page and label work like any box's
+TRANSIT = "TRANS"
 
 # qty NULL: «есть, не считал» (manifesto 4) — loose parts nobody counts; found and taken, left out of sums
 STOCK = """CREATE TABLE IF NOT EXISTS stock(
@@ -126,8 +129,9 @@ def init():
                             "INSERT INTO stock SELECT * FROM stock_v0; DROP TABLE stock_v0; COMMIT;")
         if "kind" not in [r["name"] for r in c.execute("PRAGMA table_info(boxes)")]:  # boxes from before shelves
             c.execute("ALTER TABLE boxes ADD COLUMN kind TEXT NOT NULL DEFAULT 'box'")
-        c.execute("INSERT INTO boxes(id, name, kind) VALUES (?, ?, 'hands') ON CONFLICT(id) DO UPDATE SET name=excluded.name",
-                  (HANDS, PROFILE["terms"].get("hands", "На руках")))
+        for bid, kind, name in ((HANDS, "hands", "На руках"), (TRANSIT, "transit", "В пути")):
+            c.execute("INSERT INTO boxes(id, name, kind) VALUES (?, ?, ?) ON CONFLICT(id) DO UPDATE SET name=excluded.name",
+                      (bid, PROFILE["terms"].get(kind, name), kind))
         pics = {fd["key"] for t in [*TYPES, ""] for fd in fields_for(t) if fd["type"] == "photo"}
         for r in c.execute("SELECT id, fields FROM items").fetchall():  # one photo per card before: a name, not a list
             f = item_fields(r)
@@ -315,8 +319,11 @@ def change_stock(box_id, item_id, action, qty, author, project_id=None):
     return move(item_id, box_id, qty, action, author, project_id)
 
 
-def transfer(item_id, src, dst, author):
-    """All of a thing from one box to another (a box scanned on its card, №30): two «переложил» movements."""
+def transfer(item_id, src, dst, author, qty=None):
+    """A thing from one box to another (a box scanned on its card, №30): two «переложил» movements. qty None moves
+    it all, else at most qty; from «в пути» all of qty lands — 12 came of 10 ordered: 10 leave it, 12 land."""
+    if qty is not None and qty < 1:
+        raise ValueError("Количество должно быть больше нуля")
     src, dst = find_box(src), find_box(dst)
     if src == dst:
         return
@@ -325,8 +332,9 @@ def transfer(item_id, src, dst, author):
     if not row:
         raise ValueError(f"в {src} этого нет")
     # ponytail: two transactions like clear_box; both boxes are checked first, so a half-move needs a crash between
-    move(item_id, src, -(row["qty"] or 0), "move", author)
-    return move(item_id, dst, row["qty"], "move", author)
+    took = row["qty"] if qty is None or row["qty"] is None else min(qty, row["qty"])
+    move(item_id, src, -(took or 0), "move", author)
+    return move(item_id, dst, qty if qty is not None and src == TRANSIT else took, "move", author)
 
 
 def projects(c):
@@ -446,8 +454,8 @@ def trash(kind, key):
         r = c.execute(f"SELECT * FROM {table} WHERE id=?", (key,)).fetchone()
         if not r:
             raise ValueError("Уже удалено")
-        if kind == "box" and r["kind"] == "hands":
-            raise ValueError("«На руках» не удаляется")
+        if kind == "box" and r["kind"] in ("hands", "transit"):
+            raise ValueError(f"«{r['name']}» не удаляется")
         if kind == "item":
             s["items"].append(dict(r))
             s["stock"] = _rows(c, "SELECT * FROM stock WHERE item_id=?", key)
@@ -525,16 +533,20 @@ def trash_list():
 
 
 def stock_of_item(c, item_id):
-    """Where it lies: [{box_id, qty, name, where}]; in hand last, its where «взят из …» when a take put it there."""
-    rows = c.execute("SELECT s.box_id, s.qty, b.name FROM stock s JOIN boxes b ON b.id=s.box_id "
-                     "WHERE s.item_id=? ORDER BY s.box_id=?, s.box_id", (item_id, HANDS)).fetchall()
-    out = [dict(r, where=box_where(c, r["box_id"])) for r in rows]
+    """Where it lies: [{box_id, qty, name, where}]; in transit and in hand last, their where «заказано ДД.ММ» and
+    «взят из …» when a take put it there."""
+    rows = c.execute("SELECT s.box_id, s.qty, s.updated_at, b.name FROM stock s JOIN boxes b ON b.id=s.box_id "
+                     "WHERE s.item_id=? ORDER BY s.box_id=?, s.box_id=?, s.box_id", (item_id, HANDS, TRANSIT)).fetchall()
+    out = [dict(r, where=f"заказано {r['updated_at'][8:10]}.{r['updated_at'][5:7]}" if r["box_id"] == TRANSIT
+                else box_where(c, r["box_id"])) for r in rows]
     if out and out[-1]["box_id"] == HANDS:
         out[-1]["src"] = taken_from(c, item_id)
         if out[-1]["src"]:
             b = c.execute("SELECT name FROM boxes WHERE id=?", (out[-1]["src"],)).fetchone()
             where = box_where(c, out[-1]["src"])
             out[-1]["where"] = "взят из " + ((b["name"] if b else "") or out[-1]["src"]) + (f" · {where}" if where else "")
+        if out[-1]["src"] == TRANSIT:  # it came: «положить на место» there would order it again
+            out[-1]["src"] = ""
     return out
 
 
