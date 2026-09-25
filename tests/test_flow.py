@@ -332,3 +332,17 @@ def test_hands():
     c.post("/stock", data={"box": core.HANDS, "item": iid, "action": "add", "kind": "put", "qty": 1})
     assert stock(iid) == {box: 1, core.HANDS: 1} and c.get(f"/i/{iid}").text.count("положил") == n + 1  # not a mirror leg
     assert c.post("/stock", data={"box": "руках", "item": iid, "action": "add", "qty": 1}).status_code == 400  # not by name
+
+
+def test_pick_new():
+    """№19: a picker's «+ Место» / «+ Коробка» opens a page that makes one and hands its id back to the field."""
+    new = c.get("/places/new?from=/b/K7M2Q&field=place&name=Антресоль").text
+    assert 'value="Антресоль"' in new and "Назад" in new  # what was typed in the search comes along
+    r = c.post("/places", data={"name": "Антресоль"}, headers={"X-Autosave": "1"})
+    pid = core.db().execute("SELECT id FROM places WHERE name='Антресоль'").fetchone()[0]
+    assert r.json() == {"id": pid}
+    assert c.post("/places", data={"name": "Антресоль"}, headers={"X-Autosave": "1"}).json() == {"id": pid}  # a twin: the old one
+    assert 'data-new="/places/new"' in c.get("/boxes/new").text and 'data-new="/boxes/new"' in c.get("/items/new?type=resistor").text
+    box = c.get("/boxes/new?from=/items/new&field=box&name=JST").text
+    assert 'value="JST"' in box and "<button>Создать" in box
+    assert "<button>Создать" not in c.get("/boxes/new").text  # opened on its own: saves itself, no buttons

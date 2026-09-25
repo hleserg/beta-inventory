@@ -3,7 +3,7 @@
 {% macro box_link(id, name) %}<a href="/b/{{ id }}">{% if id == "HANDS" %}<b>{{ name }}</b>{# №28: a place, not a labelled box #}{% elif name %}<b>{{ name }}</b> <span class="mut">{{ id }}</span>{% else %}<b>{{ id }}</b>{% endif %}</a>{% endmacro %}
 {% macro box_input(name="box", value="", placeholder="название, часть названия или скан", required=False, exclude=None) %}
 {%- set boxes = all_boxes()|rejectattr("id", "equalto", exclude)|list %}{% set hit = boxes|selectattr("id", "equalto", value)|first %}
-<input name="{{ name }}" value="{{ label(hit) if hit else value }}" list="boxlist" data-box placeholder="{{ placeholder }}" autocomplete="off"{% if required %} required{% endif %}>
+<input name="{{ name }}" value="{{ label(hit) if hit else value }}" list="boxlist" data-box data-new="/boxes/new" data-term="{{ t.box }}" placeholder="{{ placeholder }}" autocomplete="off"{% if required %} required{% endif %}>
 <button type="button" class="ghost mini" data-qr title="Навести камеру на QR коробки">QR</button>
 <datalist id="boxlist">{% for b in boxes %}<option value="{{ label(b) }}" data-place="{{ b.top or '' }}" data-where="{{ b.where or '' }}">{% endfor %}</datalist>
 {%- endmacro %}

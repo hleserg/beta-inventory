@@ -1,5 +1,15 @@
 {% extends "base.html" %}{% from "_box.html" import box_link %}
 {% block main %}
+{% if new %}{# №19: a picker's «+ Место»; the new place goes back into that field (base.html pickMade) #}
+<h1>+ {{ t.place }}</h1>
+<form method="post" action="/places" id="newf"><input name="name" value="{{ request.query_params.get('name', '') }}" placeholder="например: шкаф в комнате" required>
+  <label>Заметка</label><input name="note"><p class="row"><button>Создать</button><button type="button" class="ghost" data-back onclick="history.back()">Назад</button></p></form>
+<script>pickMade(newf, async () => {
+  if (!newf.reportValidity()) return null;
+  const r = await fetch("/places", {method: "POST", body: new FormData(newf), headers: {"X-Autosave": "1"}});
+  return r.ok ? (await r.json()).id : null;
+});</script>
+{% else %}
 <h1>{{ t.places }}</h1>
 <form method="post" action="/places" class="row"><input name="name" placeholder="например: шкаф в комнате" required><button>Добавить</button></form>
 {% for p in places %}
@@ -17,4 +27,5 @@
     <input name="name" value="{{ p.name }}" required><label>Заметка</label><input name="note" value="{{ p.note }}"><p><button>Сохранить</button></p></form></details>
 </div></div>
 {% endfor %}
+{% endif %}
 {% endblock %}

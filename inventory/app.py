@@ -154,7 +154,7 @@ def box_page(req, b, draft=False):
         children = c.execute("SELECT * FROM boxes WHERE parent_id=? ORDER BY id", (b["id"],)).fetchall()
         places = c.execute("SELECT * FROM places ORDER BY name").fetchall()
         return page(req, "box.html", b=b, where=core.box_where(c, b["id"]), contents=contents, top=box_top(b["id"]),
-                    children=children, places=places, projects=core.projects(c), draft=draft,
+                    children=children, places=places, projects=core.projects(c), draft=draft, picking="from" in req.query_params,
                     nfc=f"{public_base(req)}/b/{b['id']}".lower())  # NFC Tools writes it as typed
 
 
@@ -431,11 +431,17 @@ def places(req: Request):
     return page(req, "places.html", places=rows)
 
 
+@app.get("/places/new")
+def place_new(req: Request):  # №19: from a picker's «+ Место»
+    return page(req, "places.html", places=[], new=True)
+
+
 @app.post("/places")
-def place_add(name: str = Form(), note: str = Form("")):
+def place_add(name: str = Form(), note: str = Form(""), x_autosave: str = Header("")):
     with db() as c:
         c.execute("INSERT OR IGNORE INTO places(name, note) VALUES (?, ?)", (name.strip(), note.strip()))
-    return go("/places")
+        pid = c.execute("SELECT id FROM places WHERE name=?", (name.strip(),)).fetchone()[0]
+    return JSONResponse({"id": pid}) if x_autosave else go("/places")
 
 
 @app.post("/places/{place_id}/shelves")

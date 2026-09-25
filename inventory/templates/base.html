@@ -76,8 +76,8 @@ dialog video{width:min(80vw,480px);display:block;margin-bottom:8px}
 .pick>button{position:absolute;right:1px;top:1px;bottom:1px;background:none;color:var(--mut);padding:0 12px}
 .pickl,.pickall{display:flex;flex-direction:column}
 .pickl{flex-basis:100%;grid-column:1/-1;border:1px solid var(--line);border-radius:8px;overflow:hidden;background:var(--card)}
-.pickl button,.pickall button{background:none;color:inherit;text-align:left;border-radius:0;padding:11px 12px;border-top:1px solid var(--line)}
-.pickl button:first-child{border-top:0}.pickl .pmore{color:var(--acc)}.pickl>div{padding:11px 12px}
+.pickl button,.pickall button,.pickm>.pmore{background:none;color:inherit;text-align:left;border-radius:0;padding:11px 12px;border-top:1px solid var(--line)}
+.pickl button:first-child{border-top:0}.pickl .pmore,.pickm .pmore{color:var(--acc)}.pickm>.pmore{display:block;width:100%}.pickl>div{padding:11px 12px}
 .pickm{padding:0;margin:12px auto auto;width:min(92vw,480px);border:1px solid var(--line);border-radius:12px;background:var(--card);color:var(--fg)}
 .pickm::backdrop{background:#0008}.pickm>div{display:flex;gap:8px;padding:8px}.pickm input{flex:1;min-width:0}
 .pickall{max-height:70vh;overflow-y:auto}
@@ -215,6 +215,43 @@ function pickFill(s, q) {
   s.list.replaceChildren(...(!q && empty ? [empty] : []).concat(l.slice(0, 6)).map(o => pickBtn(o, () => pickSet(s, o.v))));
   if (l.length > 6) s.list.append(Object.assign(pickBtn({t: "Выбрать…"}, () => pickAll(s, q)), {className: "pmore"}));
   if (!l.length) s.list.append(Object.assign(document.createElement("div"), {className: "mut", textContent: "не нашлось"}));
+  if (s.f.dataset.new) s.list.append(pickNew(s, () => q));
+}
+// №19: «+ Коробка» under a field with data-new: that page makes one and comes back with it (pickMade). data-act: a new box
+// page saves itself before leaving, so the way back is to its own address.
+function pickNew(s, q) {
+  const b = pickBtn({t: "+ " + s.f.dataset.term}, () => location.assign(s.f.dataset.new + "?" +
+    new URLSearchParams({from: location.pathname + location.search, field: s.f.name, name: q()})));
+  b.className = "pmore"; b.setAttribute("data-act", ""); return b;
+}
+// The page it opens: a form, make() → the new id or null (the page says why), made() → the id if it exists already.
+// Back (the page's «Назад» or the phone's): nothing typed → just back; typed → «Сохранить?»: yes puts it in the field.
+// The phone's Back is caught by one extra history step once something is typed; pkd counts our steps to jump over them.
+function pickMade(f, make, made = () => null) {
+  const u = new URLSearchParams(location.search), at = u.get("from"), field = u.get("field");
+  if (!at) return;
+  const vals = () => JSON.stringify([...new FormData(f)].map(([k, v]) => [k, v.name ?? v])), blank = vals();
+  if (!history.state) history.replaceState({pkd: 0}, "");
+  let guard = false;
+  const push = () => { history.pushState({pkd: history.state.pkd + 1}, ""); guard = true; };
+  const back = id => {
+    if (id) sessionStorage.picked = JSON.stringify({at, field, id: String(id)});
+    history.go(-1 - history.state.pkd);
+  };
+  const ask = async () => {
+    if (made()) return back(made());
+    if (vals() == blank || !confirm("Сохранить? «Отмена» — выйти без сохранения.")) return back();
+    const id = await make();
+    id ? back(id) : guard || push();
+  };
+  f.addEventListener("input", () => guard || vals() == blank || push());
+  addEventListener("popstate", () => { if (guard) { guard = false; ask(); } });
+  for (const b of f.querySelectorAll("[data-back]")) b.onclick = ask;
+  f.addEventListener("submit", async e => {
+    e.preventDefault(); e.stopImmediatePropagation();
+    const id = await make();
+    if (id) back(id);
+  }, true);
 }
 function pickOpen(s) {
   pickClose(true);
@@ -247,7 +284,7 @@ function pickAll(s, q) {  // all of them, with search
   i.oninput();
   d.onclick = e => e.target === d && pickClose(true);  // the backdrop
   d.onclose = () => { d.remove(); if (pk === s) pickClose(true); };  // the phone's Back
-  top.append(i, x); d.append(top, l); document.body.append(d);
+  top.append(i, x); d.append(top, ...s.f.dataset.new ? [pickNew(s, () => i.value)] : [], l); document.body.append(d);
   document.activeElement?.blur();  // else closing it focuses the field again, and that opens the list
   d.showModal();
 }
@@ -263,6 +300,10 @@ addEventListener("DOMContentLoaded", () => {
     } else { s.vis = f; s.dl = f.list; f.dataset.pk = f.getAttribute("list"); f.removeAttribute("list"); s.append(f, s.b); }
     s.ph = s.vis.placeholder;
   }
+  let got = null;  // №19: back from a «+» page (pickMade) with what it made
+  try { got = JSON.parse(sessionStorage.picked || "null"); sessionStorage.removeItem("picked"); } catch {}
+  const s = got?.at == location.pathname + location.search && [...document.querySelectorAll(".pick")].find(s => s.f.name == got.field);
+  if (s) pickSet(s, s.dl ? [...s.dl.options].map(o => o.value).find(v => v == got.id || v.endsWith(` (${got.id})`)) ?? got.id : got.id);
 });
 addEventListener("focusin", e => { const s = e.target.closest?.(".pick"); if (s && e.target === s.vis && pk !== s) pickOpen(s); });
 addEventListener("click", e => {
