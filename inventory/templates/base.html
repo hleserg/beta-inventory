@@ -100,6 +100,7 @@ dialog video{width:min(80vw,480px);display:block;margin-bottom:8px}
 .pill.on{border:2px solid var(--acc);color:var(--fg)}.pill:focus-within{border:2px solid var(--acc)}
 .rnd{flex:none;width:48px;height:48px;border-radius:50%;border:1px solid var(--line);background:var(--card);color:var(--fg);display:grid;place-items:center}
 .fab{flex:none;width:60px;height:60px;min-height:0;border-radius:50%;padding:0;display:grid;place-items:center}
+.fab.on{box-shadow:0 0 0 4px var(--bg),0 0 0 7px var(--acc)}  /* NFC listens: a tag opens its box */
 body:has(main :is(input:not([type=checkbox],[type=radio],[type=file]),textarea):focus){--bar:0px}  /* the keyboard is up: the page's own field wins the space */
 body:has(main :is(input:not([type=checkbox],[type=radio],[type=file]),textarea):focus) .bar{display:none}
 @media print{.bar,.fbar{display:none}}
@@ -204,8 +205,7 @@ function ask(text, yes, key) {  // key: «больше не спрашивать
 function nfcScan() {  // one reader per page: two would both fire and the second would miss the armed field
   return scanning ||= (() => { const r = new NDEFReader();
     r.onreading = e => {
-      if (window.nfcBusy || document.querySelector("dialog[open]:not([data-nfc])")) return;  // this page is writing the tag; a question is open
-      document.querySelector("dialog[data-nfc]")?.close();  // the corner button's «поднесите метку» got its tag
+      if (window.nfcBusy || document.querySelector("dialog[open]")) return;  // this page is writing the tag; a question is open
       for (const rec of e.message.records) {
         const u = ["url", "absolute-url"].includes(rec.recordType) ? new TextDecoder().decode(rec.data) : "";
         const b = u.match(BOX), i = u.match(ITEM);
@@ -213,17 +213,13 @@ function nfcScan() {  // one reader per page: two would both fire and the second
         if (i) return location.href = "/I/" + i[1];  // a thing's tag: its card as scanned (№37, №43)
       }
     };
-    return r.scan(); })().catch(e => { scanning = null; throw e; });
+    return r.scan().then(() => { const b = document.getElementById("scan");  // the ring: NFC listens, a tag opens its box (№65: no window)
+      if (b) { b.classList.add("on"); b.title = b.ariaLabel = SCAN.qr ? "Поднесите метку. Ещё раз — QR" : "Поднесите метку"; } }); })().catch(e => { scanning = null; throw e; });
 }
 function fab() {  // the corner button: NFC where the phone reads tags (unless the settings say QR first), else the QR camera
   if (!(SCAN.nfc && "NDEFReader" in window && (SCAN.def !== "qr" || !SCAN.qr))) return qrScan();
-  const d = document.createElement("dialog"), p = document.createElement("p"), r = document.createElement("p");
-  d.dataset.nfc = ""; p.textContent = "Поднесите телефон к метке"; r.className = "row";
-  if (SCAN.qr) { const q = document.createElement("button"); q.type = "button"; q.className = "ghost"; q.textContent = "Сканировать QR";
-    q.onclick = () => { d.close(); qrScan(); }; r.append(q); }
-  const x = document.createElement("button"); x.type = "button"; x.className = "ghost"; x.textContent = "Закрыть"; x.onclick = () => d.close();
-  r.append(x); d.onclose = () => d.remove(); d.append(p, r); document.body.append(d); d.showModal();
-  nfcScan().catch(e => p.textContent = "NFC не включился: " + e.message);
+  if (document.getElementById("scan").classList.contains("on")) return SCAN.qr && qrScan();  // NFC listens already, the ring says so; a second tap is the camera
+  nfcScan().catch(e => alert("NFC не включился: " + e.message));
 }
 async function qrScan(f) {  // f: the box field whose QR button was pressed; none: the corner button, it opens what it reads
   if (!("BarcodeDetector" in window && navigator.mediaDevices)) {
