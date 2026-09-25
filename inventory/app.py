@@ -519,9 +519,7 @@ def projects_page(req: Request):
 
 @app.post("/projects")
 def project_add(name: str = Form(), description: str = Form(""), git_url: str = Form("")):
-    with db() as c:
-        c.execute("INSERT INTO projects(name, description, git_url) VALUES (?, ?, ?)",
-                  (name.strip(), description.strip(), git_url.strip()))
+    core.accept_project(git_url, name, description)  # a repo already in the inbox is taken, not doubled
     return go("/projects")
 
 

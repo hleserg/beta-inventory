@@ -116,11 +116,13 @@ def test_github_inbox():
     assert [p["name"] for p in call("list_projects").structured_content["inbox"]] == ["feeder", "lamp"]
     call("accept_project", git_url="https://github.com/me/feeder.git", name="Страж миски", description="Кошка не ест")
     call("accept_project", git_url="https://github.com/me/private", name="Голова", description="")  # not listed
-    call("skip_project", git_url="https://github.com/me/lamp")
+    c.post("/projects", data={"name": "Лампа", "git_url": "https://github.com/me/lamp/"})  # added by hand
+    assert call("list_projects").structured_content["inbox"] == []
     with core.db() as db:
         assert {"Голова", "Страж миски", "Часы"} <= {p["name"] for p in core.projects(db)}
-        assert "lamp" not in {p["name"] for p in core.projects(db)}
-    assert call("list_projects").structured_content["inbox"] == []
+        assert [p["name"] for p in core.projects(db)].count("Лампа") == 1
+    assert not call("skip_project", git_url="https://github.com/me/dotfiles").is_error
+    assert call("skip_project", git_url="https://github.com/me/feeder").is_error  # a taken project is not skipped
     assert call("skip_project", git_url="https://github.com/me/nope").is_error
 
 
