@@ -27,7 +27,6 @@ h2{font-size:1.1rem;margin:1.3em 0 .4em}
 input,select,textarea,button{font:inherit;color:inherit;background:var(--card);border:1px solid var(--line);border-radius:8px;padding:8px 10px;max-width:100%}
 input,select,textarea{width:100%}
 .row input,.row select{width:auto;flex:1;min-width:0}
-.row input[type=number]{flex:0 0 5.5em}
 textarea{min-height:8em}
 button,.btn{cursor:pointer;background:var(--acc);color:#fff;border:0;text-decoration:none;display:inline-block;padding:9px 14px;border-radius:8px}
 .ghost{background:transparent;color:var(--acc);border:1px solid var(--line)}
@@ -65,8 +64,10 @@ summary{cursor:pointer;color:var(--acc)}
 [hidden]{display:none!important}[data-qr]{display:none}.qr [data-qr]{display:inline-block}
 label.chk{display:flex;gap:8px;align-items:center;font-weight:400}.chk input{flex:none;width:auto}
 .stock{display:grid;grid-template-columns:5em 1fr;gap:8px;margin-top:8px}
-.spin,.acts{display:flex;flex-direction:column;gap:4px}.acts{justify-content:space-between}
-.spin input{text-align:center;font-size:1.2em;padding:6px 2px}.spin button{padding:4px 0}
+.acts{display:flex;flex-direction:column;gap:4px;justify-content:space-between}
+.num{display:flex;gap:4px}.num input{text-align:center;min-width:3em}.num button{padding:6px 12px}
+.row .num{flex:0 0 auto}.row .num input{flex:0 0 4em}
+.stock .num{flex-direction:column-reverse}.stock .num input{font-size:1.2em;padding:6px 2px}.stock .num button{padding:4px 0}
 .stock select{grid-column:1/-1}
 .mini{padding:6px 9px;font-size:.85em}.mini.on{background:var(--acc);color:#fff}
 dialog video{width:min(80vw,480px);display:block;margin-bottom:8px}
@@ -362,6 +363,25 @@ document.addEventListener("pointerdown", e => {
   addEventListener("pointermove", move); addEventListener("pointerup", up); addEventListener("pointercancel", up);
 });
 addEventListener("pageshow", e => { if (e.persisted) location.reload(); });  // back button: the page from memory has old counts
+// №40: every number field gets − and + by one. Card numbers are text ("1,5"), so no stepUp; never below min (else 0).
+// An empty field: + starts it, − leaves it empty («не считал»). Events as if typed: drafts and autosave see it.
+addEventListener("DOMContentLoaded", () => {
+  for (const f of document.querySelectorAll("input[type=number], input[inputmode=decimal]")) {
+    const s = document.createElement("span"), btn = (t, d) => {
+      const b = document.createElement("button");
+      b.type = "button"; b.className = "ghost"; b.textContent = t;
+      b.onclick = () => {
+        const min = f.min === "" ? 0 : +f.min, max = f.max === "" ? Infinity : +f.max, v = parseFloat(f.value.replace(",", "."));
+        if (isNaN(v) && d < 0) return;
+        const n = isNaN(v) ? Math.max(min, 1) : Math.min(max, Math.max(min, Math.round((v + d) * 1000) / 1000));
+        f.value = f.value.includes(",") ? String(n).replace(".", ",") : n;
+        for (const e of ["input", "change"]) f.dispatchEvent(new Event(e, {bubbles: true}));
+      };
+      return b;
+    };
+    s.className = "num"; f.before(s); s.append(btn("−", -1), f, btn("+", 1));
+  }
+});
 </script>
 {% block main %}{% endblock %}</main>
 </body>

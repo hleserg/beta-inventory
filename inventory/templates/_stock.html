@@ -1,10 +1,10 @@
 {% from "_box.html" import box_link %}
-{# Stock form for one box×item pair: one number, ▲▼ to turn it, and what to do with it. folded=True: box page with many items. #}
+{# Stock form for one box×item pair: one number (−/+ from base.html), and what to do with it. folded=True: box page with many items. #}
 {% macro stock_forms(box_id, item_id, qty, projects, back, folded=False) %}
 {% if folded %}<details><summary>взять / вернуть / пересчитать</summary>{% endif %}
 <form method="post" action="/stock" class="stock">
   <input type="hidden" name="box" value="{{ box_id }}"><input type="hidden" name="item" value="{{ item_id }}"><input type="hidden" name="back" value="{{ back }}"><input type="hidden" name="kind" value="return">
-  <div class="spin"><button type="button" class="ghost" onclick="this.nextElementSibling.stepUp()">▲</button><input type="number" name="qty" value="1" min="0" inputmode="numeric" required><button type="button" class="ghost" onclick="this.previousElementSibling.stepDown()">▼</button></div>
+  <input type="number" name="qty" value="1" min="0" inputmode="numeric" required>
   <div class="acts"><button name="action" value="take">Взять</button><button name="action" value="add" class="ghost">Вернуть</button><button name="action" value="set" class="ghost">Пересчитать</button></div>
   {% if projects %}<select name="project"><option value="">взять: без проекта</option>{% for p in projects %}<option value="{{ p.id }}">взять на {{ p.name }}</option>{% endfor %}</select>{% endif %}
 </form>
