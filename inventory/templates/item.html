@@ -1,6 +1,7 @@
-{% extends "base.html" %}{% from "_stock.html" import stock_forms, moves_table %}{% from "_box.html" import box_input, box_link, nfc_tag %}{% from "_photos.html" import carousel %}
+{% extends "base.html" %}{% from "_stock.html" import stock_forms, moves_table %}{% from "_box.html" import box_input, box_link, crumbs, nfc_tag %}{% from "_photos.html" import carousel %}
 {% block title %}{{ it.name }}{% endblock %}
 {% block main %}
+{% set home = stock|rejectattr("box_id", "in", ("HANDS", TRANSIT))|list %}{% if home|length == 1 %}<div class="crumbs">{{ crumbs(home[0].crumbs + [(home[0].name or home[0].box_id, "/b/" ~ home[0].box_id)]) }}</div>{% endif %}
 {% if pk and f[pk] %}{{ carousel(f[pk], "/i/" ~ it.id ~ "/rotate") }}{% endif %}
 <h1>{{ it.name }}</h1>
 <div class="row"><span class="mut" style="flex:1">{{ type_label(it.type) or "тип не выбран" }}</span><span class="row right" style="flex-wrap:nowrap"><a class="btn ghost" href="/i/{{ it.id }}/edit">Изменить</a>
@@ -23,7 +24,7 @@
     <input type="{{ 'hidden' if single else 'number' }}" name="qty" min="1" max="{{ s.qty }}" value="{{ s.qty }}" required><button class="bad">Списать</button>
   </form>
   {% else %}
-  <div class="row">{{ box_link(s.box_id, s.name) }} <span class="mut">{{ s.where }}</span><span class="qty right">{{ s.qty|qty(unit=unit_of(it.type, f)) }}</span></div>
+  <div class="row">{{ box_link(s.box_id, s.name) }} <span class="mut crumbs">{% if s.crumbs %}{{ crumbs(s.crumbs) }}{% else %}{{ s.where }}{% endif %}</span><span class="qty right">{{ s.qty|qty(unit=unit_of(it.type, f)) }}</span></div>
   {{ stock_forms(s.box_id, it.id, s.qty, projects, "/i/" ~ it.id, single=single) }}
   {% endif %}
 </div>

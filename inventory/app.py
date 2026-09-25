@@ -198,7 +198,7 @@ def box_page(req, b, draft=False):
         contents = core.box_contents(c, b["id"])
         children = c.execute("SELECT * FROM boxes WHERE parent_id=? ORDER BY id", (b["id"],)).fetchall()
         places = c.execute("SELECT * FROM places ORDER BY name").fetchall()
-        return page(req, "box.html", b=b, pics=json.loads(b["photos"]), where=core.box_where(c, b["id"]), contents=contents, top=box_top(b["id"]),
+        return page(req, "box.html", b=b, pics=json.loads(b["photos"]), where=core.box_crumbs(c, b["id"]), contents=contents, top=box_top(b["id"]),
                     children=children, places=places, projects=core.projects(c), draft=draft, picking="from" in req.query_params,
                     nfc=f"{public_base(req)}/b/{b['id']}".lower())  # NFC Tools writes it as typed
 
@@ -236,9 +236,9 @@ async def box_save(req: Request, box_id: str, name: str = Form(""), place: str =
             c.execute("UPDATE boxes SET name=?, place_id=?, parent_id=? WHERE id=?", (name.strip(), place_id, parent, bid))
         if photos is not None:
             c.execute("UPDATE boxes SET photos=? WHERE id=?", (json.dumps(photos), bid))
-        where = core.box_where(c, bid)
+        crumbs = core.box_crumbs(c, bid)
     if x_autosave:  # box.html saves as you type and redraws the heading
-        return {"id": bid, "name": name.strip(), "where": where, "parent": parent, "place": box_top(bid), "photos": photos}
+        return {"id": bid, "name": name.strip(), "crumbs": crumbs, "parent": parent, "place": box_top(bid), "photos": photos}
     return go(f"/b/{bid}")
 
 

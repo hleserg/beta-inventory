@@ -213,12 +213,17 @@ def test_new_box_and_shelves():
 
     j = c.post(f"/b/{bid}", data={"name": "Макетки", "parent_id": shelf}, headers={"X-Autosave": "1"}).json()
     assert j["parent"] == shelf and j["place"] == pid  # №39: on a shelf, the place is the cabinet's
+    assert j["crumbs"] == [["Стеллаж", f"/places#p{pid}"], ["Полка 2", f"/b/{shelf}"]]  # №44: autosave redraws them
     places = c.get("/places").text
     assert places.index("Стеллаж") < places.index("Верхняя") < places.index("Полка 2") and "Макетки" not in places  # №38
     assert "Макетки" in c.get(f"/b/{shelf}").text  # a box on a shelf is on the shelf's page
     page = c.get(f"/b/{bid}").text
     assert f'<option value="Полка 2 ({shelf})" data-place="{pid}" data-where="Стеллаж">' in page  # «Полка 2» is in every cabinet
+    assert f'<a href="/places#p{pid}">Стеллаж</a> › <a href="/b/{shelf}">Полка 2</a>' in page  # №44: the way up, as links
     assert '<div id="placeview">Стеллаж</div>' in page and '<div id="placesel" hidden>' in page  # №39: the place is text
+    c.post("/items/new?type=hand_tool", files=photo(), data={"name": "макетка", "box": bid})
+    assert (f'<div class="crumbs"><a href="/places#p{pid}">Стеллаж</a> › <a href="/b/{shelf}">Полка 2</a> › '
+            f'<a href="/b/{bid}">Макетки</a></div>') in c.get(f"/i/{newest()}").text  # №44: a thing in one place shows the way to it
     j = c.post(f"/b/{bid}", data={"name": "Макетки", "place": str(pid)}, headers={"X-Autosave": "1"}).json()
     assert j["parent"] is None and j["place"] == pid  # out of the shelf, it stays in the cabinet
 

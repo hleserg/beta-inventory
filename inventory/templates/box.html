@@ -1,9 +1,9 @@
-{% extends "base.html" %}{% from "_stock.html" import stock_forms %}{% from "_box.html" import box_input, box_link, nfc_tag %}{% from "_photos.html" import carousel %}
+{% extends "base.html" %}{% from "_stock.html" import stock_forms %}{% from "_box.html" import box_input, box_link, crumbs, nfc_tag %}{% from "_photos.html" import carousel %}
 {% block title %}{{ b.name or b.id }}{% endblock %}
 {% block main %}
+<div class="crumbs" id="where">{% if where %}{{ crumbs(where) }}{% else %}место не указано{% endif %}</div>
 {% if pics %}{{ carousel(pics, "/b/" ~ b.id ~ "/rotate") }}{% endif %}
 <h1>{% if b.name %}{{ b.name }} <span class="mut">{{ b.id }}</span>{% else %}{{ b.id }}{% endif %}</h1>
-<div class="mut" id="where">{{ where or "место не указано" }}</div>
 {% if not contents and not children %}
 <div class="card">
   <h2 style="margin-top:0">Пусто. Что кладём?</h2>
@@ -57,7 +57,12 @@
         h.textContent = j.name || j.id;
         if (j.name) h.insertAdjacentHTML("beforeend", ` <span class="mut">${j.id}</span>`);
         document.title = j.name || j.id;
-        document.getElementById("where").textContent = j.where || "место не указано";
+        const w = document.getElementById("where");  // the crumbs, as _box.html draws them
+        w.replaceChildren(...j.crumbs.flatMap(([label, href], i) => {
+          const a = document.createElement("a"); a.href = href; a.textContent = label;
+          return i ? [" › ", a] : [a];
+        }));
+        if (!j.crumbs.length) w.textContent = "место не указано";
         if (sel) {  // in a box the place is the box's; out of it, the list keeps that place
           sel.value = j.place ?? ""; sel.closest(".pick").vis.value = sel.selectedOptions[0].text;
           document.getElementById("placeview").textContent = sel.selectedOptions[0].text;

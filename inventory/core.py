@@ -240,19 +240,24 @@ def free_box_id():
     return bid
 
 
-def box_where(c, box_id):
-    """Human path of where a box stands: 'Шкаф › K3ABC'."""
+def box_crumbs(c, box_id):
+    """The way up from a box, as links: [('Шкаф', '/places#p1'), ('K3ABC', '/b/K3ABC')] (№44)."""
     parts, seen = [], set()
     b = c.execute("SELECT * FROM boxes WHERE id=?", (box_id,)).fetchone()
     while b and b["parent_id"] and b["parent_id"] not in seen:
         seen.add(b["parent_id"])
         b = c.execute("SELECT * FROM boxes WHERE id=?", (b["parent_id"],)).fetchone()
         if b:
-            parts.insert(0, b["name"] or b["id"])
+            parts.insert(0, (b["name"] or b["id"], f"/b/{b['id']}"))
     if b and b["place_id"]:
         p = c.execute("SELECT name FROM places WHERE id=?", (b["place_id"],)).fetchone()
-        parts.insert(0, p["name"])
-    return " › ".join(parts)
+        parts.insert(0, (p["name"], f"/places#p{b['place_id']}"))
+    return parts
+
+
+def box_where(c, box_id):
+    """Human path of where a box stands: 'Шкаф › K3ABC'."""
+    return " › ".join(label for label, _ in box_crumbs(c, box_id))
 
 
 def find_box(text):
@@ -729,7 +734,8 @@ def stock_of_item(c, item_id):
     rows = c.execute("SELECT s.box_id, s.qty, s.updated_at, b.name FROM stock s JOIN boxes b ON b.id=s.box_id "
                      "WHERE s.item_id=? ORDER BY s.box_id=?, s.box_id=?, s.box_id", (item_id, HANDS, TRANSIT)).fetchall()
     out = [dict(r, where=f"заказано {r['updated_at'][8:10]}.{r['updated_at'][5:7]}" if r["box_id"] == TRANSIT
-                else box_where(c, r["box_id"])) for r in rows]
+                else box_where(c, r["box_id"]), crumbs=[] if r["box_id"] in (HANDS, TRANSIT) else box_crumbs(c, r["box_id"]))
+           for r in rows]
     if out and out[-1]["box_id"] == HANDS:
         out[-1]["src"] = taken_from(c, item_id)
         if out[-1]["src"]:
