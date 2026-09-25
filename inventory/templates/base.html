@@ -297,11 +297,11 @@ addEventListener("click", async e => {  // «Печать» (_box.html print_btn
   b.disabled = true;
   try {
     const L = await import("/static/vendor/niimbluelib.js");
-    if (!niim?.isConnected()) {  // one connection per page: the next label goes without choosing the printer again
+    if (!niim?.isConnected()) {  // the page owns the connection: the next label here goes at once, a new page connects again (№69)
       niim ??= new L.NiimbotBluetoothClient();
-      const dev = !niimPick && (await navigator.bluetooth.getDevices?.() ?? [])[0];  // chosen on this site before: no picker
+      const dev = !niimPick && (await navigator.bluetooth.getDevices?.() ?? [])[0];  // the first device this site was allowed: the printer while it is the only one
       st.textContent = dev ? "Подключаю принтер…" : "Выберите принтер в списке…";
-      try { await niim.connect(dev ? {authorizedDevice: dev} : undefined); }
+      try { if (dev) await heard(dev); await niim.connect(dev ? {authorizedDevice: dev} : undefined); }
       catch (x) { if (dev) niimPick = true; throw x; }  // off, or another printer: the next press opens the list (it needs a fresh tap)
     }
     await niim.fetchRfidInfo();  // the roll may have changed since connecting
@@ -326,11 +326,19 @@ addEventListener("click", async e => {  // «Печать» (_box.html print_btn
       await t.printInit(); await t.printPage(L.ImageEncoder.encodeCanvas(c, L.PageColorType.SingleColor, m.printDirection), 1); await t.waitForFinished();
     } finally { await t.printEnd().catch(() => {}); niim.startHeartbeat(); }
     st.textContent = `Напечатано ✓ ${pw}×${ph} мм — ` + (p ? "размер сообщил принтер" : "размер из настроек, принтер его не сообщил");
+    if (!navigator.bluetooth.getDevices) st.insertAdjacentHTML("beforeend", `<br>Каждая страница заново спрашивает принтер? <a href="/settings#phone">Chrome можно научить его помнить</a>.`);
   } catch (x) {
     st.textContent = (niimPick ? "Принтер не ответил. Он включён? Нажмите «Печать» ещё раз — откроется список принтеров. " : "Не напечаталось: ") + (x.message || x);
   } finally { b.disabled = false; }
 });
-addEventListener("pagehide", () => niim?.disconnect());
+// №69: Chrome connects to a remembered printer only once it has heard it since it started; not heard in 5 s — try anyway
+const heard = dev => !dev.watchAdvertisements ? null : new Promise(ok => {
+  const ac = new AbortController(), done = () => { dev.removeEventListener("advertisementreceived", done); ac.abort(); ok(); };
+  dev.addEventListener("advertisementreceived", done);
+  setTimeout(done, 5000);
+  dev.watchAdvertisements({signal: ac.signal}).catch(done);
+});
+addEventListener("pagehide", () => niim?.disconnect());  // a half-dropped link would fail the next page's connect
 addEventListener("click", e => {  // «Скопировать» (nfc_tag), for NFC Tools: navigator.clipboard needs https, this is http
   const b = e.target.closest("[data-copy]");
   if (!b) return;

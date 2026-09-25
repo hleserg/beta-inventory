@@ -39,6 +39,8 @@
       <div class="row"><input readonly value="chrome://flags/#unsafely-treat-insecure-origin-as-secure"><button type="button" class="ghost copy">Копировать</button></div></li>
     <li>В пункте «Insecure origins treated as secure» впишите адрес сайта и выберите <b>Enabled</b>:
       <div class="row"><input readonly value="{{ origin }}"><button type="button" class="ghost copy">Копировать</button></div></li>
+    {% if core.PRINT_BT %}<li>Чтобы принтер не выбирать на каждой странице заново, там же найдите и включите (<b>Enabled</b>):
+      <div class="row"><input readonly value="chrome://flags/#enable-web-bluetooth-new-permissions-backend"><button type="button" class="ghost copy">Копировать</button></div></li>{% endif %}
     <li>Нажмите <b>Relaunch</b> внизу экрана: Chrome перезапустится.</li>
     <li>Установите приложение: меню Chrome ⋮ → «Добавить на главный экран» (или «Установить приложение»).
       Метка, поднесённая к закрытому телефону, всё равно откроется в Chrome: без HTTPS Android не отдаёт ссылки приложению.
@@ -61,7 +63,9 @@
   {% if core.PRINT_BT %}<p>Печать на Niimbot работает и здесь, в Chrome: вставьте в адресную строку
     <span class="row"><input readonly value="chrome://flags/#unsafely-treat-insecure-origin-as-secure"><button type="button" class="ghost copy">Копировать</button></span>
     впишите в «Insecure origins treated as secure» адрес <span class="row"><input readonly value="{{ origin }}"><button type="button" class="ghost copy">Копировать</button></span>
-    выберите <b>Enabled</b> и нажмите <b>Relaunch</b>.</p>{% endif %}</div>
+    выберите <b>Enabled</b>. Чтобы принтер не выбирать на каждой странице заново, там же включите
+    <span class="row"><input readonly value="chrome://flags/#enable-web-bluetooth-new-permissions-backend"><button type="button" class="ghost copy">Копировать</button></span>
+    и нажмите <b>Relaunch</b>.</p>{% endif %}</div>
 </details>{% endif %}
 
 <form method="post" action="/settings" id="set">
