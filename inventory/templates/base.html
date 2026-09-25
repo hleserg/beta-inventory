@@ -127,7 +127,7 @@ form[data-sent] button{opacity:.5}
 .code{display:flex;align-items:flex-start;gap:4px;padding:6px 2px 6px 12px;margin-top:6px;background:var(--bg);border:1px solid var(--line);border-radius:8px} .code pre{flex:1;min-width:0;margin:0;font:13px/1.5 ui-monospace,monospace;white-space:pre-wrap;word-break:break-all}
 .warn{display:flex;gap:8px;align-items:flex-start;margin:0;font-size:13px}
 .save{position:fixed;z-index:10;left:0;right:0;bottom:calc(var(--bar) + env(safe-area-inset-bottom));display:flex;justify-content:flex-end;align-items:center;gap:12px;padding:10px 12px;background:var(--card);border-top:1px solid var(--line)}
-input[type=checkbox].tgl{appearance:none;flex:none;width:52px;height:32px;margin:0;border-radius:99px;background:var(--line);position:relative;cursor:pointer} .tgl::after{content:"";position:absolute;top:3px;left:3px;width:26px;height:26px;border-radius:50%;background:#fff;transition:transform .15s} .tgl:checked{background:var(--acc)} .tgl:checked::after{transform:translateX(20px)}
+input[type=checkbox].tgl{appearance:none;flex:none;width:52px;height:32px;margin:0;border-radius:99px;background:var(--line);position:relative;cursor:pointer} .tgl::after{content:"";position:absolute;top:3px;left:3px;width:26px;height:26px;border-radius:50%;background:#fff;transition:transform .15s} input[type=checkbox].tgl:checked{background:var(--acc)} .tgl:checked::after{transform:translateX(20px)}
 body:has(.save:not([hidden])) main{padding-bottom:calc(var(--bar) + 88px + env(safe-area-inset-bottom))}
 .tree details{margin:0}
 .tn{display:flex;align-items:center;gap:4px;min-height:56px;padding:6px 8px 6px 4px;border-bottom:1px solid var(--line)}
