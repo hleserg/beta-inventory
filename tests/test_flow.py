@@ -102,7 +102,7 @@ def test_phone_app():
     m = c.get("/manifest.webmanifest").json()
     assert m["display"] == "standalone" and m["scope"] == "/"  # labels' /b/ links fall in the app's scope
     assert "nfcScan" in c.get("/").text and "nfcScan()" in c.get("/phone").text  # a scanned label opens its box
-    assert all('id="scan"' in c.get(u).text for u in ("/", "/boxes", "/history"))  # the QR scan button on every page
+    assert all('id="scan"' in c.get(u).text for u in ("/", "/places", "/history"))  # the QR scan button on every page
     assert c.get("/more").status_code == 200 and 'class="bar"' in c.get("/more").text  # №54
     assert 'class="bar"' not in c.get("/items/new?type=module").text  # a new thing: its own .save, no bar
     assert "data-draft" in c.get("/items/new?type=module").text  # unsaved card edits survive leaving the page
@@ -183,8 +183,10 @@ def test_box_by_name():
     assert f'<option value="Клеммники Phoenix ({a})" ' in c.get(f"/i/{newest()}").text
 
     named = f'<b>Клеммники WAGO</b> <span class="mut">{b}</span>'  # the name first, the ID grey at the end
-    for url in (f"/i/{newest()}", "/boxes", "/history", "/?q=wago"):
+    for url in (f"/i/{newest()}", "/history", "/?q=wago"):
         assert named in c.get(url).text, url
+    places = c.get("/places").text  # №54: the tree names the box, its ID leads the grey line
+    assert '<span class="nm">Клеммники WAGO</span>' in places and f'<span class="path">{b} ·' in places
     page = c.get(f"/b/{b}").text
     assert f'<h1>Клеммники WAGO <span class="mut">{b}</span></h1>' in page and f'<b>Ящик</b> <span class="mut">{d}</span>' in page
 
@@ -199,7 +201,7 @@ def test_new_box_and_shelves():
     assert c.get(f"/b/{bid}/label.png").headers["content-type"] == "image/png"  # the label shows before the box exists
     assert c.get(f"/b/{bid}").status_code == 404
     r = c.post(f"/b/{bid}", data={"name": "Макетки"}, headers={"X-Autosave": "1"})  # the first typed name saves it
-    assert r.status_code == 200 and count() == before + 1 and "Макетки" in c.get("/boxes").text
+    assert r.status_code == 200 and count() == before + 1 and "Макетки" in c.get("/places").text
     assert c.post("/b/NOPE!", data={"name": "x"}).status_code == 404  # only IDs the site hands out
 
     c.post("/places", data={"name": "Стеллаж"})
@@ -210,14 +212,12 @@ def test_new_box_and_shelves():
     shelf = r.headers["location"].split("/")[-1]  # with a label: its page, to print and write the tag
     page = c.get(f"/b/{shelf}").text
     assert "Полка 2" in page and "label.png" in page and "Где лежит" not in page  # shelves do not move
-    boxes = c.get("/boxes").text
-    assert "Верхняя" not in boxes and "Полка 2" not in boxes  # shelves live in places, not among boxes
 
     j = c.post(f"/b/{bid}", data={"name": "Макетки", "parent_id": shelf}, headers={"X-Autosave": "1"}).json()
     assert j["parent"] == shelf and j["place"] == pid  # №39: on a shelf, the place is the cabinet's
     assert j["crumbs"] == [["Стеллаж", f"/places#p{pid}"], ["Полка 2", f"/b/{shelf}"]]  # №44: autosave redraws them
     places = c.get("/places").text
-    assert places.index("Стеллаж") < places.index("Верхняя") < places.index("Полка 2") and "Макетки" not in places  # №38
+    assert places.index("Стеллаж") < places.index("Верхняя") < places.index("Полка 2") < places.index("Макетки")  # №54: one tree
     assert "Макетки" in c.get(f"/b/{shelf}").text  # a box on a shelf is on the shelf's page
     page = c.get(f"/b/{bid}").text
     assert f'<option value="Полка 2 ({shelf})" data-place="{pid}" data-where="Стеллаж">' in page  # «Полка 2» is in every cabinet
@@ -255,7 +255,7 @@ def test_box_photos():
     box = c.post("/boxes", data={"n": 1}, follow_redirects=False).headers["location"].split("=")[1]
     c.post(f"/b/{box}", data={"name": "С фото", "photos_on": "1"}, files={"photos": photo()["photo"]})
     [a] = json.loads(core.db().execute("SELECT photos FROM boxes WHERE id=?", (box,)).fetchone()[0])
-    assert f"/u/{a}" in c.get(f"/b/{box}").text and f"/u/{a}" in c.get("/boxes").text
+    assert f"/u/{a}" in c.get(f"/b/{box}").text and f"/u/{a}" in c.get("/places").text
     c.post(f"/b/{box}", data={"name": "С фото"})  # tests and scripts post bare fields
     b = c.post(f"/b/{box}/rotate", data={"photo": a, "deg": 90}).json()["photo"]
     assert b != a and f"/u/{b}" in c.get(f"/b/{box}").text
@@ -413,8 +413,9 @@ def test_hands():
     c.post("/stock", data={"box": core.HANDS, "item": iid, "action": "take", "qty": 2})
     assert stock(iid) == {box: 1} and "списал" in c.get(f"/i/{iid}").text
     assert "модуль с ПВЗ" not in c.get("/items?hands=1").text
-    loose = c.get("/boxes?loose=1").text
-    assert box in loose and placed not in loose and core.HANDS not in loose
+    places = c.get("/places").text  # a box with no place is under «Без места», a placed one under its place
+    loose = places[places.index('id="loose"'):]
+    assert box in loose and placed in places and placed not in loose and core.HANDS not in places
     assert c.get(f"/b/{core.HANDS}", follow_redirects=False).headers["location"] == "/?hands=1"
     assert f"({core.HANDS})" not in c.get(f"/i/{iid}").text  # not offered as a box to put into
     n = c.get(f"/i/{iid}").text.count("положил")
@@ -470,7 +471,7 @@ def test_transit():
     assert "В пути" in card and "заказано" in card and "Пришло" in card
     c.post("/stock", data={"box": box, "item": iid, "action": "add", "kind": "move", "src": core.TRANSIT, "qty": 12})
     assert stock(iid) == {box: 15}  # 12 came of the 10 ordered
-    assert core.TRANSIT not in c.get("/boxes").text
+    assert core.TRANSIT not in c.get("/places").text
     c.post(f"/b/{core.TRANSIT}/delete")
     assert c.get(f"/b/{core.TRANSIT}").status_code == 200
 
@@ -549,7 +550,7 @@ def test_label_sheet():
     """A batch of labels: one sheet at the label's size to print, and each label's NFC link to copy or write."""
     c = TestClient(app)
     ids = c.post("/boxes", data={"n": 3}, follow_redirects=False).headers["location"].split("=")[1].split(",")
-    page = c.get("/boxes?new=" + ",".join(ids)).text
+    page = c.get("/places?new=" + ",".join(ids)).text
     assert f'data-nfcw="http://testserver/b/{ids[0].lower()}"' in page and "data-copy" in page
     sheet = c.get("/boxes/sheet?ids=" + ",".join(ids)).text
     assert sheet.count("label.png") == 3 and "width:25mm;height:15mm" in sheet

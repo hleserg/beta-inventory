@@ -191,15 +191,8 @@ def index(req: Request, q: str = "", put: str = "", type: str = "", cat: str = "
 # --- boxes ---
 
 @app.get("/boxes")
-def boxes(req: Request, new: str = "", loose: str = ""):
-    with db() as c:
-        rows = [dict(b, where=core.box_where(c, b["id"]), pics=json.loads(b["photos"])) for b in c.execute(
-            "SELECT b.*, COUNT(s.item_id) AS n FROM boxes b LEFT JOIN stock s ON s.box_id=b.id "
-            "WHERE b.kind='box' GROUP BY b.id ORDER BY b.created_at DESC, b.id")]
-    if loose:  # №28: boxes standing nowhere — no place, theirs or their outer box's
-        rows = [r for r in rows if not r["where"]]
-    return page(req, "boxes.html", boxes=rows, new=[x for x in new.split(",") if x], loose=loose,
-                nfc_base=public_base(req).lower())
+def boxes(req: Request):  # №54: boxes live in the places tree now; old links and bookmarks land there
+    return go("/places" + (f"?{req.url.query}" if req.url.query else ""))
 
 
 @app.get("/backup")
@@ -219,7 +212,7 @@ def label_sheet(req: Request, ids: str = ""):
 
 @app.post("/boxes")
 def boxes_create(n: int = Form(1)):
-    return go("/boxes?new=" + ",".join(core.new_boxes(max(1, min(n, 100)))))
+    return go("/places?new=" + ",".join(core.new_boxes(max(1, min(n, 100)))))
 
 
 @app.get("/boxes/new")
@@ -332,7 +325,7 @@ def box_delete(box_id: str):
     with db() as c:
         b = get_box(c, box_id)
     core.trash("box", b["id"])
-    return go(f"/places#p{b['place_id']}" if b["kind"] == "shelf" else "/boxes")
+    return go(f"/places#p{b['place_id']}" if b["kind"] == "shelf" else "/places")
 
 
 @app.get("/b/{box_id}/label.png")
@@ -690,22 +683,33 @@ async def settings_save(req: Request):
 # --- places, projects, history ---
 
 @app.get("/places")
-def places(req: Request):
+def places(req: Request, new: str = ""):
+    """№54: one tree, place › shelf › box; then boxes standing nowhere, then empty ones. A box in hand is in «На руках»."""
     with db() as c:
-        inside = lambda bid: c.execute("SELECT * FROM boxes WHERE parent_id=? ORDER BY name='', name, id", (bid,)).fetchall()
-        rows = [dict(p, boxes=c.execute("SELECT * FROM boxes WHERE place_id=? AND parent_id IS NULL AND kind='box' "
-                                        "ORDER BY name='', name, id", (p["id"],)).fetchall(),
-                     shelves=[dict(s, boxes=inside(s["id"])) for s in c.execute(
-                         "SELECT * FROM boxes WHERE place_id=? AND kind='shelf' ORDER BY rowid", (p["id"],))],
+        boxes = [dict(b, pics=json.loads(b["photos"] or "[]")) for b in c.execute(
+            "SELECT b.*, (SELECT count(*) FROM stock WHERE box_id=b.id) AS n, "
+            "(SELECT count(*) FROM boxes k WHERE k.parent_id=b.id) AS kids, "
+            "(SELECT i.name FROM stock s JOIN items i ON i.id=s.item_id WHERE s.box_id=b.id) AS one "
+            "FROM boxes b WHERE kind='box' ORDER BY name='', name, id")]
+        under = {}
+        for b in boxes:
+            under.setdefault(b["parent_id"], []).append(b)
+        shelves = c.execute("SELECT b.*, (SELECT count(*) FROM stock WHERE box_id=b.id) AS n "
+                            "FROM boxes b WHERE kind='shelf' ORDER BY rowid").fetchall()
+        rows = [dict(p, shelves=[dict(s, boxes=under.get(s["id"], [])) for s in shelves if s["place_id"] == p["id"]],
+                     boxes=[b for b in under.get(None, []) if b["place_id"] == p["id"]],
                      gone=c.execute("SELECT count(*) FROM stock JOIN boxes b ON b.id=box_id "  # things on its shelves
                                     "WHERE b.place_id=? AND b.kind='shelf'", (p["id"],)).fetchone()[0])
                 for p in c.execute("SELECT * FROM places ORDER BY name")]
-    return page(req, "places.html", places=rows)
+    nowhere = [b for b in under.get(None, []) if not b["place_id"]]
+    return page(req, "places.html", places=rows, shelves=len(shelves), boxes=len(boxes),
+                loose=[b for b in nowhere if b["n"] or b["kids"]], empty=[b for b in nowhere if not (b["n"] or b["kids"])],
+                new=[x for x in new.split(",") if x], nfc_base=public_base(req).lower())
 
 
 @app.get("/places/new")
 def place_new(req: Request):  # №19: from a picker's «+ Место»
-    return page(req, "places.html", places=[], new=True)
+    return page(req, "places.html", places=[], add=True)
 
 
 @app.post("/places")

@@ -1,6 +1,24 @@
-{% extends "base.html" %}{% from "_box.html" import box_link %}
+{% extends "base.html" %}{% from "_box.html" import nfc_tag %}{% from "_bar.html" import ico %}
+{% set I_DOWN, I_DOTS, I_PLACE = '<path d="M6 9l6 6 6-6"/>', '<path d="M5 12h.01M12 12h.01M19 12h.01"/>', '<path d="M3 21h18M5 21V8l7-5 7 5v13"/><path d="M9 21v-6h6v6"/>' %}
+{% set I_SHELF, I_BOX = '<path d="M4 3v18M20 3v18M4 9h16M4 15h16"/>', '<path d="M3 7.5L12 3l9 4.5v9L12 21l-9-4.5z"/><path d="M3 7.5l9 4.5 9-4.5M12 12v9"/>' %}
+{% macro dots(name) %}<button type="button" class="ib dots" aria-expanded="false" aria-label="Действия: {{ name }}">{{ ico(I_DOTS, w="3") }}</button>{% endmacro %}
+{% macro box_del(b) %}<form method="post" action="/b/{{ b.id }}/delete" onsubmit='return confirm({{ ("Удалить " ~ (b.name or b.id) ~ "?"
+    ~ ((" Вещей внутри: " ~ b.n ~ " — уйдут в корзину вместе с ней.") if b.n else "")
+    ~ ((" Коробок внутри: " ~ b.kids ~ " — переедут уровнем выше.") if b.kids else "")
+    ~ " Вернуть можно " ~ core.TRASH_DAYS ~ " дней из «Корзины».")|tojson }})'><button class="bad">Удалить</button></form>{% endmacro %}
+{% macro label_btn(id) %}<a class="btn ghost" href="/b/{{ id }}/label.png" download="{{ id }}.png">Наклейка</a>{% endmacro %}
+{% macro box_row(b, lvl) %}{# №54 screen 3: the name leads, the ID and what's inside go grey below; ⋯ opens the rest #}
+<div class="tn l{{ lvl }}"><span class="ti"></span><a class="grow" href="/b/{{ b.id }}">
+  {% if b.pics %}<img class="thumb" src="/u/{{ b.pics[0] }}" alt="">{% else %}<span class="ti">{{ ico(I_BOX) }}</span>{% endif %}
+  <span class="grow"><span class="nm">{{ b.name or b.id }}</span><span class="path">{% if b.name %}{{ b.id }} · {% endif %}
+  {%- if b.n == 1 %}{{ b.one }}{% else %}{{ t.items|lower }}: {{ b.n }}{% endif %}{% if b.kids %} · {{ t.boxes|lower }}: {{ b.kids }}{% endif %}</span></span></a>
+  {{ dots(b.name or b.id) }}</div>
+<div class="tacts" hidden>{{ label_btn(b.id) }}
+  {% if core.SCAN_NFC %}<span><button type="button" class="ghost" data-nfcw="{{ nfc_base ~ '/b/' ~ b.id|lower }}">NFC</button></span><span class="mut" data-nfcst></span>{% endif %}
+  {{ box_del(b) }}</div>
+{% endmacro %}
 {% block main %}
-{% if new %}{# №19: a picker's «+ Место»; the new place goes back into that field (base.html pickMade) #}
+{% if add %}{# №19: a picker's «+ Место»; the new place goes back into that field (base.html pickMade) #}
 <h1>+ {{ t.place }}</h1>
 <form method="post" action="/places" id="newf"><input name="name" value="{{ request.query_params.get('name', '') }}" placeholder="например: шкаф в комнате" required>
   <label>Заметка</label><input name="note"><p class="row"><button>Создать</button><button type="button" class="ghost" data-back onclick="history.back()">Назад</button></p></form>
@@ -11,21 +29,48 @@
 });</script>
 {% else %}
 <h1>{{ t.places }}</h1>
-<form method="post" action="/places" class="row"><input name="name" placeholder="например: шкаф в комнате" required><button>Добавить</button></form>
+<p class="mut">{{ t.places|lower }}: {{ places|length }} · {{ t.shelves|lower }}: {{ shelves }} · {{ t.boxes|lower }}: {{ boxes }}</p>
+{% if new %}<div class="card"><b>Готово: {{ new|length }}.</b> Сохраните картинки и напечатайте из приложения принтера
+или <a href="/boxes/sheet?ids={{ new|join(',') }}">листом на обычном принтере</a>.
+<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:12px;margin-top:8px">
+{% for id in new %}<div><a href="/b/{{ id }}/label.png" download="{{ id }}.png"><img src="/b/{{ id }}/label.png" alt="{{ id }}" style="width:100%;background:#fff;border:1px solid var(--line)"></a>
+{{ nfc_tag(nfc_base ~ "/b/" ~ id|lower) }}</div>{% endfor %}
+</div></div>{% endif %}
+{% if not places and not loose and not empty %}<div class="card">Пусто. Добавьте первое место — шкаф, стеллаж, стол — кнопкой «+ {{ t.place }}» внизу.</div>{% endif %}
+<div class="tree">
 {% for p in places %}
 {% set lost = p.boxes|length + p.shelves|map(attribute="boxes")|map("length")|sum %}
-<div class="sw"><form method="post" action="/places/{{ p.id }}/delete" onsubmit='return confirm({{ ("Удалить «" ~ p.name ~ "»?"
+<details open id="p{{ p.id }}"><summary class="tn l0 hd"><span class="ti chev">{{ ico(I_DOWN) }}</span><span class="ti">{{ ico(I_PLACE) }}</span>
+  <span class="grow"><span class="nm">{{ p.name }}</span><span class="path">{{ t.shelves|lower }}: {{ p.shelves|length }} · {{ t.boxes|lower }}: {{ lost }}{% if p.note %} · {{ p.note }}{% endif %}</span></span>
+  {{ dots(p.name) }}</summary>
+<div class="tacts" hidden>
+  <form method="post" action="/places/{{ p.id }}/shelves" class="row"><input name="name" placeholder="{{ t.shelf }} {{ p.shelves|length + 1 }}"><button class="ghost">+ {{ t.shelf }}</button><button class="ghost" name="label" value="1">+ с наклейкой</button></form>
+  <details><summary>Изменить</summary><form method="post" action="/places/{{ p.id }}"><input name="name" value="{{ p.name }}" required><label>Заметка</label><input name="note" value="{{ p.note }}"><p><button>Сохранить</button></p></form></details>
+  <form method="post" action="/places/{{ p.id }}/delete" onsubmit='return confirm({{ ("Удалить «" ~ p.name ~ "»?"
   ~ ((" Место очистится у коробок: " ~ lost ~ ".") if lost else "")
   ~ ((" " ~ t.shelves ~ " уйдут вместе с местом: " ~ p.shelves|length ~ ((", вещей на них: " ~ p.gone) if p.gone else "") ~ ".") if p.shelves else "")
-  ~ " Вернуть можно " ~ core.TRASH_DAYS ~ " дней из «Корзины».")|tojson }})'><button class="bad">Удалить</button></form>
-<div class="card" id="p{{ p.id }}" data-swipe><b>{{ p.name }}</b>{% if p.note %} <span class="mut">{{ p.note }}</span>{% endif %}
-  {% for s in p.shelves %}<div>{{ box_link(s.id, s.name) }}</div>{% endfor %}{# only places and shelves here (№38): boxes are on a shelf's page and in «Коробки» #}
-  {% if not p.shelves and not p.boxes %}<div class="mut">пусто</div>{% endif %}
-  <form method="post" action="/places/{{ p.id }}/shelves" class="row"><input name="name" placeholder="{{ t.shelf }} {{ p.shelves|length + 1 }}">
-    <button class="ghost">+ {{ t.shelf }}</button><button class="ghost" name="label" value="1">+ с наклейкой</button></form>
-  <details><summary>изменить</summary><form method="post" action="/places/{{ p.id }}">
-    <input name="name" value="{{ p.name }}" required><label>Заметка</label><input name="note" value="{{ p.note }}"><p><button>Сохранить</button></p></form></details>
-</div></div>
+  ~ " Вернуть можно " ~ core.TRASH_DAYS ~ " дней из «Корзины».")|tojson }})'><button class="bad">Удалить</button></form></div>
+{% for s in p.shelves %}
+<details id="s{{ s.id }}"><summary class="tn l1"><span class="ti chev">{{ ico(I_DOWN) }}</span><span class="ti">{{ ico(I_SHELF) }}</span>
+  <span class="grow"><span class="nm">{{ s.name }}</span><span class="path">{{ s.id }} · {{ t.boxes|lower }}: {{ s.boxes|length }}{% if s.n %} · {{ t.items|lower }}: {{ s.n }}{% endif %}</span></span>
+  {{ dots(s.name) }}</summary>
+<div class="tacts" hidden>{{ label_btn(s.id) }}<a class="btn ghost" href="/b/{{ s.id }}">Открыть</a>{{ box_del(dict(s, kids=s.boxes|length)) }}</div>
+{% for b in s.boxes %}{{ box_row(b, 2) }}{% endfor %}
+</details>
 {% endfor %}
+{% for b in p.boxes %}{{ box_row(b, 1) }}{% endfor %}
+</details>
+{% endfor %}
+{% if loose %}<details open id="loose"><summary class="tn l0 hd"><span class="ti chev">{{ ico(I_DOWN) }}</span><span class="ti">{{ ico(I_BOX) }}</span>
+  <span class="grow"><span class="nm">Без места</span><span class="path">{{ t.boxes|lower }}: {{ loose|length }}</span></span></summary>
+{% for b in loose %}{{ box_row(b, 1) }}{% endfor %}</details>{% endif %}
+{% if empty %}<details id="empty"><summary class="tn l0 hd"><span class="ti chev">{{ ico(I_DOWN) }}</span><span class="ti">{{ ico(I_BOX) }}</span>
+  <span class="grow"><span class="nm">Пустые</span><span class="path">{{ t.boxes|lower }}: {{ empty|length }} · без места и без вещей</span></span></summary>
+{% for b in empty %}{{ box_row(b, 1) }}{% endfor %}</details>{% endif %}
+</div>
+<details><summary>Много наклеек сразу</summary>
+<form method="post" action="/boxes" class="row"><input type="number" name="n" value="10" min="1" max="100"><button>Новые наклейки</button></form>
+</details>
+<div class="save"><a class="btn ghost" href="/places/new">+ {{ t.place }}</a><a class="btn" href="/boxes/new">+ {{ t.box }}</a></div>
 {% endif %}
 {% endblock %}

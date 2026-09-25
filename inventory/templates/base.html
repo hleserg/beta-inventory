@@ -127,6 +127,19 @@ form[data-sent] button{opacity:.5}
 .save{position:fixed;z-index:10;left:0;right:0;bottom:calc(var(--bar) + env(safe-area-inset-bottom));display:flex;justify-content:flex-end;align-items:center;gap:12px;padding:10px 12px;background:var(--card);border-top:1px solid var(--line)}
 input[type=checkbox].tgl{appearance:none;flex:none;width:52px;height:32px;margin:0;border-radius:99px;background:var(--line);position:relative;cursor:pointer} .tgl::after{content:"";position:absolute;top:3px;left:3px;width:26px;height:26px;border-radius:50%;background:#fff;transition:transform .15s} .tgl:checked{background:var(--acc)} .tgl:checked::after{transform:translateX(20px)}
 body:has(.save:not([hidden])) main{padding-bottom:calc(var(--bar) + 88px + env(safe-area-inset-bottom))}
+.tree details{margin:0}
+.tn{display:flex;align-items:center;gap:4px;min-height:56px;padding:6px 8px 6px 4px;border-bottom:1px solid var(--line)}
+.tn.l1{padding-left:24px}.tn.l2{padding-left:44px}
+summary.tn{list-style:none;color:inherit} summary.tn::-webkit-details-marker{display:none}
+.tn .ti{flex:none;width:28px;display:grid;place-items:center;color:var(--mut)}
+.tn .grow{flex:1;min-width:0} .tn a.grow{color:inherit;text-decoration:none;display:flex;gap:10px;align-items:center}
+.tn .nm{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tn.hd .nm{font-weight:700}
+.tn .path{display:block;font-size:13px;color:var(--mut);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ib{flex:none;width:44px;height:44px;min-height:44px;padding:0;background:transparent;color:var(--mut);display:grid;place-items:center}
+details:not([open])>summary .chev{transform:rotate(-90deg)}
+.tacts{display:flex;flex-wrap:wrap;align-items:center;gap:6px;padding:8px 8px 10px 56px;background:var(--bg);border-bottom:1px solid var(--line)}
+.tacts form{margin:0}.tacts .row{flex:1 1 100%}.tacts .row input{flex:1 1 100%}.tacts details[open]{flex:1 1 100%}.tacts .btn,.tacts button{padding:0 10px;font-size:14px}
 </style>
 </head>
 <body>
@@ -247,6 +260,12 @@ addEventListener("click", e => {
   if (!b) return;
   armed = b.parentElement.querySelector("[data-box]"); b.classList.add("on");
   qrScan(armed).finally(() => b.classList.remove("on"));
+});
+addEventListener("click", e => {  // №54 «Места»: ⋯ on a tree row opens its actions, and a folded shelf with them
+  const b = e.target.closest(".tn .dots"); if (!b) return;
+  e.preventDefault(); const s = b.closest(".tn").nextElementSibling;
+  s.hidden = !s.hidden; b.setAttribute("aria-expanded", !s.hidden);
+  if (!s.hidden && b.closest("summary")) b.closest("details").open = true;
 });
 addEventListener("click", async e => {  // «Записать на метку» (_box.html nfc_tag): Chrome on Android, site trusted as secure, see /settings
   const b = e.target.closest("[data-nfcw]");
