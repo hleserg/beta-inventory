@@ -24,7 +24,7 @@ addEventListener("popstate", () => { if (full()) show(false); });
 addEventListener("keydown", e => { if (e.key == "Escape" && full()) history.back(); });
 }</script>{% endif %}
 <h1>{{ it.name }}</h1>
-<div class="row"><span class="mut">{{ type_label(it.type) or "тип не выбран" }}</span><a class="right" href="/i/{{ it.id }}/edit">Изменить</a>
+<div class="row"><span class="mut" style="flex:1;min-width:0">{{ type_label(it.type) or "тип не выбран" }}</span><a class="btn ghost right" href="/i/{{ it.id }}/edit">Изменить</a>
   <form method="post" action="/i/{{ it.id }}/delete" onsubmit='return confirm({{ ("«" ~ it.name ~ "» уйдёт в корзину"
     ~ ((" и пропадёт из мест, где лежит: " ~ stock|length) if stock else "") ~ ". Вернуть можно " ~ trash_days
     ~ " дней из «Корзины».")|tojson }})'><button class="ghost">Удалить</button></form></div>

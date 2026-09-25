@@ -9,26 +9,34 @@
 <script>if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js")</script>
 <title>{% block title %}{{ t.items }}{% endblock %}</title>
 <style>
-:root{--bg:#f7f6f2;--fg:#1d1d1b;--mut:#6b6b66;--line:#e2e1dc;--card:#fff;--acc:#1f6feb;--bad:#c62828}
-@media (prefers-color-scheme:dark){:root{--bg:#161615;--fg:#ecebe6;--mut:#9a9993;--line:#34342f;--card:#1f1f1d;--acc:#58a6ff;--bad:#ef5350}}
+:root{--bg:#f7f6f2;--fg:#1d1d1b;--mut:#6b6b66;--line:#e2e1dc;--card:#fff;--acc:#1a64d6;--on-acc:#fff;--bad:#c62828;color-scheme:light dark}
+@media (prefers-color-scheme:dark){:root{--bg:#161615;--fg:#ecebe6;--mut:#9a9993;--line:#34342f;--card:#1f1f1d;--acc:#58a6ff;--on-acc:#0d1117;--bad:#ef5350}}
 *{box-sizing:border-box}
 body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.45 system-ui,-apple-system,sans-serif}
 main{max-width:720px;margin:0 auto;padding:8px 16px 96px}
-nav{display:flex;gap:2px;overflow-x:auto;padding:6px 8px;border-bottom:1px solid var(--line);background:var(--card)}
-nav a{padding:8px 10px;border-radius:8px;text-decoration:none;color:var(--fg);white-space:nowrap}
-nav a:hover{background:var(--line)}
+nav{position:relative;display:flex;flex-wrap:wrap;padding:4px;font-size:15px;border-bottom:1px solid var(--line);background:var(--card)}
+nav a,nav summary{flex:1 1 auto;display:flex;align-items:center;justify-content:center;min-height:44px;padding:0 3px;border-radius:8px;text-decoration:none;color:var(--fg);white-space:nowrap}
+nav a:hover,nav summary:hover{background:var(--line)}
+nav [aria-current]{color:var(--acc);box-shadow:inset 0 -2px var(--acc)}
+nav>details{flex:1 1 auto;margin:0}nav summary{list-style:none}nav summary::-webkit-details-marker{display:none}nav summary::after{content:"▾";margin-left:4px}
+nav details>div{position:absolute;z-index:10;left:0;right:0;top:100%;display:flex;flex-direction:column;padding:4px 8px;background:var(--card);border-bottom:1px solid var(--line);box-shadow:0 8px 16px #0003}
+nav details>div a{justify-content:flex-start;padding:0 12px}
 a{color:var(--acc)}
-h1{font-size:1.45rem;margin:.6em 0 .2em}
-h2{font-size:1.1rem;margin:1.3em 0 .4em}
+h1{font-size:1.45rem;margin:.6em 0 .2em;text-wrap:balance}
+h2{font-size:1.1rem;margin:1.3em 0 .4em;text-wrap:balance}
+p{text-wrap:pretty}
+:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
 .mut{color:var(--mut);font-size:.9em}
 .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px;margin:8px 0}
 .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
 .right{margin-left:auto}
 input,select,textarea,button{font:inherit;color:inherit;background:var(--card);border:1px solid var(--line);border-radius:8px;padding:8px 10px;max-width:100%}
 input,select,textarea{width:100%}
-.row input,.row select{width:auto;flex:1;min-width:0}
+input,select{min-height:44px}
+.row input,.row select{width:auto;flex:1;min-width:0}.row>input,.row>select{min-width:6em}  /* a field squeezed by its buttons wraps them instead */
 textarea{min-height:8em}
-button,.btn{cursor:pointer;background:var(--acc);color:#fff;border:0;text-decoration:none;display:inline-block;padding:9px 14px;border-radius:8px}
+button,.btn{cursor:pointer;background:var(--acc);color:var(--on-acc);border:0;text-decoration:none;display:inline-block;min-height:44px;padding:10px 16px;border-radius:8px}
+.btn{display:inline-flex;align-items:center;justify-content:center}
 .ghost{background:transparent;color:var(--acc);border:1px solid var(--line)}
 .bad{background:var(--bad)}
 label{display:block;margin:14px 0 4px;font-weight:600}
@@ -48,28 +56,30 @@ label{display:block;margin:14px 0 4px;font-weight:600}
 .car.full .rot{display:flex;gap:8px;position:absolute;top:10px;left:10px}
 html:has(.car.full){overflow:hidden}
 .pic{position:relative;display:inline-flex}
-.pic button{position:absolute;top:-6px;right:-6px;padding:0 6px;border-radius:50%}
+.pic button{position:absolute;top:-6px;right:-6px;min-height:0;padding:0 6px;border-radius:50%}
 .thumb{width:52px;height:52px;object-fit:cover;border-radius:8px;flex:none;background:var(--line)}
 a.line{display:flex;gap:10px;align-items:center;text-decoration:none;color:inherit;padding:8px 0;border-bottom:1px solid var(--line)}
 table{border-collapse:collapse;width:100%}
-td{border-bottom:1px solid var(--line);padding:6px 4px;vertical-align:top}
+td{border-bottom:1px solid var(--line);padding:8px 4px;vertical-align:top;font-variant-numeric:tabular-nums}
+td a{color:inherit;text-decoration:none;font-weight:600}  /* a row of names, not a wall of blue: bold says «tap me» */
 details{margin:8px 0}
 summary{cursor:pointer;color:var(--acc)}
-.qty{font-weight:700;white-space:nowrap}
+.qty{font-weight:700;white-space:nowrap;font-variant-numeric:tabular-nums}
 .chips{display:flex;gap:6px;flex-wrap:wrap}
-.chips a{padding:4px 10px;border:1px solid var(--line);border-radius:99px;text-decoration:none;font-size:.9em}
-.seg a{font-size:1em;padding:6px 14px}
-.chips a.on{background:var(--acc);color:#fff;border-color:var(--acc)}
+.chips a{display:inline-flex;align-items:center;min-height:44px;padding:0 14px;border:1px solid var(--line);border-radius:99px;text-decoration:none;font-size:.9em}
+.seg a{font-size:1em}
+.chips a.on{background:var(--acc);color:var(--on-acc);border-color:var(--acc)}
 .md img{max-width:100%}.md pre{overflow-x:auto}.md table td,.md table th{border:1px solid var(--line);padding:4px 6px}
 [hidden]{display:none!important}[data-qr]{display:none}.qr [data-qr]{display:inline-block}
-label.chk{display:flex;gap:8px;align-items:center;font-weight:400}.chk input{flex:none;width:auto}
+label.chk{display:flex;gap:10px;align-items:center;min-height:44px;font-weight:400}.chk input{flex:none;width:auto}
+input[type=checkbox],input[type=radio]{width:20px;height:20px;min-height:0;padding:0;margin:0;accent-color:var(--acc)}
 .stock{display:grid;grid-template-columns:5em 1fr;gap:8px;margin-top:8px}
 .acts{display:flex;flex-direction:column;gap:4px;justify-content:space-between}
 .num{display:flex;gap:4px}.num input{text-align:center;min-width:3em}.num button{padding:6px 12px}
 .row .num{flex:0 0 auto}.row .num input{flex:0 0 4em}
 .stock .num{flex-direction:column-reverse}.stock .num input{font-size:1.2em;padding:6px 2px}.stock .num button{padding:4px 0}
 .stock select{grid-column:1/-1}
-.mini{padding:6px 9px;font-size:.85em}.mini.on{background:var(--acc);color:#fff}
+.mini{padding:6px 9px;font-size:.85em}.mini.on{background:var(--acc);color:var(--on-acc)}
 dialog{border:1px solid var(--line);border-radius:12px;background:var(--card);color:var(--fg)}dialog::backdrop{background:#0008}
 dialog video{width:min(80vw,480px);display:block;margin-bottom:8px}
 #scan{position:fixed;z-index:10;right:max(16px,env(safe-area-inset-right));bottom:max(16px,env(safe-area-inset-bottom));width:56px;height:56px;padding:0;border-radius:50%;display:grid;place-items:center;box-shadow:0 4px 12px #0004}
@@ -78,7 +88,7 @@ body:has(:is(input:not([type=checkbox],[type=radio],[type=file]),textarea):focus
 .pick{position:relative;display:flex;width:100%}.row .pick{flex:1;width:auto;min-width:0}.stock .pick{grid-column:1/-1}
 .pick input{flex:1;min-width:0;padding-right:2.4em}
 .pick select{position:absolute;inset:0;opacity:0;pointer-events:none}
-.pick>button{position:absolute;right:1px;top:1px;bottom:1px;background:none;color:var(--mut);padding:0 12px}
+.pick>button{position:absolute;right:1px;top:1px;bottom:1px;min-height:0;background:none;color:var(--mut);padding:0 12px}
 .pickl,.pickall{display:flex;flex-direction:column}
 .pickl{flex-basis:100%;grid-column:1/-1;border:1px solid var(--line);border-radius:8px;overflow:hidden;background:var(--card)}
 .pickl button,.pickall button,.pickm>.pmore{background:none;color:inherit;text-align:left;border-radius:0;padding:11px 12px;border-top:1px solid var(--line)}
@@ -90,7 +100,11 @@ form[data-sent] button{opacity:.5}
 </style>
 </head>
 <body>
-<nav><a href="/">Поиск</a><a href="/boxes">{{ t.boxes }}</a><a href="/items">{{ t.items }}</a><a href="/places">{{ t.places }}</a><a href="/projects">Проекты</a><a href="/history">История</a><a href="/readers">Считыватели</a><a href="/trash">Корзина</a><a href="/phone">Телефон</a></nav>
+{% set seg = (request.url.path if request is defined else "/").split("/")[1]|lower %}
+{% set cur = {"b": "/boxes", "i": "/items", "p": "/projects"}.get(seg, "/" ~ seg) %}
+{% set more = [("/places", t.places), ("/projects", "Проекты"), ("/readers", "Считыватели"), ("/trash", "Корзина"), ("/phone", "Телефон")] %}
+<nav>{% for h, l in [("/", "Поиск"), ("/boxes", t.boxes), ("/items", t.items), ("/history", "История")] %}<a href="{{ h }}"{% if h == cur %} aria-current="page"{% endif %}>{{ l }}</a>{% endfor %}
+<details><summary{% if cur in more|map("first") %} aria-current="true"{% endif %}>Ещё</summary><div>{% for h, l in more %}<a href="{{ h }}"{% if h == cur %} aria-current="page"{% endif %}>{{ l }}</a>{% endfor %}</div></details></nav>
 <main><div id="drafts"></div>
 <script>
 // Card-form drafts (item_form.html) are kept until saved: offer the way back from any other page.
@@ -190,6 +204,8 @@ async function qrScan(f) {  // f: the box field whose QR button was pressed; non
   } catch (e) { d.close(); alert("Камера недоступна: " + e.message); }
 }
 addEventListener("click", e => {
+  const more = document.querySelector("nav details[open]");
+  if (more && !more.contains(e.target)) more.open = false;  // «Ещё» closes on a tap past it, like any menu
   if (e.target.closest("#scan")) return qrScan();
   const b = e.target.closest("[data-qr]");
   if (!b) return;
