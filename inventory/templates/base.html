@@ -164,6 +164,28 @@ label.lrow{margin:0;font-weight:400;cursor:pointer}.lrows>details+.lrow{border-t
 details:not([open])>summary .chev{transform:rotate(-90deg)}
 .tacts{display:flex;flex-wrap:wrap;align-items:center;gap:6px;padding:8px 8px 10px 56px;background:var(--bg);border-bottom:1px solid var(--line)}
 .tacts form{margin:0}.tacts .stock{flex:1 1 100%}.tacts .row{flex:1 1 100%}.tacts .row input{flex:1 1 100%}.tacts details[open]{flex:1 1 100%}.tacts .btn,.tacts button{padding:0 10px;font-size:14px}
+.dt{display:none}
+/* №58 desktop: the bottom bar becomes a left column, search runs across the top, bottom panels start after the column */
+@media (min-width:1024px){
+:root{--bar:0px;--nav:220px;--top:73px;--detail:clamp(300px,28vw,360px)}
+.dt{display:inline}
+main{max-width:1100px;margin:0 0 0 var(--nav);padding:calc(var(--top) + 16px) 32px 32px}
+.bar{top:0;right:auto;width:var(--nav);padding:16px 12px;border-top:0;border-right:1px solid var(--line)}
+body:has(main :is(input:not([type=checkbox],[type=radio],[type=file]),textarea):focus) .bar{display:block}
+.bar>div{max-width:none;margin:0;flex-direction:column;align-items:stretch;gap:2px}
+.bar form{position:fixed;top:0;left:var(--nav);right:0;height:var(--top);padding:12px 32px;background:var(--card);border-bottom:1px solid var(--line)}
+.pill{max-width:1036px}
+.tab{width:auto;height:44px;flex-direction:row;justify-content:flex-start;gap:12px;padding:0 12px;color:var(--fg);font-size:15px}
+.tab:hover{background:var(--bg)}.tab.on{background:var(--bg);color:var(--acc)}
+.fab{width:auto;height:44px;border-radius:10px;display:flex;justify-content:flex-start;gap:12px;padding:0 12px;margin-top:12px;font-size:15px}
+.fab svg{width:24px;height:24px}
+.fbar,.save{left:var(--nav)}
+.fbar{top:var(--top);bottom:auto;border-top:0;border-bottom:1px solid var(--line);padding:8px 32px}.fbar>div{max-width:none;margin:0}
+body:has(.fbar) main{padding-top:calc(var(--top) + 77px);padding-bottom:32px}
+.put{left:auto;top:var(--top);width:var(--detail);max-height:none;padding:24px;border-top:0;border-left:1px solid var(--line)}
+body:has(.put) main{max-width:none;margin-right:var(--detail);padding-bottom:32px}
+.more{min-height:0}.more>h1{flex:none}
+}
 </style>
 </head>
 <body>
