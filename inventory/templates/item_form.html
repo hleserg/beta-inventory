@@ -13,7 +13,8 @@
   <p class="row"><button form="cardf" name="dup_ok" value="1">Всё равно создать</button></p></div>{% endif %}
 <form id="cardf" data-draft method="post" enctype="multipart/form-data" action="{% if it %}/i/{{ it.id }}/edit{% else %}/items/new{% endif %}?type={{ type }}">
   <label>Название *</label><input name="name" value="{{ name }}" required>
-  {% for fd in fields %}{% set v = vals[fd.key] %}
+  {% if not it %}<input type="hidden" name="single" value="0"><label class="chk"><input type="checkbox" name="single" value="1"{% if single %} checked{% endif %}> {{ t.single }}</label>{% endif %}
+  {% for fd in fields %}{% set v = vals[fd.key] %}<div{% if fd.reorder or fd.unit %} data-many{% if single %} hidden{% endif %}{% endif %}>{# №48: one of a kind — nothing to count #}
   <label>{{ fd.label }}{% if fd.required %} *{% endif %}</label>
   {% if fd.hint %}<div class="mut">{{ fd.hint }}</div>{% endif %}
   {% if fd.type == "photo" %}
@@ -23,11 +24,12 @@
   {% elif fd.type == "files" %}{% for x in v or [] %}<div class="mut">{{ x.name }}</div>{% endfor %}<input type="file" name="{{ fd.key }}" multiple>
   {% elif fd.type == "choice" %}<select name="{{ fd.key }}" {% if fd.required %}required{% endif %}><option value="">—</option>{% for o in fd.options %}<option {% if o == (v or fd.default) %}selected{% endif %}>{{ o }}</option>{% endfor %}</select>
   {% else %}<input name="{{ fd.key }}" value="{{ v if v is defined and v is not none else '' }}" {% if fd.type == "number" %}inputmode="decimal"{% elif fd.type == "link" %}type="url"{% endif %} {% if fd.required %}required{% endif %}>
-  {% endif %}
+  {% endif %}</div>
   {% endfor %}
   {% if not it %}
   <label>Куда положить</label>
-  <div class="row">{{ box_input(value=box, placeholder="название или скан, можно пусто") }}<input type="number" name="qty" value="{{ qty }}" min="0" placeholder="не считал"></div>
+  <div class="row">{{ box_input(value=box, placeholder="название или скан, можно пусто") }}</div>
+  <div data-many{% if single %} hidden{% endif %}><label>Сколько</label><input type="number" name="qty" value="{{ qty }}" min="0" placeholder="не считал"></div>
   <label class="chk"><input type="checkbox" name="for_agent" value="1"{% if agent %} checked{% endif %}> {{ t.to_agent }}</label>
   {% endif %}
   {% if it %}<p id="savest" class="mut">Изменения сохраняются сами.</p><p><button>Готово</button></p>
@@ -58,14 +60,14 @@ for (const inp of document.querySelectorAll("input[data-pics]")) {
 }
 // Every edit goes to a local draft, so leaving the page (a label scanned, a call) loses nothing. Photos and files stay out.
 const f = document.querySelector("form[data-draft]"), key = "draft:" + location.pathname;
-const vals = () => Object.fromEntries([...f.elements].filter(e => e.name && e.type != "file" && e.type != "hidden").map(e => [e.name, e.value]));
+const vals = () => Object.fromEntries([...f.elements].filter(e => e.name && e.type != "file" && e.type != "hidden").map(e => [e.name, e.type == "checkbox" ? e.checked : e.value]));  // a checkbox keeps its tick, not its value
 let shown = JSON.stringify(vals()), unsaved = !!document.querySelector(".err");  // errors: the values shown were not saved
 const store = () => { const v = vals();
   if (JSON.stringify(v) === shown && !unsaved) localStorage.removeItem(key);
   else localStorage[key] = JSON.stringify({t: Date.now(), name: v.name, url: location.pathname + location.search, v}); };
 const d = JSON.parse(localStorage[key] || "null");
 if (d && JSON.stringify(d.v) !== shown) {
-  for (const e of f.elements) if (e.name in d.v && e.type != "file" && e.type != "hidden" && !(e.name == "box" && e.value)) e.value = d.v[e.name];  // opened from a box: that box wins
+  for (const e of f.elements) if (e.name in d.v && e.type != "file" && e.type != "hidden" && !(e.name == "box" && e.value)) e[e.type == "checkbox" ? "checked" : "value"] = d.v[e.name];  // opened from a box: that box wins
   store();
   document.getElementById("drafts").insertAdjacentHTML("afterbegin", `<div class="card"><b>Есть несохранённый черновик от ${when(d.t)}</b> — он уже в форме. Фото и файлы в черновик не попадают: выберите их заново.
     <p class="row"><button type="button" id="dsave">Сохранить</button><button type="button" class="ghost" id="dcancel">Отменить</button></p></div>`);
@@ -104,6 +106,9 @@ addEventListener("pagehide", () => {  // left mid-typing (a scan, a call): the t
   if (navigator.sendBeacon(f.action, fd)) localStorage.removeItem(key);
 });
 {% else %}
+const one = f.querySelector("input[type=checkbox][name=single]");
+one.onchange = () => f.querySelectorAll("[data-many]").forEach(e => e.hidden = one.checked);
+one.onchange();  // a restored draft may have changed the tick
 f.addEventListener("submit", () => { if (localStorage[key]) localStorage[key] = JSON.stringify({...JSON.parse(localStorage[key]), sent: 1}); });
 {% endif %}
 }</script>

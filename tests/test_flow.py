@@ -366,6 +366,15 @@ def test_single():
     assert flag(rid) == 0  # a rescan keeps the hand's choice
     assert c.post(f"/i/{rid}/tag").status_code == 200 and flag(rid) == 0  # written from the site: same rule
 
+    # №48: a new card of one of a kind hides its count, reorder level and unit; ticked by hand, it is one
+    assert re.search(r'name="single" value="1" checked.*data-many hidden', c.get("/items/new?type=hand_tool").text, re.S)
+    new = c.get("/items/new?type=resistor").text
+    assert "data-many hidden" not in new and 'name="qty" value="1"' in new  # №47: one by default
+    c.post("/items/new?type=resistor", data={"name": "осциллограф", "value": "x", "box": b, "qty": "5", "single": "1"})
+    assert flag(newest()) == 1 and stock(newest()) == {b: 1}
+    c.post("/items/new?type=hand_tool", files=photo(), data={"name": "клеевой пистолет", "box": b, "qty": "3", "single": "0"})
+    assert flag(newest()) == 0 and stock(newest()) == {b: 3}  # unticked: counted like anything else
+
 
 def test_for_agent():
     """№41: «Передать агенту» — the card waits for an agent to fill it in (agent_queue); an agent's update clears it."""

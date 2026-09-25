@@ -347,10 +347,12 @@ def items(req: Request, type: str = "", cat: str = "", q: str = "", hands: str =
     return page(req, "items.html", items=rows, type=type, cat=cat, q=q, hands=hands, reorder=reorder)
 
 
-def card_form(req, status=200, it=None, type="", name="", vals=None, errors=(), box="", qty="", dups=(), nfc=False,
-              agent=False):
+def card_form(req, status=200, it=None, type="", name="", vals=None, errors=(), box="", qty="1", dups=(), nfc=False,
+              agent=False, single=None):  # qty 1: what a new thing mostly is (№47); single None: the card's, else the type's
+    if single is None:
+        single = bool(it["single"]) if it and it["single"] is not None else core.TYPES.get(type, {}).get("single", False)
     return page(req, "item_form.html", status, it=it, type=type, fields=core.fields_for(type), name=name,
-                vals=vals or {}, errors=errors, box=box, qty=qty, dups=dups, nfc=nfc, agent=agent)
+                vals=vals or {}, errors=errors, box=box, qty=qty, dups=dups, nfc=nfc, agent=agent, single=single)
 
 
 def check_type(type):
@@ -372,6 +374,8 @@ async def item_create(req: Request, type: str):
     name, f, errors, form = await read_fields(req, {}, fields)
     box, qty, box_id = str(form.get("box", "")).strip(), str(form.get("qty", "")).strip(), None
     nfc, agent = bool(form.get("nfc")), bool(form.get("for_agent"))  # №42 «…и записать метку», №41 «Передать агенту»
+    # №48: one of a kind — its count is hidden and ignored. The form sends 0 before the box's 1; no field: the type's
+    single = form.get("single") == "1" if "single" in form else core.TYPES[type]["single"]
     try:
         box_id = core.find_box(box) if box else None
     except ValueError as e:
@@ -379,16 +383,20 @@ async def item_create(req: Request, type: str):
     if qty and not qty.isdigit():
         errors.append("Количество — целое число; пусто — «не считал»")
     if errors:
-        return card_form(req, 400, type=type, name=name, vals=f, errors=errors, box=box, qty=qty, nfc=nfc, agent=agent)
+        return card_form(req, 400, type=type, name=name, vals=f, errors=errors, box=box, qty=qty, nfc=nfc, agent=agent,
+                         single=single)
     if not form.get("dup_ok") and (dups := core.lookalikes(name)):  # asked, not refused: two alike things are real too
-        return card_form(req, 409, type=type, name=name, vals=f, box=box, qty=qty, dups=dups, nfc=nfc, agent=agent)
+        return card_form(req, 409, type=type, name=name, vals=f, box=box, qty=qty, dups=dups, nfc=nfc, agent=agent, single=single)
     iid = core.save_item(None, name, type, f)
     if agent:
         core.set_for_agent(iid, True)
-    if box_id and (not qty or int(qty) > 0):  # empty: «есть, не считал»
-        core.move(iid, box_id, int(qty) if qty else None, "put", AUTHOR)
-    elif not box_id and qty and int(qty) > 0:  # no box yet: brought home, in hand until put away (№28)
-        core.move(iid, core.HANDS, int(qty), "buy", AUTHOR)
+    if single != core.TYPES[type]["single"]:
+        core.set_single(iid, single)
+    n = 1 if single else int(qty) if qty else None
+    if box_id and n != 0:  # None: «есть, не считал»
+        core.move(iid, box_id, n, "put", AUTHOR)
+    elif not box_id and n:  # no box yet: brought home, in hand until put away (№28)
+        core.move(iid, core.HANDS, n, "buy", AUTHOR)
     if nfc:  # the card writes its tag on arrival (base.html)
         return go(f"/i/{iid}?nfc=1")
     return go(f"/b/{box_id}" if box_id else f"/i/{iid}")  # filling a box: back to it for the next item
