@@ -1,17 +1,27 @@
 {% extends "base.html" %}
+{% from "_bar.html" import ico %}
 {% block title %}Ещё{% endblock %}
 {% block main %}
-<h1>Ещё</h1>
+{# №54 screen 7: the list sits at the thumb, each row says how much is behind it; the last moves below #}
+{% set chev = ico('<path d="M9 6l6 6-6 6"/>', 20) %}
+<div class="more"><h1>Ещё</h1>
 <div class="card lrows">
-{% for href, name, sub in [
-  ("/items/new", "+ Новый предмет", "карточка вещи: фото, поля, куда положить"),
-  ("/settings", "Настройки", "этот телефон, наклейки, поиск, GitHub, агенты"),
-  ("/boxes/sheet", "Лист наклеек", "новые ID для коробок — печать пачкой"),
-  ("/readers", "Считыватели", "NFC-ридеры у коробок"),
-  ("/trash", "Корзина", "удалённое хранится " ~ core.TRASH_DAYS ~ " дней"),
-  ("/projects", "Проекты", "куда уходят вещи"),
-  ("/history", "История", "кто что взял и положил"),
-] %}<a class="lrow" href="{{ href }}"><span><b>{{ name }}</b><br><span class="mut">{{ sub }}</span></span>
-  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></a>
+{% for href, name, sub, d in [
+  ("/items/new", "+ Новый предмет", "карточка вещи: фото, поля, куда положить", '<path d="M12 5v14M5 12h14"/>'),
+  ("/settings", "Настройки", "этот телефон, наклейки, поиск, GitHub, агенты",
+   '<path d="M4 6h9M17 6h3M4 12h3M11 12h9M4 18h11M19 18h1"/><circle cx="15" cy="6" r="2"/><circle cx="9" cy="12" r="2"/><circle cx="17" cy="18" r="2"/>'),
+  ("/boxes/sheet", "Лист наклеек", "новые ID для коробок — печать пачкой", '<path d="M7 9V3h10v6M7 17H4V9h16v8h-3"/><path d="M7 14h10v7H7z"/>'),
+  ("/readers", "Считыватели", (readers ~ " в работе" if readers else "NFC-ридеры у коробок") ~ (" · ждут приёма: " ~ readers_new if readers_new else ""),
+   '<rect x="5" y="10" width="14" height="10" rx="2"/><path d="M9 6.5a4.5 4.5 0 0 1 6 0M6.5 4a8 8 0 0 1 11 0"/>'),
+  ("/trash", "Корзина", (trash if trash else "пусто") ~ " · хранится " ~ core.TRASH_DAYS ~ " дн.", '<path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/>'),
+  ("/projects", "Проекты", (projects ~ " в работе" if projects else "куда уходят вещи") ~ (" · новых из GitHub: " ~ inbox if inbox else ""), '<path d="M3 6h6l2 2h10v11H3z"/>'),
+] %}<a class="lrow" href="{{ href }}"><span class="thumb bx">{{ ico(d, 22) }}</span><span class="ell grow"><b>{{ name }}</b><span class="sm mut">{{ sub }}</span></span>{{ chev }}</a>
 {% endfor %}</div>
+<div class="hd"><h2>История</h2><a href="/history">Вся {{ ico('<path d="M9 6l6 6-6 6"/>', 18) }}</a></div>
+<div class="card lrows">
+{% for m in moves %}<a class="lrow" href="/i/{{ m.item_id }}"><span class="ell grow"><b>{{ kinds[m.kind]|capitalize }} · {{ m.item }}</b>
+  <span class="sm mut">{{ m.box or m.box_id }} · {{ m.at[8:10] }}.{{ m.at[5:7] }} {{ m.at[11:16] }} · {{ m.author }}</span></span>
+  <b class="qty">{{ "%+d"|format(m.delta)|replace("-", "−") if m.delta else "?" }}</b></a>
+{% else %}<p class="lrow mut">Пока пусто.</p>{% endfor %}</div>
+</div>
 {% endblock %}

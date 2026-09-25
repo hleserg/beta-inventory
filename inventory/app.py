@@ -839,8 +839,13 @@ def place_delete(place_id: int):
 
 
 @app.get("/more")
-def more_page(req: Request):  # №54: whatever the bar has no room for
-    return page(req, "more.html")
+def more_page(req: Request):  # №54: whatever the bar has no room for, the counts in each row, the last moves below
+    trash = len(core.trash_list())  # it purges on its own connection
+    with db() as c:
+        n = lambda sql: c.execute(sql).fetchone()[0]
+        return page(req, "more.html", trash=trash, moves=c.execute(MOVES + " ORDER BY m.id DESC LIMIT 3").fetchall(),
+                    readers=n("SELECT count(*) FROM readers WHERE accepted"), readers_new=n("SELECT count(*) FROM readers WHERE NOT accepted"),
+                    projects=n("SELECT count(*) FROM projects WHERE status='active'"), inbox=n("SELECT count(*) FROM projects WHERE status='inbox'"))
 
 
 @app.get("/trash")

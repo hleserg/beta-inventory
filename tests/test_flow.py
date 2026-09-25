@@ -86,6 +86,7 @@ def test_main_path():
     c.post(f"/b/{box}/clear")
     assert "Что кладём" in c.get(f"/b/{box}").text
     assert "Метеостанция" in c.get("/history").text
+    assert "Освободил · " in c.get("/more").text  # №54: the last moves under the menu
 
 
 class StubModel:

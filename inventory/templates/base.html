@@ -150,6 +150,9 @@ label.tile{position:relative;margin:0;display:flex;flex-direction:column;align-i
 label.chk.rt{justify-content:space-between}
 label.lrow{margin:0;font-weight:400;cursor:pointer}.lrows>details+.lrow{border-top:1px solid var(--line)}.lrows details>div{padding:0 14px 14px;overflow-x:auto}.lrows h2{font-size:15px;margin:12px 0 4px}
 .thumb.bx{display:grid;place-items:center;color:var(--mut);background:var(--bg);border:1px solid var(--line)}
+.more{display:flex;flex-direction:column;min-height:calc(100dvh - var(--bar) - 32px - env(safe-area-inset-bottom))}.more>h1{flex:1}  /* №54: the menu at the thumb */
+.more .thumb{width:44px;height:44px}.more .grow{flex:1;min-width:0}.more .hd{display:flex;align-items:center;justify-content:space-between;margin-top:10px}
+.more .hd h2{margin:0;font-size:13px;font-weight:600;color:var(--mut);text-transform:uppercase;letter-spacing:.05em}.more .hd a{text-decoration:none;display:flex;align-items:center;font-weight:600;min-height:44px}
 .tn .ti{flex:none;width:28px;display:grid;place-items:center;color:var(--mut)}
 .tn .grow{flex:1;min-width:0} .tn a.grow{color:inherit;text-decoration:none;display:flex;gap:10px;align-items:center}
 .tn .nm{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
