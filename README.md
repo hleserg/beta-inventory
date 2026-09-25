@@ -60,6 +60,9 @@ weight.
 - **Search** by name, other names, description and typed fields, ranked by
   relevance; box IDs and places too. Below the word matches, a small local
   model adds items close in meaning, so "step-down" finds a buck converter.
+- **Backup** in one tap (bottom of «Корзина», or `GET /backup`): a zip of the
+  database and the uploads. To restore, stop the container, unzip into the
+  data folder, start.
 - **Projects** with a git link, to charge takes against, and what each needs:
   what is short is ordered line by line or all at once, and waits «in transit».
   With `GITHUB_OWNER` set, new repos of that account wait in an inbox until

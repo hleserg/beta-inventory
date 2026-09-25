@@ -9,4 +9,5 @@
     <span class="mut">{{ r.at[:16] }} · ещё {{ r.left|round(0, "ceil")|int }} дн.</span></span>
   <button class="ghost right">Вернуть</button></form>
 {% else %}<p class="mut">Пусто.</p>{% endfor %}
+<p class="mut">Всё целиком — база и фото — одним архивом: <a class="btn ghost" href="/backup">Скачать бэкап</a></p>
 {% endblock %}

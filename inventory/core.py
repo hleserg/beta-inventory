@@ -5,9 +5,11 @@ import os
 import re
 import secrets
 import sqlite3
+import tempfile
 import threading
 import urllib.request
 import uuid
+import zipfile
 from pathlib import Path
 
 import numpy as np
@@ -479,6 +481,19 @@ def own_upload(v):
     """Name of our own upload, given as a /u/ link or bare, or None: a form or an agent can't point at other files."""
     name = str(v).rsplit("/u/", 1)[-1]
     return name if name and Path(name).name == name and (UPLOADS / name).is_file() else None
+
+
+def backup(path):
+    """A household in one zip: a consistent copy of the database, and the uploads. models/ downloads again by itself.
+    Back: stop, unzip into DATA_DIR, start."""
+    with zipfile.ZipFile(path, "w") as z, tempfile.TemporaryDirectory() as d:
+        src, dst = sqlite3.connect(DATA / "inventory.db"), sqlite3.connect(Path(d) / "inventory.db")
+        src.backup(dst)
+        src.close(), dst.close()
+        z.write(Path(d) / "inventory.db", "inventory.db", zipfile.ZIP_DEFLATED)
+        for f in sorted(UPLOADS.rglob("*")):  # photos are compressed already: stored as they are
+            if f.is_file():
+                z.write(f, f.relative_to(DATA).as_posix())
 
 
 def save_bytes(data, ext, photo=False):

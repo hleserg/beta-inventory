@@ -2,6 +2,10 @@
 import io
 import json
 import re
+import sqlite3
+import tempfile
+import zipfile
+from pathlib import Path
 
 from fastapi.testclient import TestClient
 from PIL import Image
@@ -454,3 +458,17 @@ def test_label_sheet():
     sheet = c.get("/boxes/sheet?ids=" + ",".join(ids)).text
     assert sheet.count("label.png") == 3 and "width:25mm;height:15mm" in sheet
     assert c.get("/boxes/sheet?ids=../x").status_code == 404
+
+
+def test_backup():
+    """One button: the database and every upload in one zip, and the database in it opens."""
+    c = TestClient(app)
+    c.post("/items/new?type=resistor", data={"dup_ok": "1", "name": "Бэкапный", "value": "1 Ом"}, files=photo())
+    assert "/backup" in c.get("/trash").text
+    r = c.get("/backup")
+    z = zipfile.ZipFile(io.BytesIO(r.content))
+    assert "attachment" in r.headers["content-disposition"]
+    assert any(n.startswith("uploads/") for n in z.namelist())
+    db = Path(tempfile.mkdtemp()) / "inventory.db"
+    db.write_bytes(z.read("inventory.db"))
+    assert sqlite3.connect(db).execute("SELECT 1 FROM items WHERE name='Бэкапный'").fetchone()

@@ -3,6 +3,8 @@ import asyncio
 import io
 import json
 import os
+import tempfile
+from datetime import date
 from contextlib import asynccontextmanager
 from pathlib import Path
 from urllib.parse import urlsplit
@@ -16,6 +18,7 @@ from fastapi.templating import Jinja2Templates
 from markdown_it import MarkdownIt
 from markupsafe import Markup
 from PIL import Image, ImageDraw, ImageFont
+from starlette.background import BackgroundTask
 from starlette.exceptions import HTTPException
 
 from . import core
@@ -144,6 +147,14 @@ def boxes(req: Request, new: str = "", loose: str = ""):
         rows = [r for r in rows if not r["where"]]
     return page(req, "boxes.html", boxes=rows, new=[x for x in new.split(",") if x], loose=loose,
                 nfc_base=public_base(req).lower())
+
+
+@app.get("/backup")
+def backup():
+    fd, f = tempfile.mkstemp(suffix=".zip")
+    os.close(fd)
+    core.backup(f)
+    return FileResponse(f, filename=f"inventory-{date.today()}.zip", background=BackgroundTask(os.unlink, f))
 
 
 @app.get("/boxes/sheet")
