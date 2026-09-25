@@ -57,6 +57,11 @@ addEventListener("keydown", e => { if (e.key == "Escape" && full()) history.back
   <p><img src="/i/{{ it.id }}/label.png" alt="наклейка" style="width:240px;max-width:100%;background:#fff;border:1px solid var(--line)"><br>
   <a data-act href="/i/{{ it.id }}/label.png" download="{{ it.id }}.png">Скачать наклейку</a></p>
   {{ nfc_tag(nfc) }}</details>
+{% if projects %}<details{% if needs %} open{% endif %}><summary>Нужно для проекта</summary>
+{% for n in needs %}<div class="row"><a href="/p/{{ n.id }}">{{ n.name }}</a><span class="qty right">{{ n.qty|qty(unit=unit_of(it.type, f)) }}</span></div>{% endfor %}
+<form method="post" action="/i/{{ it.id }}/need" class="row"><select name="project">{% for p in projects %}<option value="{{ p.id }}">{{ p.name }}</option>{% endfor %}</select>
+  <input type="number" name="qty" min="0" value="1" required><button>Сохранить</button></form>
+<p class="mut">0 — больше не нужно.</p></details>{% endif %}
 
 {% for fd in fields if fd.type != "photo" and f[fd.key] %}
 <h2>{{ fd.label }}</h2>

@@ -12,7 +12,7 @@
   <p class="row"><button name="status" value="active">Взять</button><button class="ghost" name="status" value="skipped" formnovalidate>Пропустить</button></p></form>
 {% endfor %}<h2>Проекты</h2>{% endif %}
 {% for p in projects %}
-<div class="card"><b>{{ p.name }}</b>{% if p.status != "active" %} <span class="mut">(архив)</span>{% endif %}
+<div class="card"><a href="/p/{{ p.id }}"><b>{{ p.name }}</b></a>{% if p.status != "active" %} <span class="mut">(архив)</span>{% endif %}
   {% if p.description %}<div>{{ p.description }}</div>{% endif %}
   {% if p.git_url.startswith(("http://", "https://")) %}<div><a href="{{ p.git_url }}" target="_blank" rel="noopener">{{ p.git_url }}</a></div>{% endif %}
   <details><summary>изменить</summary><form method="post" action="/projects/{{ p.id }}">

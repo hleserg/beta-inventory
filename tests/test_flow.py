@@ -411,3 +411,35 @@ def test_pick_new():
     box = c.get("/boxes/new?from=/items/new&field=box&name=JST").text
     assert 'value="JST"' in box and "<button>Создать" in box
     assert "<button>Создать" not in c.get("/boxes/new").text  # opened on its own: saves itself, no buttons
+
+
+def test_project_needs():
+    """A project lists what it needs; one line or «всё недостающее» goes «в пути», and the page says how much is there."""
+    box = core.new_boxes(1)[0]
+    c.post("/items/new?type=resistor", data={"dup_ok": "1", "name": "10к часы", "value": "10 кОм", "box": box, "qty": 3})
+    a = newest()
+    c.post("/items/new?type=resistor", data={"dup_ok": "1", "name": "1к часы", "value": "1 кОм", "box": box, "qty": 1})
+    b = newest()
+    c.post("/projects", data={"name": "Часы с нуждами"})
+    pid = core.db().execute("SELECT id FROM projects WHERE name='Часы с нуждами'").fetchone()[0]
+    assert "Нужно для проекта" in c.get(f"/i/{a}").text
+    c.post(f"/i/{a}/need", data={"project": pid, "qty": 10})
+    c.post(f"/i/{b}/need", data={"project": pid, "qty": 4})
+    need = lambda: {r["item_id"]: (r["need"], r["have"], r["transit"], r["short"]) for r in core.project_needs(pid)}
+    assert need() == {a: (10, 3, 0, 7), b: (4, 1, 0, 3)}
+
+    c.post("/stock", data={"box": core.TRANSIT, "item": a, "action": "add", "kind": "buy", "qty": 5, "project": pid})
+    assert need()[a] == (10, 3, 5, 2)
+    assert core.db().execute("SELECT project_id FROM movements WHERE item_id=? AND box_id=?", (a, core.TRANSIT)
+                             ).fetchone()[0] == pid  # ordered for this project: history says so
+    page = c.get(f"/p/{pid}").text
+    assert "Часы с нуждами" in page and "в пути 5" in page and 'min="1" value="2"' in page and f'href="/p/{pid}"' in c.get("/projects").text
+    c.post(f"/p/{pid}/order")
+    assert need() == {a: (10, 3, 7, 0), b: (4, 1, 3, 0)}  # all the rest ordered at once
+
+    core.trash("item", a)
+    assert list(need()) == [b]
+    core.restore(core.trash_list()[0]["id"])
+    assert set(need()) == {a, b}  # the need came back with the thing
+    c.post(f"/i/{b}/need", data={"project": pid, "qty": 0})
+    assert list(need()) == [a]

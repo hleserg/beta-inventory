@@ -58,13 +58,16 @@ weight.
 - **Search** by name, other names, description and typed fields, ranked by
   relevance; box IDs and places too. Below the word matches, a small local
   model adds items close in meaning, so "step-down" finds a buck converter.
-- **Projects** with a git link, to charge takes against. With `GITHUB_OWNER`
-  set, new repos of that account wait in an inbox until you take or skip them.
+- **Projects** with a git link, to charge takes against, and what each needs:
+  what is short is ordered line by line or all at once, and waits «in transit».
+  With `GITHUB_OWNER` set, new repos of that account wait in an inbox until
+  you take or skip them.
 - **MCP for agents** at `http://<host>/mcp` (streamable HTTP, same port and
   data as the site): `search`, `get_item`, `get_box`, `card_template`,
   `list_projects`; `create_item`, `update_item` (photos and files by URL, the
   server downloads them), `change_stock` (history names the agent as author),
-  `accept_project` / `skip_project` for the GitHub inbox.
+  `accept_project` / `skip_project` for the GitHub inbox, `project_needs` /
+  `set_project_need` for what a project needs.
   Tick «Передать агенту» on a card and it shows up in `agent_queue`, together
   with the skill that says how to fill it in; `update_item` takes it off.
   Each field's `hint` in the profile tells agents what goes in it, so any MCP
@@ -80,7 +83,8 @@ weight.
 
 - No login, no HTTPS, no multi-user. It is meant for a home LAN. If you expose
   it, put it behind a reverse proxy with auth.
-- Not an ERP: no suppliers, prices, BOMs or purchase orders.
+- Not an ERP: no suppliers, prices or purchase orders. A project lists what it
+  needs and orders what is short «in transit», nothing more.
 
 ## License
 

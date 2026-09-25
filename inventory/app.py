@@ -368,6 +368,8 @@ def item(req: Request, item_id: int):
         it = get_item(c, item_id)
         return page(req, "item.html", it=it, f=json.loads(it["fields"]), fields=core.fields_for(it["type"]),
                     stock=core.stock_of_item(c, item_id), projects=core.projects(c),
+                    needs=c.execute("SELECT p.id, p.name, n.qty FROM needs n JOIN projects p ON p.id=n.project_id "
+                                    "WHERE n.item_id=? ORDER BY p.name", (item_id,)).fetchall(),
                     nfc=f"{public_base(req)}/i/{item_id}".lower(),  # №37: the tag opens this card
                     history=c.execute(MOVES + " AND m.item_id=? ORDER BY m.id DESC LIMIT 50", (item_id,)).fetchall())
 
@@ -375,6 +377,12 @@ def item(req: Request, item_id: int):
 @app.post("/i/{item_id}/agent")
 async def item_for_agent(req: Request, item_id: int):
     core.set_for_agent(item_id, bool((await req.form()).get("on")))
+    return go(f"/i/{item_id}")
+
+
+@app.post("/i/{item_id}/need")
+def item_need(item_id: int, project: int = Form(), qty: int = Form(0)):
+    core.set_need(project, item_id, max(qty, 0))
     return go(f"/i/{item_id}")
 
 
@@ -424,7 +432,7 @@ def stock(box: str = Form(), item: int = Form(), action: str = Form(), qty: int 
     else:
         if action != "take":
             action = "count" if action == "set" else kind if kind in ("put", "return", "buy") else "put"
-        core.change_stock(box, item, action, qty, AUTHOR, int(project) if project and action == "take" else None)
+        core.change_stock(box, item, action, qty, AUTHOR, int(project) if project and action in ("take", "buy") else None)
     return go(back if back.startswith("/") and not back.startswith("//") else "/")
 
 
@@ -542,6 +550,25 @@ def project_save(project_id: int, name: str = Form(), description: str = Form(""
         c.execute("UPDATE projects SET name=?, description=?, git_url=?, status=? WHERE id=?",
                   (name.strip(), description.strip(), git_url.strip(), status, project_id))
     return go("/projects")
+
+
+@app.get("/p/{project_id}")
+def project_page(req: Request, project_id: int):
+    with db() as c:
+        p = c.execute("SELECT * FROM projects WHERE id=?", (project_id,)).fetchone()
+    if not p:
+        raise HTTPException(404, "Нет такого проекта")
+    needs = [dict(n, unit=core.unit_of(n["type"], json.loads(n["fields"]))) for n in core.project_needs(project_id)]
+    return page(req, "project.html", p=p, needs=needs)
+
+
+@app.post("/p/{project_id}/order")
+def project_order(project_id: int):
+    """Everything the project is short of goes «в пути», each line for this project."""
+    for n in core.project_needs(project_id):
+        if n["short"]:
+            core.change_stock(core.TRANSIT, n["item_id"], "buy", n["short"], AUTHOR, project_id)
+    return go(f"/p/{project_id}")
 
 
 @app.get("/history")

@@ -54,6 +54,9 @@ CREATE TABLE IF NOT EXISTS movements(
   delta INTEGER NOT NULL, kind TEXT NOT NULL, project_id INTEGER REFERENCES projects(id),
   author TEXT NOT NULL, note TEXT NOT NULL DEFAULT '',
   at TEXT NOT NULL DEFAULT (datetime('now','localtime')));
+CREATE TABLE IF NOT EXISTS needs(
+  project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE, item_id INTEGER NOT NULL REFERENCES items(id),
+  qty INTEGER NOT NULL CHECK (qty > 0), PRIMARY KEY (project_id, item_id));
 CREATE TABLE IF NOT EXISTS trash(
   id INTEGER PRIMARY KEY, kind TEXT NOT NULL, label TEXT NOT NULL, data TEXT NOT NULL,
   at TEXT NOT NULL DEFAULT (datetime('now','localtime')));
@@ -352,6 +355,31 @@ def projects(c):
     return c.execute("SELECT id, name FROM projects WHERE status='active' ORDER BY name").fetchall()
 
 
+def set_need(project_id, item_id, qty):
+    """How many of a thing a project needs; 0 or None: it needs none."""
+    with db() as c:
+        if not qty:
+            c.execute("DELETE FROM needs WHERE project_id=? AND item_id=?", (project_id, item_id))
+        else:
+            c.execute("INSERT INTO needs(project_id, item_id, qty) VALUES (?,?,?) ON CONFLICT DO UPDATE SET qty=excluded.qty",
+                      (project_id, item_id, qty))
+
+
+def project_needs(project_id):
+    """What a project needs, line by line: need, have (all boxes and hands), transit («в пути»), short = what is left
+    to order. A pile «есть, не считал» may be enough: its line is not short.
+    ponytail: stock is not reserved — two projects needing the same 5 both see them; add reservations when that bites."""
+    with db() as c:
+        rows = c.execute(
+            "SELECT n.item_id, i.name, i.type, i.fields, n.qty AS need, "
+            "coalesce(sum(CASE WHEN s.box_id!=? THEN s.qty END), 0) AS have, "
+            "coalesce(sum(CASE WHEN s.box_id=? THEN s.qty END), 0) AS transit, "
+            "count(CASE WHEN s.box_id!=? AND s.qty IS NULL THEN 1 END) AS uncounted "
+            "FROM needs n JOIN items i ON i.id=n.item_id LEFT JOIN stock s ON s.item_id=n.item_id "
+            "WHERE n.project_id=? GROUP BY n.item_id ORDER BY i.name", (TRANSIT, TRANSIT, TRANSIT, project_id)).fetchall()
+    return [dict(r, short=0 if r["uncounted"] else max(0, r["need"] - r["have"] - r["transit"])) for r in rows]
+
+
 # GitHub: the owner's new repos wait in the inbox (status 'inbox') until a person or an agent takes them in their
 # own words (accept_project) or skips them ('skipped': not offered again). No owner and no token: sync is off.
 GITHUB_OWNER = os.environ.get("GITHUB_OWNER", "")
@@ -527,7 +555,7 @@ def _drop_box(c, s, b):
 def trash(kind, key):
     """kind is item, box or place. A place takes its shelves along (a shelf never leaves its cabinet);
     boxes standing on it lose the place (№27)."""
-    s = {k: [] for k in ("places", "boxes", "items", "stock", "movements", "links")}
+    s = {k: [] for k in ("places", "boxes", "items", "stock", "movements", "links", "needs")}
     with db() as c:
         table = {"item": "items", "box": "boxes", "place": "places"}[kind]
         r = c.execute(f"SELECT * FROM {table} WHERE id=?", (key,)).fetchone()
@@ -539,7 +567,8 @@ def trash(kind, key):
             s["items"].append(dict(r))
             s["stock"] = _rows(c, "SELECT * FROM stock WHERE item_id=?", key)
             s["movements"] = _rows(c, "SELECT * FROM movements WHERE item_id=?", key)
-            for t in ("movements", "stock"):
+            s["needs"] = _rows(c, "SELECT * FROM needs WHERE item_id=?", key)
+            for t in ("movements", "stock", "needs"):
                 c.execute(f"DELETE FROM {t} WHERE item_id=?", (key,))
             c.execute("DELETE FROM items WHERE id=?", (key,))
         elif kind == "box":
@@ -591,6 +620,10 @@ def restore(trash_id):
         for r in s["movements"]:
             r["item_id"] = iid.get(r["item_id"], r["item_id"])
             _put(c, "movements", {k: v for k, v in r.items() if k != "id" or not has("movements", r["id"])})
+        for r in s.get("needs", []):  # trash from before needs has none
+            if has("projects", r["project_id"]):
+                c.execute("INSERT OR IGNORE INTO needs(project_id, item_id, qty) VALUES (?, ?, ?)",
+                          (r["project_id"], iid.get(r["item_id"], r["item_id"]), r["qty"]))
         for box, parent, place, parent_now, place_now in reversed(s["links"]):
             c.execute("UPDATE boxes SET parent_id=?, place_id=? WHERE id=? AND parent_id IS ? AND place_id IS ?",
                       (parent, pid.get(place, place), box, parent_now, pid.get(place_now, place_now)))

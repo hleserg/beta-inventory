@@ -161,12 +161,42 @@ def skip_project(git_url: str) -> dict[str, Any]:
     return {"skipped": git_url}
 
 
+def check_project(project_id):
+    with db() as c:
+        if not c.execute("SELECT 1 FROM projects WHERE id=?", (project_id,)).fetchone():
+            raise ToolError(f"No project {project_id}. Call list_projects.")
+
+
+@server.tool(annotations=READ)
+def project_needs(project_id: int) -> dict[str, Any]:
+    """What a project needs (list_projects gives project_id), line by line: need, have (boxes and hands),
+    transit («в пути», ordered), short = still to order; uncounted > 0: a pile «есть, не считал» may cover it.
+    To order a line: change_stock(box_id="TRANS", action="buy", qty=short, project_id=...)."""
+    check_project(project_id)
+    return {"needs": [{k: n[k] for k in ("item_id", "name", "need", "have", "transit", "short", "uncounted")}
+                      for n in core.project_needs(project_id)]}
+
+
+@server.tool(annotations=LOGGED)
+def set_project_need(project_id: int, item_id: int, qty: int) -> dict[str, Any]:
+    """A project needs qty of an item (search / get_item for item_id); 0 takes the line off. Returns project_needs."""
+    check_project(project_id)
+    if qty < 0:
+        raise ToolError("qty is 0 or more")
+    with db() as c:
+        if not c.execute("SELECT 1 FROM items WHERE id=?", (item_id,)).fetchone():
+            raise ToolError(f"No item {item_id}. Find it with search.")
+    core.set_need(project_id, item_id, qty)
+    return project_needs(project_id)
+
+
 @server.tool(annotations=LOGGED)
 def change_stock(box_id: str, item_id: int, action: Literal["put", "return", "buy", "take", "count"], qty: int | None,
                  agent: str, project_id: int | None = None) -> dict[str, Any]:
     """Change how many of an item lie in a box. Every change goes to history with agent as the author.
 
-    put / return / buy: qty more in the box; take: qty out, project_id says what for (list_projects);
+    put / return / buy: qty more in the box; take: qty out, project_id says what for (list_projects), and so does
+    buy into TRANS (ordered for a project, see project_needs);
     count: the box holds exactly qty now (stocktaking). qty counts in the item's unit (get_item).
     agent: your name as the user knows you.
     put / return / buy with qty null: some went in, not counted (loose resistors and the like); the box then
@@ -177,9 +207,7 @@ def change_stock(box_id: str, item_id: int, action: Literal["put", "return", "bu
     Returns the new qty in the box.
     """
     if project_id is not None:
-        with db() as c:
-            if not c.execute("SELECT 1 FROM projects WHERE id=?", (project_id,)).fetchone():
-                raise ToolError(f"No project {project_id}. Call list_projects.")
+        check_project(project_id)
     try:
         qty = core.change_stock(box_id, item_id, action, qty, author(agent), project_id)
     except ValueError as e:

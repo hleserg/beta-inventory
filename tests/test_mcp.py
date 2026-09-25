@@ -73,6 +73,20 @@ def test_stock_tools():
                 ).structured_content["qty"] == 10
 
 
+def test_project_needs():
+    box = core.new_boxes(1)[0]
+    iid = call("create_item", type="resistor", name="4k7", agent="Claude", box_id=box, qty=2, fields={"value": "4,7 кОм"}
+               ).structured_content["id"]
+    TestClient(app).post("/projects", data={"name": "Метео"})
+    pid = next(p["id"] for p in call("list_projects").structured_content["projects"] if p["name"] == "Метео")
+    line = call("set_project_need", project_id=pid, item_id=iid, qty=5).structured_content["needs"][0]
+    assert (line["need"], line["have"], line["short"]) == (5, 2, 3)
+    call("change_stock", box_id="TRANS", item_id=iid, action="buy", qty=3, agent="Claude", project_id=pid)
+    assert call("project_needs", project_id=pid).structured_content["needs"][0]["short"] == 0
+    assert call("set_project_need", project_id=pid, item_id=iid, qty=0).structured_content["needs"] == []
+    assert "list_projects" in call("project_needs", project_id=9999).content[0].text
+
+
 def test_card_tools(monkeypatch):
     got = []
     monkeypatch.setattr(mcp_server, "fetch", lambda url: got.append(url) or photo()["photo"][1])

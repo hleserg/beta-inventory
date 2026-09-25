@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block main %}
+<h1>{{ p.name }}</h1>
+{% if p.description %}<p>{{ p.description }}</p>{% endif %}
+{% if p.git_url.startswith(("http://", "https://")) %}<p><a href="{{ p.git_url }}" target="_blank" rel="noopener">{{ p.git_url }}</a></p>{% endif %}
+<h2>Нужно</h2>
+{% for n in needs %}
+<div class="card"><div class="row"><a href="/i/{{ n.item_id }}">{{ n.name }}</a><span class="qty right">{{ n.need|qty(unit=n.unit) }}</span></div>
+  <div class="mut">есть {{ n.have|qty(n.uncounted, n.unit) }}{% if n.transit %} · в пути {{ n.transit|qty(unit=n.unit) }}{% endif %}{% if n.short %} · не хватает {{ n.short|qty(unit=n.unit) }}{% endif %}</div>
+  {% if n.short %}<form method="post" action="/stock" class="row">
+    <input type="hidden" name="box" value="{{ TRANSIT }}"><input type="hidden" name="item" value="{{ n.item_id }}"><input type="hidden" name="action" value="add"><input type="hidden" name="kind" value="buy"><input type="hidden" name="project" value="{{ p.id }}"><input type="hidden" name="back" value="/p/{{ p.id }}">
+    <input type="number" name="qty" min="1" value="{{ n.short }}" required><button>Заказать</button></form>{% endif %}
+</div>
+{% else %}<p class="mut">Пока ничего. Добавить — на карточке вещи, «Нужно для проекта».</p>{% endfor %}
+{% if needs|sum(attribute="short") %}<form method="post" action="/p/{{ p.id }}/order"><p><button>Заказать всё недостающее</button></p></form>{% endif %}
+{% endblock %}
