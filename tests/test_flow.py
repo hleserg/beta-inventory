@@ -515,6 +515,15 @@ def test_diy_fields():
     assert "BME280" in c.get("/?q=0x76").text and "BME280" in c.get("/?q=spi").text
 
 
+
+def test_home():
+    """№59: household things are a category of the profile — a coffee maker is one of a kind with a manual and care."""
+    from inventory import mcp_server
+    t = mcp_server.card_template("appliance")
+    assert t["single"] and {"manual", "care", "model"} <= {f["key"] for f in t["fields"]}
+    assert not mcp_server.card_template("kitchen")["single"]
+    assert "Дом" in c.get("/items/new").text and "Уход" in c.get("/items/new?type=appliance").text
+
 def test_pick_new():
     """№19: a picker's «+ Место» / «+ Коробка» opens a page that makes one and hands its id back to the field."""
     new = c.get("/places/new?from=/b/K7M2Q&field=place&name=Антресоль").text
