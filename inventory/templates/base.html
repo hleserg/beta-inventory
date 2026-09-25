@@ -373,7 +373,9 @@ addEventListener("DOMContentLoaded", () => {  // №42: «Сохранить и 
   (b.closest("details") || {}).open = true; b.scrollIntoView({block: "center"}); b.click();
 });
 if (SCAN.nfc && "NDEFReader" in window) navigator.permissions.query({name: "nfc"})
-  .then(p => p.state === "granted" && nfcScan().catch(() => addEventListener("click", nfcScan, {once: true}))).catch(() => {});
+  .then(p => p.state === "granted" ? nfcScan().catch(() => addEventListener("click", nfcScan, {once: true}))
+    // not asked yet and no corner button here (the new-item form): the tap on the box field asks, then a tag fills it
+    : p.state === "prompt" && !document.getElementById("scan") && document.querySelector("[data-box]")?.addEventListener("click", () => nfcScan().catch(() => {}), {once: true})).catch(() => {});
 if (!SCAN.qr && !("NDEFReader" in window)) document.getElementById("scan")?.remove();  // nothing left for the corner button here
 
 // Our own list over a choice (select[data-pick], a long select, a datalist field): the native datalist won't open on an
