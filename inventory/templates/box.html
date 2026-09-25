@@ -20,13 +20,20 @@
   {% for c in children %}<div class="card">{{ t.box }} {{ box_link(c.id, c.name) }}</div>{% endfor %}
   <p class="row"><a class="btn" href="/?put={{ b.id }}">Положить сюда</a> <a class="btn ghost" href="/items/new?box={{ b.id }}">+ {{ t.item }}</a></p>
 {% endif %}
+{% if b.kind == "box" and not draft %}{# №56: the whole box in hand #}
+{% if b.parent_id == core.HANDS %}{% set bb = all_boxes()|selectattr("id", "equalto", b.back)|first %}
+<form method="post" action="/b/{{ b.id }}/back" class="row"><button>Положить на место</button>
+  <span class="mut">→ {{ (bb.name or bb.id) if bb else (places|selectattr("id", "equalto", b.place_id)|first or {}).name or "стоит сама" }}</span></form>
+{% else %}<form method="post" action="/b/{{ b.id }}/take"><p><button class="ghost">Взять на руки</button></p></form>{% endif %}
+{% endif %}
 <details{% if not contents and not children %} open{% endif %}><summary>Настроить, наклейка{% if contents %}, освободить{% endif %}</summary>
   <form method="post" action="/b/{{ b.id }}" id="boxf" enctype="multipart/form-data">
     <label>Название</label><input name="name" value="{{ b.name or draft and request.query_params.get('name') or '' }}" placeholder="например: разъёмы JST">
     <label>Фото</label><input type="hidden" name="photos_on" value="1">
     <div class="row" id="pics">{% for x in pics %}<span class="pic"><img class="thumb" src="/u/{{ x }}" alt=""><input type="hidden" name="photos__keep" value="{{ x }}"><button type="button" class="mini" aria-label="Убрать фото">✕</button></span>{% endfor %}</div>
     <input type="file" name="photos" accept="image/*" multiple>
-    {% if b.kind != "shelf" %}{# a shelf stays in its cabinet #}
+    {% if b.parent_id == core.HANDS %}<input type="hidden" name="parent_id" value="{{ b.parent_id }}">{# in hand: «Положить на место» takes it back #}
+    {% elif b.kind != "shelf" %}{# a shelf stays in its cabinet #}
     <label>{{ t.place }}</label>
     <div id="placesel"{% if b.parent_id %} hidden{% endif %}><select name="place" data-pick data-new="/places/new" data-term="{{ t.place }}"><option value="">—</option>{% for p in places %}<option value="{{ p.id }}"{% if p.id == top %} selected{% endif %}>{{ p.name }}</option>{% endfor %}</select></div>
     <div id="placeview"{% if not b.parent_id %} hidden{% endif %}>{{ (places|selectattr("id", "equalto", top)|first or {}).name or "—" }}</div>{# in a box: the box's place, not chosen here #}

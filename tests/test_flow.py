@@ -421,6 +421,35 @@ def test_hands():
     assert c.post("/stock", data={"box": "руках", "item": iid, "action": "add", "qty": 1}).status_code == 400  # not by name
 
 
+def test_take_box():
+    """№56: a whole box goes «на руки» — gone from its place, listed with what's in hand, back where it was on «положить»."""
+    def row(bid):
+        with core.db() as db:
+            return dict(db.execute("SELECT parent_id, place_id, back FROM boxes WHERE id=?", (bid,)).fetchone())
+    outer, box, inner = core.new_boxes(3)
+    with core.db() as db:
+        pid = db.execute("INSERT INTO places(name) VALUES ('антресоль')").lastrowid
+        db.execute("UPDATE boxes SET name='ящик', place_id=? WHERE id=?", (pid, outer))
+        db.execute("UPDATE boxes SET name='крепёж', place_id=? WHERE id=?", (pid, box))
+        db.execute("UPDATE boxes SET name='винты', parent_id=? WHERE id=?", (outer, inner))
+    assert "Взять на руки" in c.get(f"/b/{box}").text
+    c.post(f"/b/{box}/take")
+    where = lambda bid: core.box_where(core.db(), bid)
+    assert where(box) == "На руках" and f"/b/{box}" in c.get("/items?hands=1").text
+    page = c.get(f"/b/{box}").text
+    assert "Положить на место" in page and "антресоль" in page  # says where it goes back to
+    r = c.post(f"/b/{box}", data={"name": "крепёж М3", "parent_id": core.HANDS}, headers={"X-Autosave": "1"})
+    assert r.status_code == 200 and row(box)["parent_id"] == core.HANDS  # autosaving the name keeps it in hand
+    assert c.post(f"/b/{outer}", data={"name": "ящик", "parent_id": core.HANDS}).status_code == 400  # a box is taken by the button
+    c.post(f"/b/{box}/back")
+    assert row(box) == {"parent_id": None, "place_id": pid, "back": None} and where(box) == "антресоль"
+    assert f"/b/{box}" not in c.get("/items?hands=1").text
+    c.post(f"/b/{inner}/take")
+    assert row(inner)["parent_id"] == core.HANDS and f"/b/{inner}" not in c.get(f"/b/{outer}").text
+    c.post(f"/b/{inner}/back")
+    assert row(inner)["parent_id"] == outer
+
+
 def test_transit():
     """Manifesto 3: ordered things lie «в пути» — out of the total, in the «докупить» check; «пришло» moves them in."""
     def stock(iid):

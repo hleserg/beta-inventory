@@ -74,7 +74,8 @@ def all_boxes():  # for box fields: named first, by name; each with its place �
         while t["parent_id"] in rows and t["parent_id"] not in seen:
             seen.add(t["parent_id"])
             t = rows[t["parent_id"]]
-        r["top"], r["where"] = t["place_id"], t["place"]
+        # №56: a box taken in hand stands nowhere — its place_id only remembers where it goes back to
+        r["top"], r["where"] = (None, PROFILE["terms"].get("hands", "На руках")) if t["parent_id"] == core.HANDS else (t["place_id"], t["place"])
     return sorted(rows.values(), key=lambda r: (not r["name"], r["name"] or "", r["id"]))
 
 
@@ -215,11 +216,11 @@ async def box_save(req: Request, box_id: str, name: str = Form(""), place: str =
     photos = None if not form.get("photos_on") else [x for x in map(core.own_upload, form.getlist("photos__keep")) if x] + [
         save_upload(up, photo=True) for up in form.getlist("photos") if getattr(up, "filename", "")]
     parent = core.find_box(parent_id) if parent_id.strip() else None
-    if parent == core.HANDS:  # «на руках» holds things, not boxes (№28)
-        raise ValueError(f"«{PROFILE['terms'].get('hands', 'На руках')}» — не коробка")
     with db() as c:  # an error rolls the insert back: a draft stays a draft
         c.execute("INSERT OR IGNORE INTO boxes(id) VALUES (?)", (bid,))
         b = get_box(c, bid)
+        if parent == core.HANDS and b["parent_id"] != core.HANDS:  # «на руках» holds things; a box goes there by «взять» (№28, №56)
+            raise ValueError(f"«{PROFILE['terms'].get('hands', 'На руках')}» — не коробка")
         p = parent
         while p:  # parent must exist and must not sit inside this box
             if p == b["id"]:
@@ -232,8 +233,10 @@ async def box_save(req: Request, box_id: str, name: str = Form(""), place: str =
                 raise ValueError(f"Нет такого места — добавьте его в «{PROFILE['terms']['places']}»")
         if b["kind"] == "shelf":  # a shelf stays in its cabinet: only the name changes
             c.execute("UPDATE boxes SET name=? WHERE id=?", (name.strip() or b["name"], bid))
+        elif parent == core.HANDS:  # a box in hand stays in hand: «положить на место» takes it back
+            c.execute("UPDATE boxes SET name=? WHERE id=?", (name.strip(), bid))
         else:
-            c.execute("UPDATE boxes SET name=?, place_id=?, parent_id=? WHERE id=?", (name.strip(), place_id, parent, bid))
+            c.execute("UPDATE boxes SET name=?, place_id=?, parent_id=?, back=NULL WHERE id=?", (name.strip(), place_id, parent, bid))
         if photos is not None:
             c.execute("UPDATE boxes SET photos=? WHERE id=?", (json.dumps(photos), bid))
         crumbs = core.box_crumbs(c, bid)
@@ -252,6 +255,24 @@ def box_clear(box_id: str):
     with db() as c:
         b = get_box(c, box_id)
     core.clear_box(b["id"], AUTHOR)
+    return go(f"/b/{b['id']}")
+
+
+@app.post("/b/{box_id}/take")
+def box_take(box_id: str):  # №56: the whole box in hand — gone from its place, remembers where it stood
+    with db() as c:
+        b = get_box(c, box_id)
+        c.execute("UPDATE boxes SET back=parent_id, parent_id=? WHERE id=? AND kind='box' AND parent_id IS NOT ?",
+                  (core.HANDS, b["id"], core.HANDS))
+    return go(f"/b/{b['id']}")
+
+
+@app.post("/b/{box_id}/back")
+def box_back(box_id: str):  # into the box it came out of; that box gone meanwhile — into its own place
+    with db() as c:
+        b = get_box(c, box_id)
+        c.execute("UPDATE boxes SET parent_id=(SELECT x.id FROM boxes x WHERE x.id=boxes.back), back=NULL WHERE id=? AND parent_id=?",
+                  (b["id"], core.HANDS))
     return go(f"/b/{b['id']}")
 
 
@@ -330,7 +351,8 @@ def items(req: Request, type: str = "", cat: str = "", q: str = "", hands: str =
             "SELECT i.*, COALESCE(SUM(CASE WHEN s.box_id!=? THEN s.qty END), 0) AS total, COALESCE(SUM(s.qty), 0) AS have, "
             "MAX(s.box_id IS NOT NULL AND s.qty IS NULL) AS uncounted, MAX(s.box_id=?) AS hands FROM items i LEFT JOIN stock s ON s.item_id=i.id "
             "WHERE ?='' OR i.type=? GROUP BY i.id ORDER BY i.name", (core.TRANSIT, core.HANDS, type, type))]
-    if hands:  # №28: taken and not put back, or not put away yet
+        taken = c.execute("SELECT * FROM boxes WHERE parent_id=? ORDER BY name='', name, id", (core.HANDS,)).fetchall() if hands else []
+    if hands:  # №28: taken and not put back, or not put away yet; №56: whole boxes too
         rows = [r for r in rows if r["hands"]]
     if reorder and RK:  # manifesto 3: fewer than the card's threshold; «не считал» is never flagged
         rows = [r for r in rows if not r["uncounted"] and str(r["fields"].get(RK, "")).isdigit()
@@ -340,7 +362,7 @@ def items(req: Request, type: str = "", cat: str = "", q: str = "", hands: str =
     if q.strip():  # same search as the main page, kept in its rank order
         rank = {i["id"]: n for n, i in enumerate(core.search(q)[0])}
         rows = sorted((r for r in rows if r["id"] in rank), key=lambda r: rank[r["id"]])
-    return page(req, "items.html", items=rows, type=type, cat=cat, q=q, hands=hands, reorder=reorder)
+    return page(req, "items.html", items=rows, taken=taken, type=type, cat=cat, q=q, hands=hands, reorder=reorder)
 
 
 def card_form(req, status=200, it=None, type="", name="", vals=None, errors=(), box="", qty="1", dups=(), nfc=False,
@@ -524,7 +546,7 @@ def tap(reader: str = Body(), code: str = Body()):
             c.execute("UPDATE readers SET box_id=? WHERE id=?", (b["id"], rid))
             c.execute(now, (rid,))
             if moved:  # it stands where the reader is now
-                c.execute("UPDATE boxes SET place_id=?, parent_id=NULL WHERE id=?", (r["place_id"], b["id"]))
+                c.execute("UPDATE boxes SET place_id=?, parent_id=NULL, back=NULL WHERE id=?", (r["place_id"], b["id"]))
         return {"ok": True, "box": b["id"], "name": b["name"]}
     if m := re.search(r"/i/(\d+)", code, re.I):
         with db() as c:

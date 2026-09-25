@@ -111,6 +111,7 @@ CREATE TABLE IF NOT EXISTS boxes(
   place_id INTEGER REFERENCES places(id) ON DELETE SET NULL,
   parent_id TEXT REFERENCES boxes(id) ON DELETE SET NULL,
   photos TEXT NOT NULL DEFAULT '[]',
+  back TEXT,
   created_at TEXT NOT NULL DEFAULT (datetime('now','localtime')));
 CREATE TABLE IF NOT EXISTS items(
   id INTEGER PRIMARY KEY, name TEXT NOT NULL, type TEXT NOT NULL DEFAULT '', fields TEXT NOT NULL DEFAULT '{}',
@@ -221,6 +222,8 @@ def init():
             c.execute("ALTER TABLE boxes ADD COLUMN kind TEXT NOT NULL DEFAULT 'box'")
         if "photos" not in [r["name"] for r in c.execute("PRAGMA table_info(boxes)")]:  # boxes from before №45
             c.execute("ALTER TABLE boxes ADD COLUMN photos TEXT NOT NULL DEFAULT '[]'")
+        if "back" not in [r["name"] for r in c.execute("PRAGMA table_info(boxes)")]:  # №56: where a box taken in hand goes back to
+            c.execute("ALTER TABLE boxes ADD COLUMN back TEXT")
         if "for_agent" not in [r["name"] for r in c.execute("PRAGMA table_info(items)")]:  # cards from before №41
             c.execute("ALTER TABLE items ADD COLUMN for_agent INTEGER NOT NULL DEFAULT 0")
         if "single" not in [r["name"] for r in c.execute("PRAGMA table_info(items)")]:  # cards from before №43
