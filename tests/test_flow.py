@@ -55,6 +55,8 @@ def test_main_path():
     r = c.post(f"/i/{iid}/rotate", data={"photo": b, "deg": 90})  # №21: a turned photo is a new file, the old one may be cached
     assert r.json()["photo"] == pics()[0] != b and Image.open(core.UPLOADS / pics()[0]).size == (30, 40)
     assert c.post(f"/i/{iid}/rotate", data={"photo": a, "deg": -90}).status_code == 400  # not this card's photo
+    assert f"/i/{iid}/label.png" in c.get(f"/I/{iid}").text  # №22: a thing gets its own printed label; its QR is upper case
+    assert c.get(f"/i/{iid}/label.png").headers["content-type"] == "image/png"
     assert "MP1584" in c.get("/?q=ПОНИЖАЙКА").text
     assert "10k" in c.get("/?q=резистор").text  # type label is searchable
     assert "10k" in c.get("/items?cat=electronics").text and "10k" not in c.get("/items?cat=tools").text

@@ -50,7 +50,10 @@ addEventListener("keydown", e => { if (e.key == "Escape" && full()) history.back
   <input type="hidden" name="item" value="{{ it.id }}"><input type="hidden" name="action" value="add"><input type="hidden" name="kind" value="{{ 'return' if h and h.src else 'put' }}"><input type="hidden" name="back" value="/i/{{ it.id }}"><input type="hidden" name="src">
   {{ box_input(value=h.src if h else "", required=True) }}<input type="number" name="qty" min="1" placeholder="не считал"{% if h %} value="{{ h.qty }}"{% endif %}><button>Положить</button>
 </form></details>
-<details><summary>NFC-метка</summary>{{ nfc_tag(nfc) }}</details>
+<details><summary>Метка</summary>
+  <p><img src="/i/{{ it.id }}/label.png" alt="наклейка" style="width:240px;max-width:100%;background:#fff;border:1px solid var(--line)"><br>
+  <a data-act href="/i/{{ it.id }}/label.png" download="{{ it.id }}.png">Скачать наклейку</a></p>
+  {{ nfc_tag(nfc) }}</details>
 
 {% for fd in fields if fd.type != "photo" and f[fd.key] %}
 <h2>{{ fd.label }}</h2>
