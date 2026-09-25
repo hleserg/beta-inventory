@@ -26,6 +26,12 @@ It asks whether labels carry an IP or a name (like `inv.lan`) and which port,
 writes `.env` and starts the site. Both ways work; a name survives the server
 changing its IP. Update: `git pull && ./install.sh`.
 
+`install.sh` builds the image on the box. A ready one for amd64 and arm64
+(Raspberry Pi) is built from every commit to `main`:
+`ghcr.io/hleserg/beta-inventory:latest` (or `:sha-<commit>`). To use it, put
+`image: ghcr.io/hleserg/beta-inventory:latest` in place of `build:` in
+`compose.yaml` and run `docker compose pull && docker compose up -d`.
+
 **[docs/setup.md](docs/setup.md)**: name or IP, a DNS record in the router,
 the Android phone (app + writing NFC tags), iPhone, labels.
 
