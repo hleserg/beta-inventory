@@ -93,6 +93,12 @@ def test_card_tools(monkeypatch):
     err = call("update_item", item_id=card["id"], fields={"colour": "red"})
     assert err.is_error and "card_template" in err.content[0].text
     assert call("update_item", item_id=card["id"], fields={"photo": "../inventory.db"}).is_error  # only own uploads
+    err = call("update_item", item_id=card["id"], fields={}, type="power_module")  # a new type asks its own fields
+    assert err.is_error and "Вход, В: обязательно" in err.content[0].text
+    moved = call("update_item", item_id=card["id"], type="power_module",
+                 fields={"vin": "3–26", "vout": "0–26", "current": "3.2"}).structured_content
+    assert moved["type"] == "power_module" and moved["fields"]["pinout"] == "VCC GND SCL SDA"  # old ones stay hidden
+    assert call("update_item", item_id=card["id"], fields={}, type="nope").is_error
     err = call("create_item", type="module", name="X", agent="Claude", fields={"pinout": "A B"})
     assert err.is_error and "Фото: обязательно" in err.content[0].text
 

@@ -262,16 +262,19 @@ async def create_item(type: str, name: str, fields: dict[str, Any], agent: str, 
 
 
 @server.tool(annotations=ToolAnnotations(readOnlyHint=False, destructiveHint=True, openWorldHint=False))
-async def update_item(item_id: int, fields: dict[str, Any], name: str = "") -> dict[str, Any]:
+async def update_item(item_id: int, fields: dict[str, Any], name: str = "", type: str = "") -> dict[str, Any]:
     """Change card fields: only the keys given change, "" clears one. photo: the whole list, get_item's links keep a photo,
-    new image URLs add one; files: new [{name, url}] are added, ones already on the card are kept. Returns the card.
+    new image URLs add one; files: new [{name, url}] are added, ones already on the card are kept.
+    type: move the card to another type (card_template), its required fields must then be given. Returns the card.
     """
     with db() as c:
         it = c.execute("SELECT * FROM items WHERE id=?", (item_id,)).fetchone()
     if not it:
         raise ToolError(f"No item {item_id}. Find item ids with search.")
-    name = name.strip() or it["name"]
-    f = await fill(it["type"], core.item_fields(it), fields)
-    check(name, it["type"], f)
-    core.save_item(item_id, name, it["type"], f)
+    if type and type not in core.TYPES:
+        raise ToolError(f"Unknown type {type!r}. Call card_template without type for the list.")
+    name, type = name.strip() or it["name"], type or it["type"]
+    f = await fill(type, core.item_fields(it), fields)
+    check(name, type, f)
+    core.save_item(item_id, name, type, f)
     return card(item_id)
