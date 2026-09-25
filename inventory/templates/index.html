@@ -1,11 +1,6 @@
 {% extends "base.html" %}{% from "_box.html" import box_link %}
 {% block main %}
 {% if put %}<div class="card">Кладём в {{ box_link(put, (all_boxes()|selectattr("id", "equalto", put)|first or {}).name) }}. Найдите, что кладёте, или <a href="/items/new?box={{ put }}">заведите новое</a>.</div>{% endif %}
-<form action="/" class="row" style="margin-top:12px">
-  <input name="q" value="{{ q }}" placeholder="jst, понижайка, резистор 10к, ID коробки" {% if not q %}autofocus{% endif %}>
-  {% if put %}<input type="hidden" name="put" value="{{ put }}">{% endif %}
-  <button>Найти</button>
-</form>
 {% if q %}
   {% if boxes %}<h2>{{ t.boxes }}</h2>{% for b in boxes %}<div>{{ box_link(b.id, b.name) }} <span class="mut">{{ b.where }}</span></div>{% endfor %}{% endif %}
   <h2>{{ t.items }}{% if items %} <span class="mut">{{ items|length }}</span>{% endif %}</h2>
@@ -22,7 +17,7 @@
   </div>
   {% else %}<p class="mut">Ничего не нашлось. <a href="/items/new{% if put %}?box={{ put }}{% endif %}">+ {{ t.item }}</a></p>{% endfor %}
 {% else %}
-  <p class="row"><a class="btn" href="/items/new">+ {{ t.item }}</a> <a class="btn ghost" href="/boxes">Новые наклейки</a></p>
+  <p class="row"><a class="btn ghost" href="/boxes">Новые наклейки</a></p>
   <h2>Последние движения</h2>
   {% from "_stock.html" import moves_table %}{{ moves_table(recent) }}
 {% endif %}

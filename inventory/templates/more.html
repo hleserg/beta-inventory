@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block title %}Ещё{% endblock %}
+{% block main %}
+<h1>Ещё</h1>
+<div class="card lrows">
+{% for href, name, sub in [
+  ("/settings", "Настройки", "этот телефон, наклейки, поиск, GitHub, агенты"),
+  ("/boxes/sheet", "Лист наклеек", "новые ID для коробок — печать пачкой"),
+  ("/readers", "Считыватели", "NFC-ридеры у коробок"),
+  ("/trash", "Корзина", "удалённое хранится " ~ core.TRASH_DAYS ~ " дней"),
+  ("/projects", "Проекты", "куда уходят вещи"),
+  ("/history", "История", "кто что взял и положил"),
+] %}<a class="lrow" href="{{ href }}"><span><b>{{ name }}</b><br><span class="mut">{{ sub }}</span></span>
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></a>
+{% endfor %}</div>
+{% endblock %}

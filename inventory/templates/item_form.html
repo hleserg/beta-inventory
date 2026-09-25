@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% from "_box.html" import box_input %}
+{% block bar %}{% endblock %}{# №54: a new thing has its own .save and nothing else to reach for #}
 {% block main %}
 <h1>{% if it %}{{ it.name }}{% else %}+ {{ t.item }}{% endif %}</h1>
 <div class="mut">{{ type_label(type) or "тип не выбран" }}</div>

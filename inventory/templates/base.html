@@ -9,18 +9,11 @@
 <script>if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js")</script>
 <title>{% block title %}{{ t.items }}{% endblock %}</title>
 <style>
-:root{--bg:#f7f6f2;--fg:#1d1d1b;--mut:#6b6b66;--line:#e2e1dc;--card:#fff;--acc:#1a64d6;--on-acc:#fff;--bad:#c62828;color-scheme:light dark}
+:root{--bar:77px;--bg:#f7f6f2;--fg:#1d1d1b;--mut:#6b6b66;--line:#e2e1dc;--card:#fff;--acc:#1a64d6;--on-acc:#fff;--bad:#c62828;color-scheme:light dark}
 @media (prefers-color-scheme:dark){:root{--bg:#161615;--fg:#ecebe6;--mut:#9a9993;--line:#34342f;--card:#1f1f1d;--acc:#58a6ff;--on-acc:#0d1117;--bad:#ef5350}}
 *{box-sizing:border-box}
 body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.45 system-ui,-apple-system,sans-serif}
-main{max-width:720px;margin:0 auto;padding:8px 16px 96px}
-nav{position:relative;display:flex;flex-wrap:wrap;padding:4px;font-size:15px;border-bottom:1px solid var(--line);background:var(--card)}
-nav a,nav summary{flex:1 1 auto;display:flex;align-items:center;justify-content:center;min-height:44px;padding:0 3px;border-radius:8px;text-decoration:none;color:var(--fg);white-space:nowrap}
-nav a:hover,nav summary:hover{background:var(--line)}
-nav [aria-current]{color:var(--acc);box-shadow:inset 0 -2px var(--acc)}
-nav>details{flex:1 1 auto;margin:0}nav summary{list-style:none}nav summary::-webkit-details-marker{display:none}nav summary::after{content:"▾";margin-left:4px}
-nav details>div{position:absolute;z-index:10;left:0;right:0;top:100%;display:flex;flex-direction:column;padding:4px 8px;background:var(--card);border-bottom:1px solid var(--line);box-shadow:0 8px 16px #0003}
-nav details>div a{justify-content:flex-start;padding:0 12px}
+main{max-width:720px;margin:0 auto;padding:8px 16px calc(var(--bar) + 24px + env(safe-area-inset-bottom))}
 a{color:var(--acc)}
 h1{font-size:1.45rem;margin:.6em 0 .2em;text-wrap:balance}
 h2{font-size:1.1rem;margin:1.3em 0 .4em;text-wrap:balance}
@@ -29,6 +22,7 @@ p{text-wrap:pretty}
 .mut{color:var(--mut);font-size:.9em}
 .crumbs{color:var(--mut);font-size:.9em}.crumbs a{display:inline-block;padding:10px 0}
 .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px;margin:8px 0}
+.lrows{padding:0}.lrow{display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:56px;padding:10px 14px;color:var(--fg);text-decoration:none}.lrow+.lrow{border-top:1px solid var(--line)}.lrow svg{flex:none;color:var(--mut)}
 .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
 .right{margin-left:auto}
 input,select,textarea,button{font:inherit;color:inherit;background:var(--card);border:1px solid var(--line);border-radius:8px;padding:8px 10px;max-width:100%}
@@ -83,9 +77,20 @@ input[type=checkbox],input[type=radio]{width:20px;height:20px;min-height:0;paddi
 .mini{padding:6px 9px;font-size:.85em}.mini.on{background:var(--acc);color:var(--on-acc)}
 dialog{border:1px solid var(--line);border-radius:12px;background:var(--card);color:var(--fg)}dialog::backdrop{background:#0008}
 dialog video{width:min(80vw,480px);display:block;margin-bottom:8px}
-#scan{position:fixed;z-index:10;right:max(16px,env(safe-area-inset-right));bottom:max(16px,env(safe-area-inset-bottom));width:56px;height:56px;padding:0;border-radius:50%;display:grid;place-items:center;box-shadow:0 4px 12px #0004}
-body:has(:is(input:not([type=checkbox],[type=radio],[type=file]),textarea):focus) #scan{display:none}  /* the keyboard is up: not over the field */
-@media print{ #scan{display:none}}
+/* №54 the bar: at the thumb, the reach grows left to right; the screen's own action rides above it (.save, .act) */
+.bar{position:fixed;z-index:10;left:0;right:0;bottom:0;padding:8px 12px calc(8px + env(safe-area-inset-bottom));background:var(--card);border-top:1px solid var(--line)}
+.bar>div{max-width:720px;margin:0 auto;display:flex;align-items:center;gap:8px}.bar form{flex:1;min-width:0}
+.tab{flex:none;width:48px;height:56px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;border-radius:10px;color:var(--mut);font-size:12px;text-decoration:none}
+.tab.on{color:var(--acc);font-weight:600}
+.pill{display:flex;align-items:center;gap:6px;height:48px;margin:0;padding:0 12px;border-radius:99px;background:var(--bg);border:1px solid var(--line);color:var(--mut);font-weight:400;cursor:text}
+.pill input{flex:1;min-width:0;min-height:0;height:100%;border:0;padding:0;background:none;outline:none;font-size:16px;color:var(--fg)}
+.pill input::placeholder{color:var(--mut)}
+.pill.on{border:2px solid var(--acc);color:var(--fg)}.pill:focus-within{border:2px solid var(--acc)}
+.rnd{flex:none;width:48px;height:48px;border-radius:50%;border:1px solid var(--line);background:var(--card);color:var(--fg);display:grid;place-items:center}
+.fab{flex:none;width:60px;height:60px;min-height:0;border-radius:50%;padding:0;display:grid;place-items:center}
+body:has(main :is(input:not([type=checkbox],[type=radio],[type=file]),textarea):focus){--bar:0px}  /* the keyboard is up: the page's own field wins the space */
+body:has(main :is(input:not([type=checkbox],[type=radio],[type=file]),textarea):focus) .bar{display:none}
+@media print{.bar{display:none}}
 .pick{position:relative;display:flex;width:100%}.row .pick{flex:1;width:auto;min-width:0}.stock .pick{grid-column:1/-1}
 .pick input{flex:1;min-width:0;padding-right:2.4em}
 .pick select{position:absolute;inset:0;opacity:0;pointer-events:none}
@@ -109,17 +114,12 @@ form[data-sent] button{opacity:.5}
 .gh{margin:22px 0 4px}
 .code{display:flex;align-items:flex-start;gap:4px;padding:6px 2px 6px 12px;margin-top:6px;background:var(--bg);border:1px solid var(--line);border-radius:8px} .code pre{flex:1;min-width:0;margin:0;font:13px/1.5 ui-monospace,monospace;white-space:pre-wrap;word-break:break-all}
 .warn{display:flex;gap:8px;align-items:flex-start;margin:0;font-size:13px}
-.save{position:fixed;z-index:10;left:0;right:0;bottom:0;display:flex;justify-content:flex-end;align-items:center;gap:12px;padding:10px 12px calc(10px + env(safe-area-inset-bottom));background:var(--card);border-top:1px solid var(--line)}
+.save{position:fixed;z-index:10;left:0;right:0;bottom:calc(var(--bar) + env(safe-area-inset-bottom));display:flex;justify-content:flex-end;align-items:center;gap:12px;padding:10px 12px;background:var(--card);border-top:1px solid var(--line)}
 input[type=checkbox].tgl{appearance:none;flex:none;width:52px;height:32px;margin:0;border-radius:99px;background:var(--line);position:relative;cursor:pointer} .tgl::after{content:"";position:absolute;top:3px;left:3px;width:26px;height:26px;border-radius:50%;background:#fff;transition:transform .15s} .tgl:checked{background:var(--acc)} .tgl:checked::after{transform:translateX(20px)}
-body:has(.save:not([hidden])) #scan{display:none}
+body:has(.save:not([hidden])) main{padding-bottom:calc(var(--bar) + 88px + env(safe-area-inset-bottom))}
 </style>
 </head>
 <body>
-{% set seg = (request.url.path if request is defined else "/").split("/")[1]|lower %}
-{% set cur = {"b": "/boxes", "i": "/items", "p": "/projects"}.get(seg, "/" ~ seg) %}
-{% set more = [("/places", t.places), ("/projects", "Проекты"), ("/readers", "Считыватели"), ("/trash", "Корзина"), ("/settings", "Настройки")] %}
-<nav>{% for h, l in [("/", "Поиск"), ("/boxes", t.boxes), ("/items", t.items), ("/history", "История")] %}<a href="{{ h }}"{% if h == cur %} aria-current="page"{% endif %}>{{ l }}</a>{% endfor %}
-<details><summary{% if cur in more|map("first") %} aria-current="true"{% endif %}>Ещё</summary><div>{% for h, l in more %}<a href="{{ h }}"{% if h == cur %} aria-current="page"{% endif %}>{{ l }}</a>{% endfor %}</div></details></nav>
 <main><div id="drafts"></div>
 <script>
 // Card-form drafts (item_form.html) are kept until saved: offer the way back from any other page.
@@ -232,8 +232,6 @@ async function qrScan(f) {  // f: the box field whose QR button was pressed; non
   } catch (e) { d.close(); alert("Камера недоступна: " + e.message); }
 }
 addEventListener("click", e => {
-  const more = document.querySelector("nav details[open]");
-  if (more && !more.contains(e.target)) more.open = false;  // «Ещё» closes on a tap past it, like any menu
   if (e.target.closest("#scan")) return fab();
   const b = e.target.closest("[data-qr]");
   if (!b) return;
@@ -472,6 +470,6 @@ addEventListener("DOMContentLoaded", () => {
 });
 </script>
 {% block main %}{% endblock %}</main>
-{% if core.SCAN_NFC or core.SCAN_QR %}<button id="scan" type="button" aria-label="Сканировать" title="Сканировать"><svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 8V5a1 1 0 0 1 1-1h3M16 4h3a1 1 0 0 1 1 1v3M20 16v3a1 1 0 0 1-1 1h-3M8 20H5a1 1 0 0 1-1-1v-3M7 12h10"/></svg></button>{% endif %}
+{% block bar %}{% include "_bar.html" %}{% endblock %}
 </body>
 </html>

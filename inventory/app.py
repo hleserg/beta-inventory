@@ -687,6 +687,11 @@ def place_delete(place_id: int):
     return go("/places")
 
 
+@app.get("/more")
+def more_page(req: Request):  # №54: whatever the bar has no room for
+    return page(req, "more.html")
+
+
 @app.get("/trash")
 def trash_page(req: Request):
     return page(req, "trash.html", rows=core.trash_list())
