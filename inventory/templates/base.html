@@ -53,7 +53,17 @@ html:has(.car.full){overflow:hidden}
 .pic{position:relative;display:inline-flex}
 .pic button{position:absolute;top:-6px;right:-6px;min-height:0;padding:0 6px;border-radius:50%}
 .thumb{width:52px;height:52px;object-fit:cover;border-radius:8px;flex:none;background:var(--line)}
-a.line{display:flex;gap:10px;align-items:center;text-decoration:none;color:inherit;padding:8px 0;border-bottom:1px solid var(--line)}
+a.line,.line{display:flex;gap:10px;align-items:center;text-decoration:none;color:inherit;padding:8px 0;border-bottom:1px solid var(--line)}
+.line>a:not(.btn){display:flex;gap:10px;align-items:center;flex:1;min-width:0;color:inherit;text-decoration:none}
+.line .grow{flex:1;min-width:0}.line form{margin:0}
+.fbar{position:fixed;z-index:9;left:0;right:0;bottom:calc(var(--bar) + env(safe-area-inset-bottom));background:var(--card);border-top:1px solid var(--line);padding:8px 12px}
+.fbar>div{max-width:720px;margin:0 auto;display:flex;gap:6px;overflow-x:auto;scrollbar-width:none}
+.fbar select,.fbar label,.fbar a{flex:none;width:auto;margin:0;min-height:44px;border-radius:99px;font-weight:400;border:1px solid var(--line);background:var(--bg);color:inherit;padding:0 14px;display:inline-flex;align-items:center;gap:6px;white-space:nowrap;text-decoration:none;font-size:.9em}
+.fbar select{max-width:11em;text-overflow:ellipsis}
+.fbar .on{background:var(--acc);color:var(--on-acc);border-color:var(--acc)}
+.fbar label input{position:absolute;opacity:0;width:1px;height:1px}
+.fbar label:has(:focus-visible){outline:2px solid var(--acc);outline-offset:2px}
+body:has(.fbar) main{padding-bottom:calc(var(--bar) + 84px + env(safe-area-inset-bottom))}
 table{border-collapse:collapse;width:100%}
 td{border-bottom:1px solid var(--line);padding:8px 4px;vertical-align:top;font-variant-numeric:tabular-nums}
 td a{color:inherit;text-decoration:none;font-weight:600}  /* a row of names, not a wall of blue: bold says «tap me» */
@@ -90,7 +100,7 @@ dialog video{width:min(80vw,480px);display:block;margin-bottom:8px}
 .fab{flex:none;width:60px;height:60px;min-height:0;border-radius:50%;padding:0;display:grid;place-items:center}
 body:has(main :is(input:not([type=checkbox],[type=radio],[type=file]),textarea):focus){--bar:0px}  /* the keyboard is up: the page's own field wins the space */
 body:has(main :is(input:not([type=checkbox],[type=radio],[type=file]),textarea):focus) .bar{display:none}
-@media print{.bar{display:none}}
+@media print{.bar,.fbar{display:none}}
 .pick{position:relative;display:flex;width:100%}.row .pick{flex:1;width:auto;min-width:0}.stock .pick{grid-column:1/-1}
 .pick input{flex:1;min-width:0;padding-right:2.4em}
 .pick select{position:absolute;inset:0;opacity:0;pointer-events:none}
@@ -105,7 +115,7 @@ body:has(main :is(input:not([type=checkbox],[type=radio],[type=file]),textarea):
 form[data-sent] button{opacity:.5}
 /* settings.html: a row per setting, radios as a segmented choice, switches, the save bar */
 .choice{flex:none;display:inline-flex;border:1px solid var(--line);border-radius:10px;overflow:hidden;background:var(--card)} .choice label{margin:0;min-width:44px;height:44px;display:grid;place-items:center;padding:0 12px;font-weight:400} .choice input{position:absolute;opacity:0} .choice label:has(:checked){background:var(--acc);color:var(--on-acc);font-weight:600} .choice label:has(:focus-visible){outline:2px solid var(--acc);outline-offset:-2px}
-.src{display:inline-block;font-size:12px;font-weight:600;line-height:20px;padding:0 8px;border-radius:99px;border:1px solid var(--line);color:var(--mut);white-space:nowrap} .src.ch{border-color:var(--acc);color:var(--acc)}
+.src{display:inline-block;font-size:12px;font-weight:600;line-height:20px;padding:0 8px;border-radius:99px;border:1px solid var(--line);color:var(--mut);white-space:nowrap} .src.warn{border-color:var(--bad);color:var(--bad)} .src.ch{border-color:var(--acc);color:var(--acc)}
 .card.list{padding:0}
 .set{padding:10px 16px;border-bottom:1px solid var(--line)} .set:last-child{border-bottom:0}
 .seth{display:flex;align-items:center;gap:8px;min-height:28px} .seth .nm{flex:1;min-width:0;margin:0;font-weight:600}
@@ -376,7 +386,7 @@ function pickAll(s, q) {  // all of them, with search
   d.showModal();
 }
 addEventListener("DOMContentLoaded", () => {
-  const sel = [...document.querySelectorAll("select")].filter(f => f.hasAttribute("data-pick") || f.options.length > 7 && !f.querySelector("optgroup"));
+  const sel = [...document.querySelectorAll("select")].filter(f => f.hasAttribute("data-pick") || f.options.length > 7 && !f.querySelector("optgroup") && !f.closest(".fbar"));
   for (const f of [...document.querySelectorAll("input[list]"), ...sel]) {
     const s = document.createElement("span");
     s.className = "pick"; s.f = f; s.b = document.createElement("button"); s.b.type = "button"; s.b.textContent = "▾";

@@ -17,8 +17,41 @@
   </div>
   {% else %}<p class="mut">Ничего не нашлось. <a href="/items/new{% if put %}?box={{ put }}{% endif %}">+ {{ t.item }}</a></p>{% endfor %}
 {% else %}
-  <p class="row"><a class="btn ghost" href="/boxes">Новые наклейки</a></p>
-  <h2>Последние движения</h2>
-  {% from "_stock.html" import moves_table %}{{ moves_table(recent) }}
+{# №51/№57: what is where — at the top what is in hand, then what I just put away, then everything; filters at the thumb #}
+{% macro thumb(r) %}{% if pk and r.fields[pk] %}<img class="thumb" src="/u/{{ r.fields[pk][0] }}" alt="" loading="lazy">{% else %}<span class="thumb"></span>{% endif %}{% endmacro %}
+{% macro row(r) %}<div class="line"><a href="/i/{{ r.id }}">{{ thumb(r) }}<span class="grow">{{ r.name }}<br><span class="mut">
+  {%- if r.boxes|length == 1 %}{% set b = r.boxes[0] %}{{ b.name or b.box_id }}{% if b.where %} · {{ b.where }}{% endif %}
+  {%- elif r.boxes %}в {{ r.boxes|length }} местах{% elif r.hands %}{{ t.hands|lower }}{% elif r.tr %}{{ t.transit|lower }}{% else %}нигде нет{% endif %}</span>
+  {%- if r.low %} <span class="src warn">{{ t.reorder|lower }}</span>{% endif %}
+  {%- if r.hands and r.boxes %} <span class="src">{{ t.hands|lower }}</span>{% endif %}
+  {%- if r.tr and (r.boxes or r.hands) %} <span class="src">{{ t.transit|lower }}</span>{% endif %}</span>
+  <span class="qty">{{ r.total|qty(r.uncounted, unit=unit_of(r.type, r.fields)) }}</span></a>
+  {%- if put %}<form method="post" action="/stock"><input type="hidden" name="box" value="{{ put }}"><input type="hidden" name="item" value="{{ r.id }}"><input type="hidden" name="action" value="add"><input type="hidden" name="kind" value="put"><input type="hidden" name="qty" value="1"><input type="hidden" name="back" value="/b/{{ put }}"><button>Сюда</button></form>
+  {%- elif caller is defined %}{{ caller() }}{% endif %}</div>{% endmacro %}
+{% macro taken_box(b) %}<div class="line"><a href="/b/{{ b.id }}"><span class="thumb"></span><span class="grow">{{ b.name or b.id }}<br><span class="mut">{{ t.box }}{% if b.name %} ({{ b.id }}){% endif %}</span></span></a>
+  <form method="post" action="/b/{{ b.id }}/back"><input type="hidden" name="back" value="{{ request.url.path }}{{ '?' ~ request.url.query if request.url.query }}"><button class="ghost">На место</button></form></div>{% endmacro %}
+<h1>Что где</h1>
+<p class="mut">{{ t.items|lower }}: {{ n_items }} · {{ t.boxes|lower }}: {{ n_boxes }} · {{ t.places|lower }}: {{ places|length }}</p>
+{% set inhand = rows|selectattr("hands")|list if not filtered else [] %}
+{% if inhand or taken and not filtered %}<h2>{{ t.hands }} · {{ inhand|length + taken|length }}</h2>
+  {% for b in taken %}{{ taken_box(b) }}{% endfor %}
+  {% for r in inhand %}{% call row(r) %}<a class="btn ghost" href="/i/{{ r.id }}">Положить</a>{% endcall %}{% endfor %}{% endif %}
+{% if recent %}<h2>Недавно положил</h2>
+  {% for r, b in recent %}<div class="line"><a href="/i/{{ r.id }}">{{ thumb(r) }}<span class="grow">{{ r.name }}<br><span class="mut">→ {{ b.name or b.box_id }}{% if b.where %} · {{ b.where }}{% endif %}</span></span>
+    <span class="qty">{{ b.qty|qty(unit=unit_of(r.type, r.fields)) }}</span></a></div>{% endfor %}{% endif %}
+{% if filtered %}{% for b in taken %}{{ taken_box(b) }}{% endfor %}{% else %}<h2>Все · А–Я</h2>{% endif %}
+{% for r in rows %}{{ row(r) }}
+{% else %}{% if not (filtered and taken) %}<p class="mut">{% if filtered %}Ничего не нашлось. <a href="/{{ '?put=' ~ put if put }}">Сбросить</a>{% else %}Пока пусто. <a href="/items/new">+ {{ t.item }}</a>{% endif %}</p>{% endif %}{% endfor %}
+<form class="fbar" action="/" aria-label="Фильтры"><div>
+  {% if put %}<input type="hidden" name="put" value="{{ put }}">{% endif %}
+  <select name="type" aria-label="Тип" class="{{ 'on' if f.cat }}" onchange="this.form.submit()"><option value="">все типы</option>
+    {% for c in categories %}<optgroup label="{{ c.label }}"><option value="{{ c.key }}"{{ ' selected' if f.cat == c.key and not f.type }}>{{ c.label }} — все</option>
+      {% for ty in c.types %}<option value="{{ ty.key }}"{{ ' selected' if f.type == ty.key }}>{{ ty.label }}</option>{% endfor %}</optgroup>{% endfor %}</select>
+  {% if places %}<select name="place" aria-label="{{ t.place }}" class="{{ 'on' if f.place }}" onchange="this.form.submit()"><option value="">все {{ t.places|lower }}</option>
+    {% for p in places %}<option value="{{ p.id }}"{{ ' selected' if f.place == p.id|string }}>{{ p.name }}</option>{% endfor %}</select>{% endif %}
+  {% for key, label in [("hands", t.hands), ("reorder", t.reorder), ("transit", t.transit)] if counts[key] or f[key] %}
+  <label class="{{ 'on' if f[key] }}"><input type="checkbox" name="{{ key }}" value="1"{{ ' checked' if f[key] }} onchange="this.form.submit()">{{ label|lower }} · {{ counts[key] }}</label>{% endfor %}
+  {% if filtered %}<a href="/{{ '?put=' ~ put if put }}">✕ сбросить</a>{% endif %}
+</div></form>
 {% endif %}
 {% endblock %}

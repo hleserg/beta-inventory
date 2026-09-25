@@ -66,7 +66,7 @@ def test_main_path():
     assert "10k" in c.get("/items?cat=electronics").text and "10k" not in c.get("/items?cat=tools").text
     found = c.get("/items?q=резистор").text  # the list has its own search line (№33)
     assert 'name="q" value="резистор"' in found and "10k" in found and "MP1584" not in found
-    assert "10k" not in c.get("/items?q=резистор&cat=tools").text
+    assert "10k" in c.get("/?type=electronics").text and "10k" not in c.get("/?type=tools").text  # a category from the type list (№57)
 
     c.post("/projects", data={"name": "Метеостанция"})
     assert c.post("/stock", data={"box": box, "item": iid, "action": "take", "qty": 2, "project": 1}).status_code == 200
@@ -226,6 +226,8 @@ def test_new_box_and_shelves():
     c.post("/items/new?type=hand_tool", files=photo(), data={"name": "макетка", "box": bid})
     assert (f'<div class="crumbs"><a href="/places#p{pid}">Стеллаж</a> › <a href="/b/{shelf}">Полка 2</a> › '
             f'<a href="/b/{bid}">Макетки</a></div>') in c.get(f"/i/{newest()}").text  # №44: a thing in one place shows the way to it
+    other = core.db().execute("SELECT id FROM places WHERE name='Шкаф'").fetchone()[0]
+    assert "макетка" in c.get(f"/?place={pid}").text and "макетка" not in c.get(f"/?place={other}").text  # №57: box on a shelf → the cabinet
     j = c.post(f"/b/{bid}", data={"name": "Макетки", "place": str(pid)}, headers={"X-Autosave": "1"}).json()
     assert j["parent"] is None and j["place"] == pid  # out of the shelf, it stays in the cabinet
 
@@ -413,7 +415,7 @@ def test_hands():
     assert "модуль с ПВЗ" not in c.get("/items?hands=1").text
     loose = c.get("/boxes?loose=1").text
     assert box in loose and placed not in loose and core.HANDS not in loose
-    assert c.get(f"/b/{core.HANDS}", follow_redirects=False).headers["location"] == "/items?hands=1"
+    assert c.get(f"/b/{core.HANDS}", follow_redirects=False).headers["location"] == "/?hands=1"
     assert f"({core.HANDS})" not in c.get(f"/i/{iid}").text  # not offered as a box to put into
     n = c.get(f"/i/{iid}").text.count("положил")
     c.post("/stock", data={"box": core.HANDS, "item": iid, "action": "add", "kind": "put", "qty": 1})
@@ -462,7 +464,8 @@ def test_transit():
     c.post("/stock", data={"box": "в пути", "item": iid, "action": "add", "kind": "put", "qty": 10})
     assert stock(iid) == {box: 3, core.TRANSIT: 10}
     assert "защита АКБ" not in c.get("/items?reorder=1").text  # ordered: no need to buy again
-    assert "3 шт" in c.get("/items?q=защита").text  # not 13: it is not here yet
+    tr = c.get("/?transit=1").text  # №57: the «в пути» filter; the count shown leaves it out — not 13, it is not here yet
+    assert "защита АКБ" in tr and "3 шт" in tr and "13 шт" not in tr and "10k" not in tr
     card = c.get(f"/i/{iid}").text
     assert "В пути" in card and "заказано" in card and "Пришло" in card
     c.post("/stock", data={"box": box, "item": iid, "action": "add", "kind": "move", "src": core.TRANSIT, "qty": 12})

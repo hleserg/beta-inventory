@@ -130,11 +130,62 @@ def get_item(c, item_id):
 # --- search / home ---
 
 @app.get("/")
-def index(req: Request, q: str = "", put: str = ""):
-    items, boxes = core.search(q)
-    with db() as c:
-        recent = [] if q else c.execute(MOVES + " ORDER BY m.id DESC LIMIT 15").fetchall()
-    return page(req, "index.html", q=q, put=put.upper(), items=items, boxes=boxes, recent=recent)
+def index(req: Request, q: str = "", put: str = "", type: str = "", cat: str = "", place: str = "",
+          reorder: str = "", transit: str = "", hands: str = ""):
+    if q:
+        items, boxes = core.search(q)
+        return page(req, "index.html", q=q, put=put.upper(), items=items, boxes=boxes)
+    # №51/№57: no query — what is where. The type list's group heading picks a whole category
+    if any(c["key"] == type for c in PROFILE["categories"]):
+        cat, type = type, ""
+    elif type in core.TYPES:
+        cat = core.TYPES[type]["category"]["key"]
+    top = {b["id"]: b["top"] for b in all_boxes()}
+    with db() as c:  # total leaves «в пути» out (not here yet); have counts it, so an ordered thing leaves «докупить»
+        rows = [dict(r, fields=json.loads(r["fields"]), boxes=[], tr=0, inhand=None) for r in c.execute(
+            "SELECT i.*, COALESCE(SUM(CASE WHEN s.box_id!=? THEN s.qty END), 0) AS total, COALESCE(SUM(s.qty), 0) AS have, "
+            "MAX(s.box_id IS NOT NULL AND s.qty IS NULL) AS uncounted, MAX(s.box_id=?) AS hands FROM items i LEFT JOIN stock s ON s.item_id=i.id "
+            "GROUP BY i.id ORDER BY i.name", (core.TRANSIT, core.HANDS))]
+        by_id, where = {r["id"]: r for r in rows}, {}
+        for s in c.execute("SELECT s.item_id, s.box_id, s.qty, b.name FROM stock s JOIN boxes b ON b.id=s.box_id ORDER BY b.name, b.id"):
+            r = by_id[s["item_id"]]
+            if s["box_id"] == core.TRANSIT:
+                r["tr"] = s["qty"] or 0
+            elif s["box_id"] == core.HANDS:
+                r["inhand"] = s["qty"]
+            else:
+                if s["box_id"] not in where:
+                    where[s["box_id"]] = core.box_where(c, s["box_id"])
+                r["boxes"].append(dict(s, where=where[s["box_id"]], top=top.get(s["box_id"])))
+        taken = c.execute("SELECT * FROM boxes WHERE parent_id=? ORDER BY name='', name, id", (core.HANDS,)).fetchall()
+        places = c.execute("SELECT id, name FROM places ORDER BY name").fetchall()
+        n_boxes = c.execute("SELECT COUNT(*) FROM boxes WHERE kind NOT IN ('hands','transit')").fetchone()[0]
+        # the last thing put somewhere and still there — «where did I just leave it»
+        recent = c.execute(
+            "SELECT r.item_id, r.box_id FROM (SELECT item_id, box_id, MAX(id) AS mid FROM movements "
+            "WHERE kind IN ('put','return','buy','move') AND delta>=0 AND box_id NOT IN (?,?) GROUP BY item_id) r "
+            "JOIN stock s ON s.item_id=r.item_id AND s.box_id=r.box_id ORDER BY r.mid DESC LIMIT 3", (core.HANDS, core.TRANSIT)).fetchall()
+    for r in rows:  # manifesto 3: fewer than the card's threshold; «не считал» is never flagged
+        r["low"] = bool(RK and not r["uncounted"] and str(r["fields"].get(RK, "")).isdigit() and r["have"] < int(r["fields"][RK]))
+    counts = {"reorder": sum(r["low"] for r in rows), "transit": sum(bool(r["tr"]) for r in rows),
+              "hands": sum(bool(r["hands"]) for r in rows) + len(taken)}
+    recent = [(by_id[m["item_id"]], next(b for b in by_id[m["item_id"]]["boxes"] if b["box_id"] == m["box_id"])) for m in recent]
+    shown = rows
+    if hands:  # №28: taken and not put back, or not put away yet; №56: whole boxes too
+        shown = [r for r in shown if r["hands"]]
+    if reorder:
+        shown = [r for r in shown if r["low"]]
+    if transit:
+        shown = [r for r in shown if r["tr"]]
+    if cat:
+        shown = [r for r in shown if r["type"] in core.TYPES and core.TYPES[r["type"]]["category"]["key"] == cat and (not type or r["type"] == type)]
+    if place.isdigit():  # anything of it in a box standing there
+        shown = [r for r in shown if any(b["top"] == int(place) for b in r["boxes"])]
+    filtered = bool(hands or reorder or transit or cat or place)
+    return page(req, "index.html", q=q, put=put.upper(), rows=shown, n_items=len(rows), n_boxes=n_boxes, places=places,
+                taken=taken if not filtered or hands and not (reorder or transit or cat or place) else [],
+                recent=[] if filtered else recent, counts=counts, filtered=filtered,
+                f=dict(type=type, cat=cat, place=place, reorder=reorder, transit=transit, hands=hands))
 
 
 # --- boxes ---
@@ -190,7 +241,7 @@ def box(req: Request, box_id: str):
     with db() as c:
         b = get_box(c, box_id)
     if b["kind"] == "hands":  # no label, place or delete for it: the list of what is in hand
-        return go("/items?hands=1")
+        return go("/?hands=1")
     return box_page(req, b)
 
 
@@ -268,12 +319,12 @@ def box_take(box_id: str):  # №56: the whole box in hand — gone from its pla
 
 
 @app.post("/b/{box_id}/back")
-def box_back(box_id: str):  # into the box it came out of; that box gone meanwhile — into its own place
+def box_back(box_id: str, back: str = Form("")):  # into the box it came out of; that box gone meanwhile — into its own place
     with db() as c:
         b = get_box(c, box_id)
         c.execute("UPDATE boxes SET parent_id=(SELECT x.id FROM boxes x WHERE x.id=boxes.back), back=NULL WHERE id=? AND parent_id=?",
                   (b["id"], core.HANDS))
-    return go(f"/b/{b['id']}")
+    return go(back if back.startswith("/") and not back.startswith("//") else f"/b/{b['id']}")
 
 
 @app.post("/b/{box_id}/delete")
@@ -343,26 +394,8 @@ async def read_fields(req, old, fields):
 
 
 @app.get("/items")
-def items(req: Request, type: str = "", cat: str = "", q: str = "", hands: str = "", reorder: str = ""):
-    if type in core.TYPES:
-        cat = core.TYPES[type]["category"]["key"]
-    with db() as c:  # total leaves «в пути» out (not here yet); have counts it, so an ordered thing leaves «докупить»
-        rows = [dict(r, fields=json.loads(r["fields"])) for r in c.execute(
-            "SELECT i.*, COALESCE(SUM(CASE WHEN s.box_id!=? THEN s.qty END), 0) AS total, COALESCE(SUM(s.qty), 0) AS have, "
-            "MAX(s.box_id IS NOT NULL AND s.qty IS NULL) AS uncounted, MAX(s.box_id=?) AS hands FROM items i LEFT JOIN stock s ON s.item_id=i.id "
-            "WHERE ?='' OR i.type=? GROUP BY i.id ORDER BY i.name", (core.TRANSIT, core.HANDS, type, type))]
-        taken = c.execute("SELECT * FROM boxes WHERE parent_id=? ORDER BY name='', name, id", (core.HANDS,)).fetchall() if hands else []
-    if hands:  # №28: taken and not put back, or not put away yet; №56: whole boxes too
-        rows = [r for r in rows if r["hands"]]
-    if reorder and RK:  # manifesto 3: fewer than the card's threshold; «не считал» is never flagged
-        rows = [r for r in rows if not r["uncounted"] and str(r["fields"].get(RK, "")).isdigit()
-                and r["have"] < int(r["fields"][RK])]
-    if cat:
-        rows = [r for r in rows if r["type"] in core.TYPES and core.TYPES[r["type"]]["category"]["key"] == cat]
-    if q.strip():  # same search as the main page, kept in its rank order
-        rank = {i["id"]: n for n, i in enumerate(core.search(q)[0])}
-        rows = sorted((r for r in rows if r["id"] in rank), key=lambda r: rank[r["id"]])
-    return page(req, "items.html", items=rows, taken=taken, type=type, cat=cat, q=q, hands=hands, reorder=reorder)
+def items(req: Request):  # №57: the list lives on the main page now; old links and bookmarks land there
+    return RedirectResponse("/?" + req.url.query if req.url.query else "/", 302)
 
 
 def card_form(req, status=200, it=None, type="", name="", vals=None, errors=(), box="", qty="1", dups=(), nfc=False,
@@ -470,7 +503,7 @@ def item_label(req: Request, item_id: int):  # №22: a box of screws is a thing
 @app.post("/i/{item_id}/delete")
 def item_delete(item_id: int):
     core.trash("item", item_id)
-    return go("/items")
+    return go("/")
 
 
 @app.get("/i/{item_id}/edit")
