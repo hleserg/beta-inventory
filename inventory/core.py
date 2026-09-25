@@ -21,6 +21,7 @@ DATA = Path(os.environ.get("DATA_DIR", ROOT / "data"))
 # №53: what the /settings page may change, with the defaults. It writes DATA/settings.json, which wins over .env;
 # ENV0 is .env as the process got it — «Сбросить» goes back there.
 DEFAULTS = {"PUBLIC_BASE_URL": "", "LABEL_W_MM": "25", "LABEL_H_MM": "15", "LABEL_DPI": "300",
+            "PRINT_BT": "1", "PRINT_ROTATE": "0", "PRINT_DX_MM": "0", "PRINT_DY_MM": "0", "PRINT_DENSITY": "3",
             "SCAN_NFC": "1", "SCAN_QR": "1", "SCAN_DEFAULT": "auto",
             "SEMANTIC_MIN": "0.35", "SEMANTIC_MARGIN": "0.08", "SEMANTIC_TOP": "5",
             "PHOTO_MAX_PX": "2560", "PHOTO_QUALITY": "90", "TRASH_DAYS": "30", "READER_FORGET_MIN": "10",
@@ -60,7 +61,11 @@ def read_settings():
                READER_FORGET_MIN=num("READER_FORGET_MIN", int, 1), GITHUB_SYNC_MIN=num("GITHUB_SYNC_MIN", lo=1),
                GITHUB_OWNER=setting("GITHUB_OWNER").strip(), GITHUB_TOKEN=setting("GITHUB_TOKEN").strip(),
                LABEL=(num("LABEL_W_MM", lo=5), num("LABEL_H_MM", lo=5), num("LABEL_DPI", lo=100)),
+               PRINT_BT=setting("PRINT_BT") != "0", PRINT_ROTATE=num("PRINT_ROTATE", int, 0, 270), PRINT_DX_MM=num("PRINT_DX_MM", lo=-5, hi=5),
+               PRINT_DY_MM=num("PRINT_DY_MM", lo=-5, hi=5), PRINT_DENSITY=num("PRINT_DENSITY", int, 1, 5),
                SCAN_NFC=setting("SCAN_NFC") != "0", SCAN_QR=setting("SCAN_QR") != "0", SCAN_DEFAULT=setting("SCAN_DEFAULT"))
+    if new["PRINT_ROTATE"] % 90:
+        raise ValueError("PRINT_ROTATE: 0, 90, 180 или 270")
     if new["SCAN_DEFAULT"] not in ("auto", "nfc", "qr"):
         raise ValueError("SCAN_DEFAULT: auto, nfc или qr")
     if not re.match(r"(https?://\S+)?$", setting("PUBLIC_BASE_URL"), re.I):  # HTTP://INV.LAN: capitals keep the QR small

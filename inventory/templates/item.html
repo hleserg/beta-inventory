@@ -1,4 +1,4 @@
-{% extends "base.html" %}{% from "_stock.html" import stock_forms, moves_table %}{% from "_box.html" import box_input, box_link, crumbs, nfc_tag %}{% from "_photos.html" import carousel %}
+{% extends "base.html" %}{% from "_stock.html" import stock_forms, moves_table %}{% from "_box.html" import box_input, box_link, crumbs, nfc_tag, print_btn %}{% from "_photos.html" import carousel %}
 {% block title %}{{ it.name }}{% endblock %}
 {% block main %}
 {% set home = stock|rejectattr("box_id", "in", ("HANDS", TRANSIT))|list %}{% if home|length == 1 %}<div class="crumbs">{{ crumbs(home[0].crumbs + [(home[0].name or home[0].box_id, "/b/" ~ home[0].box_id)]) }}</div>{% endif %}
@@ -39,7 +39,7 @@
 </form></details>
 <details><summary>Метка</summary>
   <p><img src="/i/{{ it.id }}/label.png" alt="наклейка" style="width:240px;max-width:100%;background:#fff;border:1px solid var(--line)"><br>
-  <a data-act href="/i/{{ it.id }}/label.png" download="{{ it.id }}.png">Скачать наклейку</a></p>
+  <a data-act href="/i/{{ it.id }}/label.png" download="{{ it.id }}.png">Скачать наклейку</a> {{ print_btn("/i/" ~ it.id ~ "/label.png") }}</p>
   {{ nfc_tag(nfc) }}</details>
 {% if projects %}<details{% if needs %} open{% endif %}><summary>Нужно для проекта</summary>
 {% for n in needs %}<div class="row"><a href="/p/{{ n.id }}">{{ n.name }}</a><span class="qty right">{{ n.qty|qty(unit=unit_of(it.type, f)) }}</span></div>{% endfor %}

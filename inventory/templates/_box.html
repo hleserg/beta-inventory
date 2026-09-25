@@ -9,6 +9,7 @@
 <datalist id="boxlist">{% for b in boxes %}<option value="{{ label(b) }}" data-place="{{ b.top or '' }}" data-where="{{ b.where or '' }}">{% endfor %}</datalist>
 {%- endmacro %}
 
+{% macro print_btn(url) %}{% if core.PRINT_BT %}<span><button type="button" class="ghost" data-print="{{ url }}">Печать</button></span><span class="mut" data-prst></span>{% endif %}{% endmacro %}{# printing: base.html #}
 {% macro nfc_tag(url) %}{% if core.SCAN_NFC %}{# writing it: base.html; NFC switched off in the settings: no tag at all #}
 <label>Ссылка для NFC-метки</label><input readonly value="{{ url }}" onfocus="this.select()">
 <p class="row"><button type="button" data-nfcw="{{ url }}" data-act>Записать на метку</button><button type="button" class="ghost" data-copy>Скопировать</button><a href="/settings#phone">Как записать метку с телефона</a></p>

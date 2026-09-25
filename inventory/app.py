@@ -338,9 +338,9 @@ def box_delete(box_id: str):
 
 
 @app.get("/b/{box_id}/label.png")
-def label(req: Request, box_id: str):  # a «+ Коробка» page shows it before the box is saved
+def label(req: Request, box_id: str, w: float = 0, h: float = 0):  # a «+ Коробка» page shows it before the box is saved
     b = valid_box_id(box_id)
-    return Response(label_png(f"B/{b}", b, public_base(req)), media_type="image/png")
+    return Response(label_png(f"B/{b}", b, public_base(req), w, h), media_type="image/png")
 
 
 def public_base(req):
@@ -348,8 +348,11 @@ def public_base(req):
     return (os.environ.get("PUBLIC_BASE_URL") or str(req.base_url)).rstrip("/")
 
 
-def label_png(path, text, base):
+def label_png(path, text, base, w=0, h=0):
+    """w, h: the roll in the printer, mm (№61: «Печать» asks with the size the printer reported); 0 — from /settings."""
     w_mm, h_mm, dpi = core.LABEL
+    if 5 <= w <= 200 and 5 <= h <= 200:
+        w_mm, h_mm = w, h
     W, H = round(w_mm / 25.4 * dpi), round(h_mm / 25.4 * dpi)
     qr = qrcode.QRCode(error_correction=qrcode.constants.ERROR_CORRECT_L, border=1)
     qr.add_data(f"{base}/{path}".upper())  # upper case = alphanumeric mode = smaller QR
@@ -498,8 +501,8 @@ def item_need(item_id: int, project: int = Form(), qty: int = Form(0)):
 
 
 @app.get("/i/{item_id}/label.png")
-def item_label(req: Request, item_id: int):  # №22: a box of screws is a thing, not a box, and still gets a label
-    return Response(label_png(f"I/{item_id}", str(item_id), public_base(req)), media_type="image/png")
+def item_label(req: Request, item_id: int, w: float = 0, h: float = 0):  # №22: a box of screws is a thing, not a box, and still gets a label
+    return Response(label_png(f"I/{item_id}", str(item_id), public_base(req), w, h), media_type="image/png")
 
 
 @app.post("/i/{item_id}/delete")

@@ -1,4 +1,4 @@
-{% extends "base.html" %}{% from "_box.html" import nfc_tag %}{% from "_bar.html" import ico %}
+{% extends "base.html" %}{% from "_box.html" import nfc_tag, print_btn %}{% from "_bar.html" import ico %}
 {% set I_DOWN, I_DOTS, I_PLACE = '<path d="M6 9l6 6 6-6"/>', '<path d="M5 12h.01M12 12h.01M19 12h.01"/>', '<path d="M3 21h18M5 21V8l7-5 7 5v13"/><path d="M9 21v-6h6v6"/>' %}
 {% set I_SHELF, I_BOX = '<path d="M4 3v18M20 3v18M4 9h16M4 15h16"/>', '<path d="M3 7.5L12 3l9 4.5v9L12 21l-9-4.5z"/><path d="M3 7.5l9 4.5 9-4.5M12 12v9"/>' %}
 {% macro dots(name) %}<button type="button" class="ib dots" aria-expanded="false" aria-label="Действия: {{ name }}">{{ ico(I_DOTS, w="3") }}</button>{% endmacro %}
@@ -6,7 +6,7 @@
     ~ ((" Вещей внутри: " ~ b.n ~ " — уйдут в корзину вместе с ней.") if b.n else "")
     ~ ((" Коробок внутри: " ~ b.kids ~ " — переедут уровнем выше.") if b.kids else "")
     ~ " Вернуть можно " ~ core.TRASH_DAYS ~ " дней из «Корзины».")|tojson }})'><button class="bad">Удалить</button></form>{% endmacro %}
-{% macro label_btn(id) %}<a class="btn ghost" href="/b/{{ id }}/label.png" download="{{ id }}.png">Наклейка</a>{% endmacro %}
+{% macro label_btn(id) %}<a class="btn ghost" href="/b/{{ id }}/label.png" download="{{ id }}.png">Наклейка</a>{{ print_btn("/b/" ~ id ~ "/label.png") }}{% endmacro %}
 {% macro box_row(b, lvl) %}{# №54 screen 3: the name leads, the ID and what's inside go grey below; ⋯ opens the rest #}
 <div class="tn l{{ lvl }}"><span class="ti"></span><a class="grow" href="/b/{{ b.id }}">
   {% if b.pics %}<img class="thumb" src="/u/{{ b.pics[0] }}" alt="">{% else %}<span class="ti">{{ ico(I_BOX) }}</span>{% endif %}

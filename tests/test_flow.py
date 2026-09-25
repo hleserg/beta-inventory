@@ -59,6 +59,7 @@ def test_main_path():
     r = c.post(f"/i/{iid}/rotate", data={"photo": b, "deg": 90})  # №21: a turned photo is a new file, the old one may be cached
     assert r.json()["photo"] == pics()[0] != b and Image.open(core.UPLOADS / pics()[0]).size == (30, 40)
     assert c.post(f"/i/{iid}/rotate", data={"photo": a, "deg": -90}).status_code == 400  # not this card's photo
+    assert f'data-print="/i/{iid}/label.png"' in c.get(f"/i/{iid}").text  # «Печать»
     assert f"/i/{iid}/label.png" in c.get(f"/i/{iid}").text  # №22: a thing gets its own printed label; its QR is upper case
     assert c.get(f"/i/{iid}/label.png").headers["content-type"] == "image/png"
     assert "MP1584" in c.get("/?q=ПОНИЖАЙКА").text
@@ -579,6 +580,11 @@ def test_label_sheet():
     sheet = c.get("/boxes/sheet?ids=" + ",".join(ids)).text
     assert sheet.count("label.png") == 3 and "width:25mm;height:15mm" in sheet
     assert c.get("/boxes/sheet?ids=../x").status_code == 404
+    # «Печать» (№61): the picture at the roll's size the printer reported, else the one in /settings
+    assert 'data-print="/b/' + ids[0] + '/label.png"' in page
+    assert 'data-print="/b/' + ids[0] + '/label.png"' in c.get(f"/b/{ids[0]}").text
+    size = lambda q: Image.open(io.BytesIO(c.get(f"/b/{ids[0]}/label.png{q}").content)).size
+    assert size("") == (295, 177) and size("?w=50&h=30") == (591, 354) and size("?w=500&h=30") == (295, 177)
 
 
 def test_backup():

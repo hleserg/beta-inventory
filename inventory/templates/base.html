@@ -164,6 +164,9 @@ function when(t) { return new Date(t).toLocaleString("ru", {day: "numeric", mont
 // Settings «Сканирование»: NFC or QR switched off leaves the interface (the QR printed on a label stays).
 const SCAN = {nfc: {{ core.SCAN_NFC|tojson }}, qr: {{ core.SCAN_QR|tojson }}, def: {{ core.SCAN_DEFAULT|tojson }}};
 document.documentElement.classList.toggle("qr", SCAN.qr && "BarcodeDetector" in window && !!navigator.mediaDevices);
+// «Печать»: the label as the printer reports its roll, else /settings; turn, shift, darkness — /settings «Наклейки».
+const PRN = {w: {{ core.LABEL[0] }}, h: {{ core.LABEL[1] }}, rot: {{ core.PRINT_ROTATE }}, dx: {{ core.PRINT_DX_MM }}, dy: {{ core.PRINT_DY_MM }}, density: {{ core.PRINT_DENSITY }}};
+let niim = null, niimPick = false;  // the printer client; niimPick: the remembered printer failed, show the list
 let armed = null, scanning = null;  // armed: the field whose QR button was pressed
 const BOX = /\/b\/([A-Za-z0-9]+)\/?$/i, ITEM = /\/i\/(\d+)\/?$/i;  // a label's or a tag's URL, any host
 const boxField = () => armed || [...document.querySelectorAll("[data-box]")]
@@ -287,6 +290,51 @@ addEventListener("click", async e => {  // «Записать на метку» 
   } catch (e) { st.textContent = e.name == "NotAllowedError" ? "Нажмите «Записать на метку» — телефон ждёт нажатия." : "Не записалось: " + e.message; }
   finally { window.nfcBusy = false; }
 });
+addEventListener("click", async e => {  // «Печать» (_box.html print_btn): a Niimbot over Web Bluetooth, Chrome; the site trusted as secure, as for NFC
+  const b = e.target.closest("[data-print]");
+  if (!b || b.disabled) return;
+  const st = b.parentElement.nextElementSibling;
+  if (!navigator.bluetooth || !isSecureContext) {
+    st.innerHTML = `Этот браузер не печатает на Niimbot. Нужен Chrome, и адрес <b>${location.origin}</b> должен стоять в исключениях Chrome, <a href="/settings#phone">как здесь</a>.`;
+    return;
+  }
+  b.disabled = true;
+  try {
+    const L = await import("/static/vendor/niimbluelib.js");
+    if (!niim?.isConnected()) {  // one connection per page: the next label goes without choosing the printer again
+      niim ??= new L.NiimbotBluetoothClient();
+      const dev = !niimPick && (await navigator.bluetooth.getDevices?.() ?? [])[0];  // chosen on this site before: no picker
+      st.textContent = dev ? "Подключаю принтер…" : "Выберите принтер в списке…";
+      try { await niim.connect(dev ? {authorizedDevice: dev} : undefined); }
+      catch (x) { if (dev) niimPick = true; throw x; }  // off, or another printer: the next press opens the list (it needs a fresh tap)
+    }
+    await niim.fetchRfidInfo();  // the roll may have changed since connecting
+    const r = niim.getRfidInfo(), p = r.paperInfo?.valid && r.paperInfo, m = niim.getModelMetadata();
+    if (!m) throw new Error("эту модель принтера библиотека не знает");
+    const [pw, ph] = p ? [p.paperWidth, p.paperHeight] : [PRN.w, PRN.h], dpm = m.dpi / 25.4, top = m.printDirection != "left";
+    const W = Math.round(pw * dpm), H = Math.round(ph * dpm), turn = PRN.rot % 180;
+    const c = document.createElement("canvas"), g = c.getContext("2d");
+    c.width = top ? Math.min(W, m.printheadPixels) : W; c.height = top ? H : Math.min(H, m.printheadPixels);  // wider than the head: shrink to fit
+    const k = Math.min(c.width / W, c.height / H), img = new Image();
+    img.src = b.dataset.print + (turn ? `?w=${ph}&h=${pw}` : `?w=${pw}&h=${ph}`);
+    await img.decode();
+    g.fillStyle = "#fff"; g.fillRect(0, 0, c.width, c.height); g.imageSmoothingEnabled = false;
+    g.translate(c.width / 2 + PRN.dx * dpm, c.height / 2 + PRN.dy * dpm); g.rotate(PRN.rot * Math.PI / 180);
+    const [dw, dh] = turn ? [H * k, W * k] : [W * k, H * k];
+    g.drawImage(img, -dw / 2, -dh / 2, dw, dh);
+    const t = niim.protocol.newPrintTask(niim.getPrintTaskType() ?? "D110M_V4", {density: PRN.density, totalPages: 1,
+      labelType: r.labelRfidInfo?.consumablesType > 0 ? r.labelRfidInfo.consumablesType : L.LabelType.WithGaps, pageColor: L.PageColorType.SingleColor});
+    st.textContent = "Печатаю…";
+    niim.stopHeartbeat();  // its polling shouldn't cut into the print's packets
+    try {
+      await t.printInit(); await t.printPage(L.ImageEncoder.encodeCanvas(c, L.PageColorType.SingleColor, m.printDirection), 1); await t.waitForFinished();
+    } finally { await t.printEnd().catch(() => {}); niim.startHeartbeat(); }
+    st.textContent = `Напечатано ✓ ${pw}×${ph} мм — ` + (p ? "размер сообщил принтер" : "размер из настроек, принтер его не сообщил");
+  } catch (x) {
+    st.textContent = (niimPick ? "Принтер не ответил. Он включён? Нажмите «Печать» ещё раз — откроется список принтеров. " : "Не напечаталось: ") + (x.message || x);
+  } finally { b.disabled = false; }
+});
+addEventListener("pagehide", () => niim?.disconnect());
 addEventListener("click", e => {  // «Скопировать» (nfc_tag), for NFC Tools: navigator.clipboard needs https, this is http
   const b = e.target.closest("[data-copy]");
   if (!b) return;

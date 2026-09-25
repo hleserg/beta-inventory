@@ -1,4 +1,4 @@
-{% extends "base.html" %}{% from "_box.html" import box_input, crumbs, nfc_tag %}{% from "_photos.html" import carousel %}{% from "_bar.html" import ico %}
+{% extends "base.html" %}{% from "_box.html" import box_input, crumbs, nfc_tag, print_btn %}{% from "_photos.html" import carousel %}{% from "_bar.html" import ico %}
 {% set I_BOX = '<path d="M3 7.5L12 3l9 4.5v9L12 21l-9-4.5z"/><path d="M3 7.5l9 4.5 9-4.5M12 12v9"/>' %}
 {% macro kid(k) %}<div class="tn"><a class="grow" href="/b/{{ k.id }}">{% if k.pics %}<img class="thumb" src="/u/{{ k.pics[0] }}" alt="">{% else %}<span class="ti">{{ ico(I_BOX) }}</span>{% endif %}
   <span class="grow"><span class="nm">{{ k.name or k.id }}</span><span class="path">{% if k.name %}{{ k.id }}{% endif %}{% if k.n or k.kids %}{% if k.name %} · {% endif %}{{ t.items|lower }}: {{ k.n }}{% if k.kids %} · {{ t.boxes|lower }}: {{ k.kids }}{% endif %}{% endif %}</span></span><span class="ti">›</span></a></div>{% endmacro %}
@@ -34,7 +34,7 @@
 {% endif %}
 <details id="more"{% if not contents and not children %} open{% endif %}><summary>Настроить, наклейка{% if contents %}, освободить{% endif %}</summary>
   <p><img src="/b/{{ b.id }}/label.png" alt="наклейка" style="width:240px;max-width:100%;background:#fff;border:1px solid var(--line)"><br>
-  <a data-act href="/b/{{ b.id }}/label.png" download="{{ b.id }}.png">Скачать наклейку</a></p>
+  <a data-act href="/b/{{ b.id }}/label.png" download="{{ b.id }}.png">Скачать наклейку</a> {{ print_btn("/b/" ~ b.id ~ "/label.png") }}</p>
   {{ nfc_tag(nfc) }}
   {% if b.kind == "box" and not draft and b.parent_id != core.HANDS %}<form method="post" action="/b/{{ b.id }}/take"><p><button class="ghost">Взять на руки</button></p></form>{% endif %}
   <form method="post" action="/b/{{ b.id }}" id="boxf" enctype="multipart/form-data">

@@ -4,7 +4,7 @@
 {# №53: one row per setting; «изменено здесь» wins over .env, «Сбросить» brings .env (or the default) back #}
 {% macro src(k) %}{% if k in over %}<span class="src ch">изменено здесь</span>{% elif k in env0 %}<span class="src">из .env</span>{% endif %}{% endmacro %}
 {% macro bad(k) %}{% if err and err[0] == k %} aria-invalid="true" autofocus{% endif %}{% endmacro %}
-{% macro was(k) %}{% set v = env0.get(k, core.DEFAULTS[k]) %}{{ "в .env" if k in env0 else "по умолчанию" }}: {% if k == "GITHUB_TOKEN" %}{{ "задан" if v else "не задан" }}{% elif v == "" %}не задано{% elif k in ("SCAN_NFC", "SCAN_QR") %}{{ "выкл" if v == "0" else "вкл" }}{% elif k == "SCAN_DEFAULT" %}{{ {"auto": "Авто", "nfc": "NFC", "qr": "QR"}.get(v, v) }}{% else %}{{ v }}{% endif %}{% endmacro %}
+{% macro was(k) %}{% set v = env0.get(k, core.DEFAULTS[k]) %}{{ "в .env" if k in env0 else "по умолчанию" }}: {% if k == "GITHUB_TOKEN" %}{{ "задан" if v else "не задан" }}{% elif v == "" %}не задано{% elif k in ("SCAN_NFC", "SCAN_QR", "PRINT_BT") %}{{ "выкл" if v == "0" else "вкл" }}{% elif k == "SCAN_DEFAULT" %}{{ {"auto": "Авто", "nfc": "NFC", "qr": "QR"}.get(v, v) }}{% else %}{{ v }}{% endif %}{% endmacro %}
 {% macro row(k, name, hint="", inline=False) %}<div class="set">
   <div class="seth"><label for="{{ k }}" id="{{ k }}-n" class="nm">{{ name }}</label>{{ src(k) }}{% if k in over %}<button name="reset" value="{{ k }}" class="ghost">Сбросить</button>{% endif %}{% if inline %}{{ caller() }}{% endif %}</div>
   {% if not inline %}<div class="setc">{{ caller() }}</div>{% endif %}
@@ -29,9 +29,9 @@
     <p id="scanst" class="mut sm">Пока сайт открыт, поднесённая метка сразу открывает свою коробку или вещь. Браузер спросит разрешение один раз.</p>
   </div>{% endif %}
 </div>
-{% if core.SCAN_NFC %}<details id="howto"><summary>Как настроить этот телефон</summary>
+{% if core.SCAN_NFC or core.PRINT_BT %}<details id="howto"><summary>Как настроить этот телефон</summary>
 <div data-os="android">
-  <p>Сайт сам пишет NFC-метки, но Chrome разрешает это только «безопасным» сайтам. Домашний сайт работает без HTTPS,
+  <p>Сайт сам пишет NFC-метки и печатает наклейки на Niimbot, но Chrome разрешает это только «безопасным» сайтам. Домашний сайт работает без HTTPS,
     поэтому один раз впишите его в исключения Chrome:</p>
   <ol>
     <li>Включите NFC в настройках телефона (найдите «NFC» поиском по настройкам).</li>
@@ -57,7 +57,11 @@
   </ol>
   <p>Приложение на экран: Safari → «Поделиться» → «На экран „Домой“».</p>
 </div>
-<div data-os="other"><p>Метки пишутся с телефона. Откройте эту страницу на телефоне: <b>{{ origin }}/settings</b></p></div>
+<div data-os="other"><p>Метки пишутся с телефона. Откройте эту страницу на телефоне: <b>{{ origin }}/settings</b></p>
+  {% if core.PRINT_BT %}<p>Печать на Niimbot работает и здесь, в Chrome: вставьте в адресную строку
+    <span class="row"><input readonly value="chrome://flags/#unsafely-treat-insecure-origin-as-secure"><button type="button" class="ghost copy">Копировать</button></span>
+    впишите в «Insecure origins treated as secure» адрес <span class="row"><input readonly value="{{ origin }}"><button type="button" class="ghost copy">Копировать</button></span>
+    выберите <b>Enabled</b> и нажмите <b>Relaunch</b>.</p>{% endif %}</div>
 </details>{% endif %}
 
 <form method="post" action="/settings" id="set">
@@ -80,6 +84,11 @@
   {% call row("LABEL_H_MM", "Высота наклейки, мм") %}{{ num("LABEL_H_MM", 5, step="any") }}{% endcall %}
   {% set dpis = ["203", "300", "600"] %}
   {% call row("LABEL_DPI", "Разрешение принтера, DPI") %}{{ choice("LABEL_DPI", dpis if vals["LABEL_DPI"] in dpis else dpis + [vals["LABEL_DPI"]]) }}{% endcall %}
+  {% call row("PRINT_BT", "Кнопка «Печать»", "Niimbot по Bluetooth, в Chrome. Размер — с рулона, если принтер его сообщил, иначе ширина × высота выше", inline=True) %}{{ tgl("PRINT_BT") }}{% endcall %}
+  {% call row("PRINT_ROTATE", "Поворот картинки") %}{{ choice("PRINT_ROTATE", ["0", "90", "180", "270"], {"0": "0°", "90": "90°", "180": "180°", "270": "270°"}) }}{% endcall %}
+  {% call row("PRINT_DX_MM", "Сдвиг вправо, мм", "минус — влево") %}{{ num("PRINT_DX_MM", -5, 5, "0.5") }}{% endcall %}
+  {% call row("PRINT_DY_MM", "Сдвиг вниз, мм", "минус — вверх") %}{{ num("PRINT_DY_MM", -5, 5, "0.5") }}{% endcall %}
+  {% call row("PRINT_DENSITY", "Плотность печати", "1 — светлее, 5 — темнее") %}{{ num("PRINT_DENSITY", 1, 5, "1") }}{% endcall %}
 </div>
 
 <h2 class="gh">Поиск по смыслу</h2>
