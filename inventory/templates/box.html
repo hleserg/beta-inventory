@@ -1,9 +1,16 @@
-{% extends "base.html" %}{% from "_stock.html" import stock_forms %}{% from "_box.html" import box_input, box_link, crumbs, nfc_tag %}{% from "_photos.html" import carousel %}
+{% extends "base.html" %}{% from "_box.html" import box_input, crumbs, nfc_tag %}{% from "_photos.html" import carousel %}{% from "_bar.html" import ico %}
+{% set I_BOX = '<path d="M3 7.5L12 3l9 4.5v9L12 21l-9-4.5z"/><path d="M3 7.5l9 4.5 9-4.5M12 12v9"/>' %}
+{% macro kid(k) %}<div class="tn"><a class="grow" href="/b/{{ k.id }}">{% if k.pics %}<img class="thumb" src="/u/{{ k.pics[0] }}" alt="">{% else %}<span class="ti">{{ ico(I_BOX) }}</span>{% endif %}
+  <span class="grow"><span class="nm">{{ k.name or k.id }}</span><span class="path">{% if k.name %}{{ k.id }}{% endif %}{% if k.n or k.kids %}{% if k.name %} · {% endif %}{{ t.items|lower }}: {{ k.n }}{% if k.kids %} · {{ t.boxes|lower }}: {{ k.kids }}{% endif %}{% endif %}</span></span><span class="ti">›</span></a></div>{% endmacro %}
 {% block title %}{{ b.name or b.id }}{% endblock %}
-{% block main %}
+{% block main %}{# №54 screen 4: what's inside, each with «Взять» at the thumb; the box's own settings behind «⋯» #}
 <div class="crumbs" id="where">{% if where %}{{ crumbs(where) }}{% else %}место не указано{% endif %}</div>
 {% if pics %}{{ carousel(pics, "/b/" ~ b.id ~ "/rotate") }}{% endif %}
 <h1>{% if b.name %}{{ b.name }} <span class="mut">{{ b.id }}</span>{% else %}{{ b.id }}{% endif %}</h1>
+{% if b.kind == "box" and not draft and b.parent_id == core.HANDS %}{% set bb = all_boxes()|selectattr("id", "equalto", b.back)|first %}{# №56: in hand, going back #}
+<form method="post" action="/b/{{ b.id }}/back" class="row"><button>Положить на место</button>
+  <span class="mut">→ {{ (bb.name or bb.id) if bb else (places|selectattr("id", "equalto", b.place_id)|first or {}).name or "стоит сама" }}</span></form>
+{% endif %}
 {% if not contents and not children %}
 <div class="card">
   <h2 style="margin-top:0">Пусто. Что кладём?</h2>
@@ -11,22 +18,25 @@
   <p><a class="btn" data-act href="/items/new?box={{ b.id }}">+ {{ t.item }}</a></p>
 </div>
 {% else %}
-  {% for i in contents %}
-  <div class="card">
-    <div class="row">{% if pk and i.fields[pk] %}<img class="thumb" src="/u/{{ i.fields[pk][0] }}" alt="">{% endif %}<a href="/i/{{ i.id }}"><b>{{ i.name }}</b></a><span class="qty right">{{ i.qty|qty(unit=unit_of(i.type, i.fields)) }}</span></div>
-    {{ stock_forms(b.id, i.id, i.qty, projects, "/b/" ~ b.id, folded=True, single=i.single) }}
-  </div>
-  {% endfor %}
-  {% for c in children %}<div class="card">{{ t.box }} {{ box_link(c.id, c.name) }}</div>{% endfor %}
-  <p class="row"><a class="btn" href="/?put={{ b.id }}">Положить сюда</a> <a class="btn ghost" href="/items/new?box={{ b.id }}">+ {{ t.item }}</a></p>
+<p class="mut">{% if children %}{{ t.boxes|lower }}: {{ children|length }} · {% endif %}{{ t.items|lower }}: {{ items|length }}</p>
+{% for i in items %}
+<div class="line"><a href="/i/{{ i.id }}">{% if pk and i.fields[pk] %}<img class="thumb" src="/u/{{ i.fields[pk][0] }}" alt="" loading="lazy">{% else %}<span class="thumb"></span>{% endif %}
+  <span class="grow">{{ i.name }}{% if i.src %}<br><span class="mut">{{ t.box|lower }} {{ i.src }}</span>{% endif %}</span><span class="qty">{{ i.qty|qty(unit=unit_of(i.type, i.fields)) }}</span></a>
+  {% if i.qty != 0 %}<button type="button" class="ghost dots" aria-expanded="false">Взять</button>{% endif %}</div>
+{% if i.qty != 0 %}<form method="post" action="/stock" class="tacts" hidden>
+  <input type="hidden" name="box" value="{{ i.box }}"><input type="hidden" name="item" value="{{ i.id }}"><input type="hidden" name="back" value="/b/{{ b.id }}">
+  {% if projects %}<select name="project"><option value="">Без проекта</option>{% for p in projects %}<option value="{{ p.id }}">{{ p.name }}</option>{% endfor %}</select>{% endif %}
+  {% if i.single %}<input type="hidden" name="qty" value="1">{% else %}<input type="number" name="qty" value="1" min="1"{% if i.qty is not none %} max="{{ i.qty }}"{% endif %} inputmode="numeric" required>{% if i.qty is not none %}<span class="mut">из {{ i.qty }}</span>{% endif %}{% endif %}
+  <button name="action" value="take">Взять</button></form>{% endif %}
+{% endfor %}
+{% for k in nested %}{{ kid(k) }}{% endfor %}
+{% if empty %}<details><summary>Пустые · {{ empty|length }}</summary>{% for k in empty %}{{ kid(k) }}{% endfor %}</details>{% endif %}
 {% endif %}
-{% if b.kind == "box" and not draft %}{# №56: the whole box in hand #}
-{% if b.parent_id == core.HANDS %}{% set bb = all_boxes()|selectattr("id", "equalto", b.back)|first %}
-<form method="post" action="/b/{{ b.id }}/back" class="row"><button>Положить на место</button>
-  <span class="mut">→ {{ (bb.name or bb.id) if bb else (places|selectattr("id", "equalto", b.place_id)|first or {}).name or "стоит сама" }}</span></form>
-{% else %}<form method="post" action="/b/{{ b.id }}/take"><p><button class="ghost">Взять на руки</button></p></form>{% endif %}
-{% endif %}
-<details{% if not contents and not children %} open{% endif %}><summary>Настроить, наклейка{% if contents %}, освободить{% endif %}</summary>
+<details id="more"{% if not contents and not children %} open{% endif %}><summary>Настроить, наклейка{% if contents %}, освободить{% endif %}</summary>
+  <p><img src="/b/{{ b.id }}/label.png" alt="наклейка" style="width:240px;max-width:100%;background:#fff;border:1px solid var(--line)"><br>
+  <a data-act href="/b/{{ b.id }}/label.png" download="{{ b.id }}.png">Скачать наклейку</a></p>
+  {{ nfc_tag(nfc) }}
+  {% if b.kind == "box" and not draft and b.parent_id != core.HANDS %}<form method="post" action="/b/{{ b.id }}/take"><p><button class="ghost">Взять на руки</button></p></form>{% endif %}
   <form method="post" action="/b/{{ b.id }}" id="boxf" enctype="multipart/form-data">
     <label>Название</label><input name="name" value="{{ b.name or draft and request.query_params.get('name') or '' }}" placeholder="например: разъёмы JST">
     <label>Фото</label><input type="hidden" name="photos_on" value="1">
@@ -117,13 +127,11 @@
     }, true);
   })();
   </script>
-  <p><img src="/b/{{ b.id }}/label.png" alt="наклейка" style="width:240px;max-width:100%;background:#fff;border:1px solid var(--line)"><br>
-  <a data-act href="/b/{{ b.id }}/label.png" download="{{ b.id }}.png">Скачать наклейку</a></p>
-  {{ nfc_tag(nfc) }}
   {% if contents %}<form method="post" action="/b/{{ b.id }}/clear" onsubmit="return confirm('Всё содержимое спишется в историю. Освободить?')"><button class="bad">Освободить</button></form>{% endif %}
   <form method="post" action="/b/{{ b.id }}/delete" onsubmit='return confirm({{ ("Удалить " ~ (b.name or b.id) ~ "?"
     ~ ((" Вещей внутри: " ~ contents|length ~ " — уйдут в корзину вместе с ней.") if contents else "")
     ~ ((" Коробок внутри: " ~ children|length ~ " — переедут уровнем выше.") if children else "")
     ~ " Вернуть можно " ~ core.TRASH_DAYS ~ " дней из «Корзины».")|tojson }})'><p><button class="bad">Удалить</button></p></form>
 </details>
+{% if not picking %}<div class="save"><button type="button" class="ghost" onclick="const m=document.getElementById('more');m.open=!m.open;if(m.open)m.scrollIntoView({block:'start'})">⋯ {{ t.shelf if b.kind == "shelf" else t.box }}</button><a class="btn" data-act href="/?put={{ b.id }}">+ Положить сюда</a></div>{% endif %}
 {% endblock %}

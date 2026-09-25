@@ -56,6 +56,8 @@ html:has(.car.full){overflow:hidden}
 a.line,.line{display:flex;gap:10px;align-items:center;text-decoration:none;color:inherit;padding:8px 0;border-bottom:1px solid var(--line)}
 .line>a:not(.btn){display:flex;gap:10px;align-items:center;flex:1;min-width:0;color:inherit;text-decoration:none}
 .line .grow{flex:1;min-width:0}.line form{margin:0}
+.line .qty{white-space:normal;text-align:right;max-width:6em}  /* «есть, не считал» wraps instead of running over the name */
+.line .dots[aria-expanded=true]{background:var(--acc);color:var(--on-acc);border-color:var(--acc)}
 .fbar{position:fixed;z-index:9;left:0;right:0;bottom:calc(var(--bar) + env(safe-area-inset-bottom));background:var(--card);border-top:1px solid var(--line);padding:8px 12px}
 .fbar>div{max-width:720px;margin:0 auto;display:flex;gap:6px;overflow-x:auto;scrollbar-width:none}
 .fbar select,.fbar label,.fbar a{flex:none;width:auto;margin:0;min-height:44px;border-radius:99px;font-weight:400;border:1px solid var(--line);background:var(--bg);color:inherit;padding:0 14px;display:inline-flex;align-items:center;gap:6px;white-space:nowrap;text-decoration:none;font-size:.9em}
@@ -262,8 +264,8 @@ addEventListener("click", e => {
   qrScan(armed).finally(() => b.classList.remove("on"));
 });
 addEventListener("click", e => {  // №54 «Места»: ⋯ on a tree row opens its actions, and a folded shelf with them
-  const b = e.target.closest(".tn .dots"); if (!b) return;
-  e.preventDefault(); const s = b.closest(".tn").nextElementSibling;
+  const b = e.target.closest(".tn .dots, .line .dots"); if (!b) return;  // on a line: «Взять» opens its form below (box.html)
+  e.preventDefault(); const s = b.closest(".tn, .line").nextElementSibling;
   s.hidden = !s.hidden; b.setAttribute("aria-expanded", !s.hidden);
   if (!s.hidden && b.closest("summary")) b.closest("details").open = true;
 });

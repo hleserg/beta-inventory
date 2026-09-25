@@ -188,7 +188,8 @@ def test_box_by_name():
     places = c.get("/places").text  # №54: the tree names the box, its ID leads the grey line
     assert '<span class="nm">Клеммники WAGO</span>' in places and f'<span class="path">{b} ·' in places
     page = c.get(f"/b/{b}").text
-    assert f'<h1>Клеммники WAGO <span class="mut">{b}</span></h1>' in page and f'<b>Ящик</b> <span class="mut">{d}</span>' in page
+    assert f'<h1>Клеммники WAGO <span class="mut">{b}</span></h1>' in page
+    assert '<span class="nm">Ящик</span>' in page and f'<span class="path">{d}' in page  # №54 screen 4: a box inside reads as on «Места»
 
 
 def test_new_box_and_shelves():
@@ -452,6 +453,20 @@ def test_take_box():
     c.post(f"/b/{inner}/back")
     assert row(inner)["parent_id"] == outer
 
+
+def test_box_lists_what_is_inside():
+    """№54 screen 4: a box inside holding one thing shows the thing; «Взять» on the line takes it from that inner box."""
+    outer, inner, spare = core.new_boxes(3)
+    with core.db() as db:
+        db.execute("UPDATE boxes SET name='мелочь', parent_id=? WHERE id=?", (outer, inner))
+        db.execute("UPDATE boxes SET parent_id=? WHERE id=?", (outer, spare))
+    c.post("/items/new?type=resistor", data={"name": "светодиод 5мм", "value": "x", "box": inner, "qty": 7})
+    iid = newest()
+    page = c.get(f"/b/{outer}").text
+    assert "светодиод 5мм" in page and "коробка мелочь" in page and f'name="box" value="{inner}"' in page
+    assert "Пустые · 1" in page and "+ Положить сюда" in page
+    c.post("/stock", data={"box": inner, "item": iid, "action": "take", "qty": 2, "back": f"/b/{outer}"})
+    assert core.db().execute("SELECT qty FROM stock WHERE box_id=? AND item_id=?", (inner, iid)).fetchone()[0] == 5
 
 def test_transit():
     """Manifesto 3: ordered things lie «в пути» — out of the total, in the «докупить» check; «пришло» moves them in."""

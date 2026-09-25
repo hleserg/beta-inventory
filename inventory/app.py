@@ -241,9 +241,18 @@ def box(req: Request, box_id: str):
 def box_page(req, b, draft=False):
     with db() as c:
         contents = core.box_contents(c, b["id"])
-        children = c.execute("SELECT * FROM boxes WHERE parent_id=? ORDER BY id", (b["id"],)).fetchall()
+        children = [dict(k, pics=json.loads(k["photos"] or "[]")) for k in c.execute(
+            "SELECT b.*, (SELECT count(*) FROM stock WHERE box_id=b.id) AS n, "
+            "(SELECT count(*) FROM boxes k WHERE k.parent_id=b.id) AS kids "
+            "FROM boxes b WHERE parent_id=? ORDER BY name='', name, id", (b["id"],))]
+        items = [dict(i, box=b["id"]) for i in contents]  # №54 screen 4: what's inside, one flat list to take from
+        for k in children:  # ponytail: one level down; a box holding one thing shows the thing, recurse if deeper nests show up
+            if k["n"] == 1 and not k["kids"]:
+                items += [dict(i, box=k["id"], src=k["name"] or k["id"]) for i in core.box_contents(c, k["id"])]
+        items.sort(key=lambda i: i["name"].lower())
         places = c.execute("SELECT * FROM places ORDER BY name").fetchall()
         return page(req, "box.html", b=b, pics=json.loads(b["photos"]), where=core.box_crumbs(c, b["id"]), contents=contents, top=box_top(b["id"]),
+                    items=items, nested=[k for k in children if k["kids"] or k["n"] > 1], empty=[k for k in children if not k["kids"] and not k["n"]],
                     children=children, places=places, projects=core.projects(c), draft=draft, picking="from" in req.query_params,
                     nfc=f"{public_base(req)}/b/{b['id']}".lower())  # NFC Tools writes it as typed
 
