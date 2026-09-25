@@ -267,8 +267,7 @@ async def box_save(req: Request, box_id: str, name: str = Form(""), place: str =
                    x_autosave: str = Header("")):
     bid = valid_box_id(box_id)
     form = await req.form()  # photos only when the page's form sent them: a bare POST keeps what the box has
-    photos = None if not form.get("photos_on") else [x for x in map(core.own_upload, form.getlist("photos__keep")) if x] + [
-        save_upload(up, photo=True) for up in form.getlist("photos") if getattr(up, "filename", "")]
+    photos = photo_order(form, "photos") if form.get("photos_on") else None
     parent = core.find_box(parent_id) if parent_id.strip() else None
     with db() as c:  # an error rolls the insert back: a draft stays a draft
         c.execute("INSERT OR IGNORE INTO boxes(id) VALUES (?)", (bid,))
@@ -380,6 +379,21 @@ def save_upload(up, photo=False):
     return core.save_bytes(up.file.read(), Path(up.filename).suffix.lower()[:10], photo)
 
 
+def photo_order(form, k):
+    """Photos as the form lays them out (№64): a kept name, or new:N for the N-th file picked; files it doesn't place go last."""
+    ups = [u for u in form.getlist(k) if getattr(u, "filename", "")]
+    out = []
+    for x in [*map(str, form.getlist(k + "__keep")), *(f"new:{i}" for i in range(len(ups)))]:
+        if x.startswith("new:"):
+            i = int(x[4:]) if x[4:].isdigit() else len(ups)
+            if i < len(ups) and ups[i]:
+                out.append(save_upload(ups[i], photo=True))
+                ups[i] = None
+        elif n := core.own_upload(x):  # only own uploads: a form can't point at other files
+            out.append(n)
+    return out
+
+
 async def read_fields(req, old, fields):
     """Card form → (name, fields, errors, form), driven entirely by the profile."""
     form = await req.form()
@@ -387,8 +401,7 @@ async def read_fields(req, old, fields):
     for fd in fields:
         k, typ = fd["key"], fd["type"]
         if typ == "photo":
-            keep = [x for x in map(core.own_upload, form.getlist(k + "__keep")) if x]  # the ones not ✕-ed, in order
-            f[k] = keep + [save_upload(up, photo=True) for up in form.getlist(k) if getattr(up, "filename", "")]
+            f[k] = photo_order(form, k)
         elif typ == "files":
             for up in form.getlist(k):
                 if getattr(up, "filename", ""):

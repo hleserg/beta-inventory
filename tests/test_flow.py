@@ -62,6 +62,10 @@ def test_main_path():
     r = c.post(f"/i/{iid}/rotate", data={"photo": b, "deg": 90})  # №21: a turned photo is a new file, the old one may be cached
     assert r.json()["photo"] == pics()[0] != b and Image.open(core.UPLOADS / pics()[0]).size == (30, 40)
     assert c.post(f"/i/{iid}/rotate", data={"photo": a, "deg": -90}).status_code == 400  # not this card's photo
+    x, y = pics()  # №64: the form's order wins, a new photo can go first; new:N is the N-th file picked
+    c.post(f"/i/{iid}/edit?type=module", files=photo(), data={"name": "MP1584 mini buck", "pinout": "IN+ IN- OUT+ OUT-", "aliases": "понижайка",
+                                                             "photo__keep": [y, "new:0", x, "new:7"]})
+    assert pics()[0] == y and pics()[2] == x and len(pics()) == 3
     assert f'data-print="/i/{iid}/label.png"' in c.get(f"/i/{iid}").text  # «Печать»
     assert f"/i/{iid}/label.png" in c.get(f"/i/{iid}").text  # №22: a thing gets its own printed label; its QR is upper case
     assert c.get(f"/i/{iid}/label.png").headers["content-type"] == "image/png"

@@ -39,25 +39,29 @@
   <p class="row"><button>Сохранить</button><button name="nfc" value="1" class="ghost">Сохранить и записать метку</button></p>{% endif %}
 </form>
 <script>{
-// Photos: each pick adds to the ones before (a phone camera gives one shot per pick), ✕ drops one.
+// Photos: each pick adds to the ones before (a phone camera gives one shot per pick), ✕ drops one, a drag reorders (№64).
+// A new one sits in the row as new:N — the N-th picked file — so the server keeps the order the row shows.
 for (const inp of document.querySelectorAll("input[data-pics]")) {
-  const dt = new DataTransfer(), row = inp.previousElementSibling;
+  const row = inp.previousElementSibling, k = inp.name + "__keep";
   const sync = () => {
+    const dt = new DataTransfer();
+    row.querySelectorAll(".pic.new").forEach((s, i) => { dt.items.add(s.file); s.querySelector("input").value = "new:" + i; });
     inp.files = dt.files;
-    row.querySelectorAll(".pic.new").forEach(e => e.remove());
-    [...dt.files].forEach((file, i) => {
-      const s = document.createElement("span");
-      s.className = "pic new";
-      s.innerHTML = '<img class="thumb" alt=""><button type="button" class="mini" aria-label="Убрать фото">✕</button>';
-      s.firstChild.src = URL.createObjectURL(file);
-      s.lastChild.onclick = () => { dt.items.remove(i); sync(); inp.dispatchEvent(new Event("input", {bubbles: true})); };
-      row.append(s);
-    });
     inp.required = "req" in inp.dataset && !row.querySelector("input");  // new files count on their own
   };
-  inp.addEventListener("change", () => { for (const file of inp.files) dt.items.add(file); sync(); });
+  inp.addEventListener("change", () => {
+    for (const file of inp.files) {
+      const s = document.createElement("span");
+      s.className = "pic new"; s.file = file;
+      s.innerHTML = `<img class="thumb" alt=""><input type="hidden" name="${k}"><button type="button" class="mini" aria-label="Убрать фото">✕</button>`;
+      s.firstChild.src = URL.createObjectURL(file);
+      row.append(s);
+    }
+    sync();
+  });
+  row.addEventListener("input", sync);  // a drag (base.html) moved one
   row.addEventListener("click", e => {
-    if (e.target.matches(".pic:not(.new) button")) { e.target.parentNode.remove(); sync(); inp.dispatchEvent(new Event("input", {bubbles: true})); }
+    if (e.target.matches(".pic button")) { e.target.parentNode.remove(); sync(); inp.dispatchEvent(new Event("input", {bubbles: true})); }
   });
 }
 // Every edit goes to a local draft, so leaving the page (a label scanned, a call) loses nothing. Photos and files stay out.

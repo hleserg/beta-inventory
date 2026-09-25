@@ -32,6 +32,7 @@ item_fields:
     label: Фото
     type: photo
     required: true
+    hint: первое — лицевое; порядок меняется перетаскиванием
   - key: aliases
     label: Другие названия
     type: text

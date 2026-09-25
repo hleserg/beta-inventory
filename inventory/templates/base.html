@@ -50,7 +50,8 @@ label{display:block;margin:14px 0 4px;font-weight:600}
 .car.full .x{display:block;position:absolute;top:10px;right:10px}
 .car.full .rot{display:flex;gap:8px;position:absolute;top:10px;left:10px}
 html:has(.car.full){overflow:hidden}
-.pic{position:relative;display:inline-flex}
+.pic{position:relative;display:inline-flex;touch-action:none;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}.pic img{pointer-events:none}
+.pic.drag{opacity:.5}.pic:first-child:not(:only-child) img{outline:2px solid var(--acc);outline-offset:1px}  /* №64: the first is the face */
 .pic button{position:absolute;top:-6px;right:-6px;min-height:0;padding:0 6px;border-radius:50%}
 .thumb{width:52px;height:52px;object-fit:cover;border-radius:8px;flex:none;background:var(--line)}
 a.line,.line{display:flex;gap:10px;align-items:center;text-decoration:none;color:inherit;padding:8px 0;border-bottom:1px solid var(--line)}
@@ -542,6 +543,25 @@ addEventListener("DOMContentLoaded", () => {
     };
     s.className = "num"; f.before(s); s.append(btn("−", -1), f, btn("+", 1));
   }
+});
+// №64: photos in a form reorder by drag — pointer events, so a finger works too. The row says input+change, the form saves.
+addEventListener("pointerdown", e => {
+  const p = e.target.closest?.(".pic");
+  if (!p || e.button || e.target.closest("button")) return;
+  e.preventDefault();
+  const row = p.parentNode, at = [...row.children].indexOf(p), me = e.pointerId;
+  p.classList.add("drag");  // no pointer capture: moving the node in the DOM drops it, and the drag with it
+  const move = e => {
+    const t = e.pointerId == me && document.elementFromPoint(e.clientX, e.clientY)?.closest(".pic");
+    if (t && t !== p && t.parentNode === row) t[p.compareDocumentPosition(t) & Node.DOCUMENT_POSITION_FOLLOWING ? "after" : "before"](p);
+  };
+  const up = e => {
+    if (e.pointerId != me) return;
+    for (const [n, f] of [["pointermove", move], ["pointerup", up], ["pointercancel", up]]) removeEventListener(n, f);
+    p.classList.remove("drag");
+    if ([...row.children].indexOf(p) != at) for (const ev of ["input", "change"]) row.dispatchEvent(new Event(ev, {bubbles: true}));
+  };
+  for (const [n, f] of [["pointermove", move], ["pointerup", up], ["pointercancel", up]]) addEventListener(n, f);
 });
 </script>
 {% block main %}{% endblock %}</main>
