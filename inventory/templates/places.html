@@ -17,7 +17,7 @@
 <div class="sw"><form method="post" action="/places/{{ p.id }}/delete" onsubmit='return confirm({{ ("Удалить «" ~ p.name ~ "»?"
   ~ ((" Место очистится у коробок: " ~ lost ~ ".") if lost else "")
   ~ ((" " ~ t.shelves ~ " уйдут вместе с местом: " ~ p.shelves|length ~ ((", вещей на них: " ~ p.gone) if p.gone else "") ~ ".") if p.shelves else "")
-  ~ " Вернуть можно " ~ trash_days ~ " дней из «Корзины».")|tojson }})'><button class="bad">Удалить</button></form>
+  ~ " Вернуть можно " ~ core.TRASH_DAYS ~ " дней из «Корзины».")|tojson }})'><button class="bad">Удалить</button></form>
 <div class="card" id="p{{ p.id }}" data-swipe><b>{{ p.name }}</b>{% if p.note %} <span class="mut">{{ p.note }}</span>{% endif %}
   {% for s in p.shelves %}<div>{{ box_link(s.id, s.name) }}</div>{% endfor %}{# only places and shelves here (№38): boxes are on a shelf's page and in «Коробки» #}
   {% if not p.shelves and not p.boxes %}<div class="mut">пусто</div>{% endif %}

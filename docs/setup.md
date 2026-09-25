@@ -54,7 +54,7 @@ provider there skips the router and its names.
 
 ## 4. Android: app and NFC tags
 
-Open `<site address>/phone` in **Chrome**. The page shows the steps with your
+Open `<site address>/settings#phone` in **Chrome**. «Этот телефон» shows the steps with your
 address filled in:
 
 1. Turn NFC on.

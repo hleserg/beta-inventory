@@ -6,7 +6,7 @@
 <h1>{{ it.name }}</h1>
 <div class="row"><span class="mut" style="flex:1">{{ type_label(it.type) or "тип не выбран" }}</span><span class="row right" style="flex-wrap:nowrap"><a class="btn ghost" href="/i/{{ it.id }}/edit">Изменить</a>
   <form method="post" action="/i/{{ it.id }}/delete" onsubmit='return confirm({{ ("«" ~ it.name ~ "» уйдёт в корзину"
-    ~ ((" и пропадёт из мест, где лежит: " ~ stock|length) if stock else "") ~ ". Вернуть можно " ~ trash_days
+    ~ ((" и пропадёт из мест, где лежит: " ~ stock|length) if stock else "") ~ ". Вернуть можно " ~ core.TRASH_DAYS
     ~ " дней из «Корзины».")|tojson }})'><button class="ghost">Удалить</button></form></span></div>
 <form method="post" action="/i/{{ it.id }}/agent"><label class="chk"><input type="checkbox" name="on" value="1"{% if it.for_agent %} checked{% endif %}
   onchange="this.form.submit()"> {{ t.to_agent }}</label></form>

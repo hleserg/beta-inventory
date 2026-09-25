@@ -2,7 +2,7 @@
 {% block title %}Корзина{% endblock %}
 {% block main %}
 <h1>Корзина</h1>
-<p class="mut">Удалённое лежит здесь {{ trash_days }} дней, потом стирается насовсем.</p>
+<p class="mut">Удалённое лежит здесь {{ core.TRASH_DAYS }} дней, потом стирается насовсем.</p>
 {% for r in rows %}
 <form method="post" action="/trash/{{ r.id }}" class="card row">
   <span>{{ {"item": t.item, "box": t.box, "place": t.place}[r.kind] }} <b>{{ r.label }}</b>

@@ -572,3 +572,33 @@ def test_reader():
     assert tap(f"http://inv.lan/I/{tool}").status_code == 409  # a portable one forgets after READER_FORGET_MIN
     c.post("/readers/delete", data={"id": "AA:01"})
     assert "AA:01" not in c.get("/readers").text
+
+
+def test_settings():
+    """№53: /settings beats .env — kept in DATA/settings.json, works at once, «Сбросить» brings .env back."""
+    f = core.DATA / "settings.json"
+    saved = lambda: json.loads(f.read_text())
+    try:
+        page = c.post("/settings", data={"TRASH_DAYS": "7"}).text
+        assert core.TRASH_DAYS == 7 and saved() == {"TRASH_DAYS": "7"} and "изменено здесь" in page
+        assert "здесь 7 дней" in c.get("/trash").text
+        for bad in ({"TRASH_DAYS": "abc"}, {"TRASH_DAYS": "-1"}, {"PUBLIC_BASE_URL": "inv.lan"}, {"SCAN_DEFAULT": "x"}):
+            assert c.post("/settings", data=bad).status_code == 400
+        assert core.TRASH_DAYS == 7 and saved() == {"TRASH_DAYS": "7"}  # a bad value changes nothing
+        c.post("/settings", data={"reset": "TRASH_DAYS"})
+        assert core.TRASH_DAYS == 30 and saved() == {}
+        c.post("/settings", data={"TRASH_DAYS": "30", "PHOTO_QUALITY": "90"})  # the whole form comes back unchanged
+        assert saved() == {}
+
+        c.post("/settings", data={"GITHUB_TOKEN": "ghp_secret123"})
+        assert core.GITHUB_TOKEN == "ghp_secret123" and "ghp_secret123" not in c.get("/settings").text
+        c.post("/settings", data={"GITHUB_TOKEN": ""})  # an empty field keeps the token
+        assert core.GITHUB_TOKEN == "ghp_secret123"
+
+        assert 'id="scan"' in c.get("/").text
+        c.post("/settings", data={"SCAN_NFC": "0", "SCAN_QR": "0"})
+        assert 'id="scan"' not in c.get("/").text and 'data-nfcw="' not in c.get(f"/i/{newest()}").text
+    finally:
+        core.save_settings(dict.fromkeys(saved() if f.exists() else [], None))
+    r = c.get("/phone", follow_redirects=False)
+    assert r.status_code == 302 and r.headers["location"] == "/settings#phone"

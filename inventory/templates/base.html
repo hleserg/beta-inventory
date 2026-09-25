@@ -98,12 +98,26 @@ body:has(:is(input:not([type=checkbox],[type=radio],[type=file]),textarea):focus
 .pickm::backdrop{background:#0008}.pickm>div{display:flex;gap:8px;padding:8px}.pickm input{flex:1;min-width:0}
 .pickall{max-height:70vh;overflow-y:auto}
 form[data-sent] button{opacity:.5}
+/* settings.html: a row per setting, radios as a segmented choice, switches, the save bar */
+.choice{flex:none;display:inline-flex;border:1px solid var(--line);border-radius:10px;overflow:hidden;background:var(--card)} .choice label{margin:0;min-width:44px;height:44px;display:grid;place-items:center;padding:0 12px;font-weight:400} .choice input{position:absolute;opacity:0} .choice label:has(:checked){background:var(--acc);color:var(--on-acc);font-weight:600} .choice label:has(:focus-visible){outline:2px solid var(--acc);outline-offset:-2px}
+.src{display:inline-block;font-size:12px;font-weight:600;line-height:20px;padding:0 8px;border-radius:99px;border:1px solid var(--line);color:var(--mut);white-space:nowrap} .src.ch{border-color:var(--acc);color:var(--acc)}
+.card.list{padding:0}
+.set{padding:10px 16px;border-bottom:1px solid var(--line)} .set:last-child{border-bottom:0}
+.seth{display:flex;align-items:center;gap:8px;min-height:28px} .seth .nm{flex:1;min-width:0;margin:0;font-weight:600}
+.setc{display:flex;align-items:center;gap:12px;margin-top:6px}
+.sm{font-size:13px}
+.gh{margin:22px 0 4px}
+.code{display:flex;align-items:flex-start;gap:4px;padding:6px 2px 6px 12px;margin-top:6px;background:var(--bg);border:1px solid var(--line);border-radius:8px} .code pre{flex:1;min-width:0;margin:0;font:13px/1.5 ui-monospace,monospace;white-space:pre-wrap;word-break:break-all}
+.warn{display:flex;gap:8px;align-items:flex-start;margin:0;font-size:13px}
+.save{position:fixed;z-index:10;left:0;right:0;bottom:0;display:flex;justify-content:flex-end;align-items:center;gap:12px;padding:10px 12px calc(10px + env(safe-area-inset-bottom));background:var(--card);border-top:1px solid var(--line)}
+input[type=checkbox].tgl{appearance:none;flex:none;width:52px;height:32px;margin:0;border-radius:99px;background:var(--line);position:relative;cursor:pointer} .tgl::after{content:"";position:absolute;top:3px;left:3px;width:26px;height:26px;border-radius:50%;background:#fff;transition:transform .15s} .tgl:checked{background:var(--acc)} .tgl:checked::after{transform:translateX(20px)}
+body:has(.save:not([hidden])) #scan{display:none}
 </style>
 </head>
 <body>
 {% set seg = (request.url.path if request is defined else "/").split("/")[1]|lower %}
 {% set cur = {"b": "/boxes", "i": "/items", "p": "/projects"}.get(seg, "/" ~ seg) %}
-{% set more = [("/places", t.places), ("/projects", "Проекты"), ("/readers", "Считыватели"), ("/trash", "Корзина"), ("/phone", "Телефон")] %}
+{% set more = [("/places", t.places), ("/projects", "Проекты"), ("/readers", "Считыватели"), ("/trash", "Корзина"), ("/settings", "Настройки")] %}
 <nav>{% for h, l in [("/", "Поиск"), ("/boxes", t.boxes), ("/items", t.items), ("/history", "История")] %}<a href="{{ h }}"{% if h == cur %} aria-current="page"{% endif %}>{{ l }}</a>{% endfor %}
 <details><summary{% if cur in more|map("first") %} aria-current="true"{% endif %}>Ещё</summary><div>{% for h, l in more %}<a href="{{ h }}"{% if h == cur %} aria-current="page"{% endif %}>{{ l }}</a>{% endfor %}</div></details></nav>
 <main><div id="drafts"></div>
@@ -120,9 +134,11 @@ for (const k of Object.keys(localStorage)) if (k.startsWith("draft:") && k !== "
 }
 function when(t) { return new Date(t).toLocaleString("ru", {day: "numeric", month: "short", hour: "2-digit", minute: "2-digit"}); }
 
-// With the site open, a box label goes straight to its box (Web NFC, Chrome on Android; permission via /phone).
+// With the site open, a box label goes straight to its box (Web NFC, Chrome on Android; permission via /settings).
 // On a page with a visible box field (_box.html) it fills the field instead; on an item card it puts the item there.
-document.documentElement.classList.toggle("qr", "BarcodeDetector" in window && !!navigator.mediaDevices);
+// Settings «Сканирование»: NFC or QR switched off leaves the interface (the QR printed on a label stays).
+const SCAN = {nfc: {{ core.SCAN_NFC|tojson }}, qr: {{ core.SCAN_QR|tojson }}, def: {{ core.SCAN_DEFAULT|tojson }}};
+document.documentElement.classList.toggle("qr", SCAN.qr && "BarcodeDetector" in window && !!navigator.mediaDevices);
 let armed = null, scanning = null;  // armed: the field whose QR button was pressed
 const BOX = /\/b\/([A-Za-z0-9]+)\/?$/i, ITEM = /\/i\/(\d+)\/?$/i;  // a label's or a tag's URL, any host
 const boxField = () => armed || [...document.querySelectorAll("[data-box]")]
@@ -144,7 +160,7 @@ async function gotBox(id) {
 function askMove(label, card) {  // «больше не спрашивать» is for a thing's card only (№30)
   return ask(`Переложить в ${label}?`, "Переложить", card && "askMove");
 }
-function ask(text, yes, key) {  // key: «больше не спрашивать» offered, kept on this phone under it; /phone turns it back on
+function ask(text, yes, key) {  // key: «больше не спрашивать» offered, kept on this phone under it; /settings turns it back on
   try { if (key && localStorage[key] === "no") return true; } catch {}
   const d = document.createElement("dialog");
   d.innerHTML = `<form method="dialog"><p></p>${key ? `<label class="chk"><input type="checkbox"> больше не спрашивать</label>` : ""}
@@ -160,7 +176,8 @@ function ask(text, yes, key) {  // key: «больше не спрашивать
 function nfcScan() {  // one reader per page: two would both fire and the second would miss the armed field
   return scanning ||= (() => { const r = new NDEFReader();
     r.onreading = e => {
-      if (window.nfcBusy || document.querySelector("dialog[open]")) return;  // this page is writing the tag; a question is open
+      if (window.nfcBusy || document.querySelector("dialog[open]:not([data-nfc])")) return;  // this page is writing the tag; a question is open
+      document.querySelector("dialog[data-nfc]")?.close();  // the corner button's «поднесите метку» got its tag
       for (const rec of e.message.records) {
         const u = ["url", "absolute-url"].includes(rec.recordType) ? new TextDecoder().decode(rec.data) : "";
         const b = u.match(BOX), i = u.match(ITEM);
@@ -170,10 +187,20 @@ function nfcScan() {  // one reader per page: two would both fire and the second
     };
     return r.scan(); })().catch(e => { scanning = null; throw e; });
 }
+function fab() {  // the corner button: NFC where the phone reads tags (unless the settings say QR first), else the QR camera
+  if (!(SCAN.nfc && "NDEFReader" in window && (SCAN.def !== "qr" || !SCAN.qr))) return qrScan();
+  const d = document.createElement("dialog"), p = document.createElement("p"), r = document.createElement("p");
+  d.dataset.nfc = ""; p.textContent = "Поднесите телефон к метке"; r.className = "row";
+  if (SCAN.qr) { const q = document.createElement("button"); q.type = "button"; q.className = "ghost"; q.textContent = "Сканировать QR";
+    q.onclick = () => { d.close(); qrScan(); }; r.append(q); }
+  const x = document.createElement("button"); x.type = "button"; x.className = "ghost"; x.textContent = "Закрыть"; x.onclick = () => d.close();
+  r.append(x); d.onclose = () => d.remove(); d.append(p, r); document.body.append(d); d.showModal();
+  nfcScan().catch(e => p.textContent = "NFC не включился: " + e.message);
+}
 async function qrScan(f) {  // f: the box field whose QR button was pressed; none: the corner button, it opens what it reads
   if (!("BarcodeDetector" in window && navigator.mediaDevices)) {
     if (await ask(`Этот браузер не читает QR с сайта. Наведите на наклейку камеру телефона — страница откроется сама. `
-      + `Сканер на сайте работает в Chrome на Android, когда адрес ${location.origin} добавлен в исключения Chrome.`, "Как настроить")) location.href = "/phone";
+      + `Сканер на сайте работает в Chrome на Android, когда адрес ${location.origin} добавлен в исключения Chrome.`, "Как настроить")) location.href = "/settings#phone";
     return;
   }
   const d = document.createElement("dialog"), p = document.createElement("p"), v = document.createElement("video"), x = document.createElement("button");
@@ -207,18 +234,18 @@ async function qrScan(f) {  // f: the box field whose QR button was pressed; non
 addEventListener("click", e => {
   const more = document.querySelector("nav details[open]");
   if (more && !more.contains(e.target)) more.open = false;  // «Ещё» closes on a tap past it, like any menu
-  if (e.target.closest("#scan")) return qrScan();
+  if (e.target.closest("#scan")) return fab();
   const b = e.target.closest("[data-qr]");
   if (!b) return;
   armed = b.parentElement.querySelector("[data-box]"); b.classList.add("on");
   qrScan(armed).finally(() => b.classList.remove("on"));
 });
-addEventListener("click", async e => {  // «Записать на метку» (_box.html nfc_tag): Chrome on Android, site trusted as secure, see /phone
+addEventListener("click", async e => {  // «Записать на метку» (_box.html nfc_tag): Chrome on Android, site trusted as secure, see /settings
   const b = e.target.closest("[data-nfcw]");
   if (!b) return;
   const st = b.parentElement.nextElementSibling;
   if (!("NDEFReader" in window)) {  // say why, not nothing: most often the site is open under another address
-    st.innerHTML = `Этот браузер не пишет метки. Нужен Chrome на Android, и адрес <b>${location.origin}</b> должен стоять в исключениях Chrome, <a href="/phone">как здесь</a>.`;
+    st.innerHTML = `Этот браузер не пишет метки. Нужен Chrome на Android, и адрес <b>${location.origin}</b> должен стоять в исключениях Chrome, <a href="/settings#phone">как здесь</a>.`;
     return;
   }
   st.textContent = "Поднесите метку к задней крышке телефона…";
@@ -248,8 +275,9 @@ addEventListener("DOMContentLoaded", () => {  // №42: «Сохранить и 
   history.replaceState(null, "", location.pathname);  // a reload doesn't write again
   (b.closest("details") || {}).open = true; b.scrollIntoView({block: "center"}); b.click();
 });
-if ("NDEFReader" in window) navigator.permissions.query({name: "nfc"})
+if (SCAN.nfc && "NDEFReader" in window) navigator.permissions.query({name: "nfc"})
   .then(p => p.state === "granted" && nfcScan().catch(() => addEventListener("click", nfcScan, {once: true}))).catch(() => {});
+if (!SCAN.qr && !("NDEFReader" in window)) document.getElementById("scan")?.remove();  // nothing left for the corner button here
 
 // Our own list over a choice (select[data-pick], a long select, a datalist field): the native datalist won't open on an
 // Android tap and filters by the value already in it. Open: the value hides, the field searches; recent choices first,
@@ -423,7 +451,7 @@ document.addEventListener("pointerdown", e => {
   addEventListener("pointermove", move); addEventListener("pointerup", up); addEventListener("pointercancel", up);
 });
 addEventListener("pageshow", e => { if (e.persisted) location.reload(); });  // back button: the page from memory has old counts
-// №40: every number field gets − and + by one. Card numbers are text ("1,5"), so no stepUp; never below min (else 0).
+// №40: every number field gets − and + by its step (none: one). Card numbers are text ("1,5"), so no stepUp; never below min (else 0).
 // An empty field: + starts it, − leaves it empty («не считал»). Events as if typed: drafts and autosave see it.
 addEventListener("DOMContentLoaded", () => {
   for (const f of document.querySelectorAll("input[type=number], input[inputmode=decimal]")) {
@@ -431,9 +459,9 @@ addEventListener("DOMContentLoaded", () => {
       const b = document.createElement("button");
       b.type = "button"; b.className = "ghost"; b.textContent = t;
       b.onclick = () => {
-        const min = f.min === "" ? 0 : +f.min, max = f.max === "" ? Infinity : +f.max, v = parseFloat(f.value.replace(",", "."));
+        const st = +f.step || 1, min = f.min === "" ? 0 : +f.min, max = f.max === "" ? Infinity : +f.max, v = parseFloat(f.value.replace(",", "."));
         if (isNaN(v) && d < 0) return;
-        const n = isNaN(v) ? Math.max(min, 1) : Math.min(max, Math.max(min, Math.round((v + d) * 1000) / 1000));
+        const n = isNaN(v) ? Math.max(min, st) : Math.min(max, Math.max(min, Math.round((v + d * st) * 1000) / 1000));
         f.value = f.value.includes(",") ? String(n).replace(".", ",") : n;
         for (const e of ["input", "change"]) f.dispatchEvent(new Event(e, {bubbles: true}));
       };
@@ -444,6 +472,6 @@ addEventListener("DOMContentLoaded", () => {
 });
 </script>
 {% block main %}{% endblock %}</main>
-<button id="scan" type="button" aria-label="Сканировать QR" title="Сканировать QR"><svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 8V5a1 1 0 0 1 1-1h3M16 4h3a1 1 0 0 1 1 1v3M20 16v3a1 1 0 0 1-1 1h-3M8 20H5a1 1 0 0 1-1-1v-3M7 12h10"/></svg></button>
+{% if core.SCAN_NFC or core.SCAN_QR %}<button id="scan" type="button" aria-label="Сканировать" title="Сканировать"><svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 8V5a1 1 0 0 1 1-1h3M16 4h3a1 1 0 0 1 1 1v3M20 16v3a1 1 0 0 1-1 1h-3M8 20H5a1 1 0 0 1-1-1v-3M7 12h10"/></svg></button>{% endif %}
 </body>
 </html>

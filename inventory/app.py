@@ -31,21 +31,21 @@ core.init()
 
 async def github_sync():
     while True:
-        try:
-            if n := await asyncio.to_thread(lambda: core.sync_projects(core.fetch_repos())):
-                print(f"github: {n} new repos in the projects inbox", flush=True)
-        except Exception as e:  # network down, token revoked: try again next round
-            print(f"github sync failed: {e}", flush=True)
+        if core.GITHUB_OWNER or core.GITHUB_TOKEN:  # set on /settings any time: picked up next round
+            try:
+                if n := await asyncio.to_thread(lambda: core.sync_projects(core.fetch_repos())):
+                    print(f"github: {n} new repos in the projects inbox", flush=True)
+            except Exception as e:  # network down, token revoked: try again next round
+                print(f"github sync failed: {e}", flush=True)
         await asyncio.sleep(core.GITHUB_SYNC_MIN * 60)
 
 
 @asynccontextmanager
 async def lifespan(_):
-    sync = asyncio.create_task(github_sync()) if core.GITHUB_OWNER or core.GITHUB_TOKEN else None
+    sync = asyncio.create_task(github_sync())
     async with mcp_server.session_manager.run():
         yield
-    if sync:
-        sync.cancel()
+    sync.cancel()
 
 
 app = FastAPI(title="beta-inventory", lifespan=lifespan)
@@ -60,7 +60,7 @@ T.env.globals.update(
     # namespace, not dict: in Jinja t.items on a dict is dict.items, not the term
     t=SimpleNamespace(**PROFILE["terms"]), categories=PROFILE["categories"], type_label=core.type_label, kinds=core.KINDS,
     unit_of=core.unit_of,
-    trash_days=core.TRASH_DAYS,
+    core=core,  # settings change at run time (/settings): templates read core.TRASH_DAYS, core.SCAN_NFC…
     pk=next((f["key"] for f in PROFILE["item_fields"] if f["type"] == "photo"), None), TRANSIT=core.TRANSIT,
     rk=(RK := next((f["key"] for f in PROFILE["item_fields"] if f.get("reorder")), None)))  # the «докупить» threshold
 
@@ -161,7 +161,7 @@ def backup():
 @app.get("/boxes/sheet")
 def label_sheet(req: Request, ids: str = ""):
     """A batch on one sheet, each label at its real size: for a printer that takes paper, not a roll."""
-    w, h, _ = label_size()
+    w, h, _ = core.LABEL
     return page(req, "sheet.html", ids=[valid_box_id(i) for i in ids.split(",") if i], w=w, h=h)
 
 
@@ -270,16 +270,12 @@ def label(req: Request, box_id: str):  # a «+ Коробка» page shows it be
 
 
 def public_base(req):
-    """Address in labels: PUBLIC_BASE_URL from .env, else whatever the browser used."""
+    """Address in labels: PUBLIC_BASE_URL from /settings or .env, else whatever the browser used."""
     return (os.environ.get("PUBLIC_BASE_URL") or str(req.base_url)).rstrip("/")
 
 
-def label_size():
-    return tuple(float(os.environ.get(k, d)) for k, d in (("LABEL_W_MM", 25), ("LABEL_H_MM", 15), ("LABEL_DPI", 300)))
-
-
 def label_png(path, text, base):
-    w_mm, h_mm, dpi = label_size()
+    w_mm, h_mm, dpi = core.LABEL
     W, H = round(w_mm / 25.4 * dpi), round(h_mm / 25.4 * dpi)
     qr = qrcode.QRCode(error_correction=qrcode.constants.ERROR_CORRECT_L, border=1)
     qr.add_data(f"{base}/{path}".upper())  # upper case = alphanumeric mode = smaller QR
@@ -592,10 +588,48 @@ def offline(req: Request):
 
 
 @app.get("/phone")
-def phone(req: Request):
-    """Setup steps: Chrome writes NFC tags only on a 'secure' site, so plain-HTTP LAN needs one flag."""
-    u = urlsplit(public_base(req))
-    return page(req, "phone.html", origin=f"{u.scheme}://{u.netloc}".lower())
+def phone():
+    return RedirectResponse("/settings#phone", 302)  # old bookmarks: the phone steps live in settings now
+
+
+def settings_page(req, status=200, posted=None, err=None):
+    """№53: every setting with where its value comes from; values only .env can change are shown read-only."""
+    base = public_base(req).lower()
+    u = urlsplit(base)
+    with db() as c:
+        n = {k: c.execute(f"SELECT COUNT(*) FROM {t}").fetchone()[0] for k, t in (
+            ("items", "items"), ("boxes", "boxes WHERE kind='box'"), ("places", "places"),
+            ("projects", "projects"), ("moves", "movements"), ("readers", "readers"))}
+    size = lambda b: f"{b / 2**20:.1f} МБ" if b < 2**30 else f"{b / 2**30:.1f} ГБ"
+    photos = sum(f.stat().st_size for f in core.UPLOADS.rglob("*") if f.is_file())
+    env = core.ENV0.get
+    return page(req, "settings.html", status, vals={k: core.setting(k) for k in core.DEFAULTS} | (posted or {}),
+                over=core.overrides(), env0=core.ENV0, base=base, origin=f"{u.scheme}://{u.netloc}", n=n, err=err,
+                dbsize=size((core.DATA / "inventory.db").stat().st_size), photos=size(photos),
+                envonly=[("Порт", env("PORT", "8000")), ("Часовой пояс", env("TZ")), ("Профиль", env("PROFILE")),
+                         ("Зеркало pip", env("PIP_INDEX_URL")), ("Модель поиска", core.SEM_MODEL)])
+
+
+@app.get("/settings")
+def settings(req: Request):
+    return settings_page(req)
+
+
+@app.post("/settings")
+async def settings_save(req: Request):
+    """One form for all. A value equal to .env's drops the override; an empty token field keeps the token."""
+    form = await req.form()
+    posted = {k: v.strip() for k, v in form.multi_items() if k in core.DEFAULTS}  # checkbox: hidden 0, then 1 — last wins
+    changes = {k: None if v == core.ENV0.get(k, core.DEFAULTS[k]) else v for k, v in posted.items()
+               if v != core.setting(k) and not (k == "GITHUB_TOKEN" and not v)}
+    if form.get("reset") in core.DEFAULTS:
+        changes[form["reset"]] = None
+    try:
+        core.save_settings(changes)
+    except ValueError as e:
+        k, _, msg = str(e).partition(": ")
+        return settings_page(req, 400, posted, (k, msg))
+    return go("/settings")
 
 
 # --- places, projects, history ---

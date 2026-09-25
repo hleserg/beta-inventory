@@ -36,7 +36,8 @@ changing its IP. Update: `git pull && ./install.sh`.
 the Android phone (app + writing NFC tags), iPhone, labels.
 
 Every setting is in `.env`, described in `.env.example`; the code only holds
-defaults. Data (SQLite, photos, files, the search model) lives in `./data`. On
+defaults. Most can also be changed on the site under «Настройки» (`/settings`),
+which wins over `.env` until reset there. Data (SQLite, photos, files, the search model) lives in `./data`. On
 first start the search model (~240 MB) downloads there; until it is ready,
 search works by words only.
 

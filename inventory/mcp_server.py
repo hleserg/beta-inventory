@@ -16,7 +16,6 @@ from PIL import Image
 from . import core
 from .core import PROFILE, db
 
-BASE = os.environ.get("PUBLIC_BASE_URL", "").rstrip("/")  # empty: links come out as site paths
 T = PROFILE["terms"]
 FETCH_LIMIT = 20 * 1024 * 1024
 ENRICH = Path(__file__).parent.parent / "skills" / "inventory-enrich-card" / "SKILL.md"
@@ -32,7 +31,7 @@ server = MCPServer("inventory", instructions=(
 
 
 def link(path):
-    return BASE + path
+    return os.environ.get("PUBLIC_BASE_URL", "").rstrip("/") + path  # empty: a site path; /settings may change it
 
 
 def with_links(fields, type_key):

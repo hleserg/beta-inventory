@@ -117,6 +117,6 @@
   <form method="post" action="/b/{{ b.id }}/delete" onsubmit='return confirm({{ ("Удалить " ~ (b.name or b.id) ~ "?"
     ~ ((" Вещей внутри: " ~ contents|length ~ " — уйдут в корзину вместе с ней.") if contents else "")
     ~ ((" Коробок внутри: " ~ children|length ~ " — переедут уровнем выше.") if children else "")
-    ~ " Вернуть можно " ~ trash_days ~ " дней из «Корзины».")|tojson }})'><p><button class="bad">Удалить</button></p></form>
+    ~ " Вернуть можно " ~ core.TRASH_DAYS ~ " дней из «Корзины».")|tojson }})'><p><button class="bad">Удалить</button></p></form>
 </details>
 {% endblock %}

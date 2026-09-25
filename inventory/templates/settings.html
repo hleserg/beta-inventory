@@ -1,0 +1,186 @@
+{% extends "base.html" %}
+{% block title %}Настройки{% endblock %}
+{% block main %}
+{# №53: one row per setting; «изменено здесь» wins over .env, «Сбросить» brings .env (or the default) back #}
+{% macro src(k) %}{% if k in over %}<span class="src ch">изменено здесь</span>{% elif k in env0 %}<span class="src">из .env</span>{% endif %}{% endmacro %}
+{% macro bad(k) %}{% if err and err[0] == k %} aria-invalid="true" autofocus{% endif %}{% endmacro %}
+{% macro was(k) %}{% set v = env0.get(k, core.DEFAULTS[k]) %}{{ "в .env" if k in env0 else "по умолчанию" }}: {% if k == "GITHUB_TOKEN" %}{{ "задан" if v else "не задан" }}{% elif v == "" %}не задано{% elif k in ("SCAN_NFC", "SCAN_QR") %}{{ "выкл" if v == "0" else "вкл" }}{% elif k == "SCAN_DEFAULT" %}{{ {"auto": "Авто", "nfc": "NFC", "qr": "QR"}.get(v, v) }}{% else %}{{ v }}{% endif %}{% endmacro %}
+{% macro row(k, name, hint="", inline=False) %}<div class="set">
+  <div class="seth"><label for="{{ k }}" id="{{ k }}-n" class="nm">{{ name }}</label>{{ src(k) }}{% if k in over %}<button name="reset" value="{{ k }}" class="ghost">Сбросить</button>{% endif %}{% if inline %}{{ caller() }}{% endif %}</div>
+  {% if not inline %}<div class="setc">{{ caller() }}</div>{% endif %}
+  {% if hint or k in over %}<p class="mut sm">{{ hint }}{% if k in over %}{{ " · " if hint }}{{ was(k) }}{% endif %}</p>{% endif %}
+  {% if err and err[0] == k %}<p class="err">{{ err[1] }}</p>{% endif %}
+</div>{% endmacro %}
+{% macro choice(k, values, names={}) %}<div class="choice" role="radiogroup" aria-labelledby="{{ k }}-n">{% for v in values %}<label><input type="radio" name="{{ k }}" value="{{ v }}"{% if vals[k] == v %} checked{% endif %}>{{ names.get(v, v) }}</label>{% endfor %}</div>{% endmacro %}
+{% macro tgl(k) %}<input type="hidden" name="{{ k }}" value="0"><input type="checkbox" class="tgl" id="{{ k }}" name="{{ k }}" value="1"{% if vals[k] != "0" %} checked{% endif %}>{% endmacro %}
+{% macro num(k, lo, hi="", step="") %}<input type="number" id="{{ k }}" name="{{ k }}" value="{{ vals[k] }}" min="{{ lo }}"{% if hi %} max="{{ hi }}"{% endif %}{% if step %} step="{{ step }}"{% endif %}{{ bad(k) }}>{% endmacro %}
+{% macro plural(n, one, few, many) %}{{ one if n % 10 == 1 and n % 100 != 11 else few if n % 10 in (2, 3, 4) and n % 100 not in (12, 13, 14) else many }}{% endmacro %}
+
+<h1>Настройки</h1>
+<p class="mut"><span class="src">из .env</span> — значение из файла .env. <span class="src ch">изменено здесь</span> — задано на этой странице, важнее .env; «Сбросить» вернёт значение из .env.</p>
+
+<h2 class="gh" id="phone">Этот телефон</h2>
+<p class="mut sm">Хранится только на этом устройстве</p>
+<div class="card list">
+  {% call row("askmove", "Спрашивать «Переложить в …?»", "Скан коробки на карточке вещи, которая уже лежит в другой коробке. Выключено — переложим сразу.", inline=True) %}<input type="checkbox" class="tgl" id="askmove" checked>{% endcall %}
+  {% call row("asktake", "Спрашивать «Взять?»", "Скан метки уникальной вещи. Выключено — вещь сразу «на руках», следующий скан коробки положит её туда.", inline=True) %}<input type="checkbox" class="tgl" id="asktake" checked>{% endcall %}
+  {% if core.SCAN_NFC %}<div class="set" id="nfcrow" hidden>
+    <div class="seth"><span class="nm">Метки открываются сами</span><button type="button" id="nfcallow" class="ghost">Разрешить</button></div>
+    <p id="scanst" class="mut sm">Пока сайт открыт, поднесённая метка сразу открывает свою коробку или вещь. Браузер спросит разрешение один раз.</p>
+  </div>{% endif %}
+</div>
+{% if core.SCAN_NFC %}<details id="howto"><summary>Как настроить этот телефон</summary>
+<div data-os="android">
+  <p>Сайт сам пишет NFC-метки, но Chrome разрешает это только «безопасным» сайтам. Домашний сайт работает без HTTPS,
+    поэтому один раз впишите его в исключения Chrome:</p>
+  <ol>
+    <li>Включите NFC в настройках телефона (найдите «NFC» поиском по настройкам).</li>
+    <li>Скопируйте и вставьте в адресную строку Chrome — ссылкой такие страницы не открываются:
+      <div class="row"><input readonly value="chrome://flags/#unsafely-treat-insecure-origin-as-secure"><button type="button" class="ghost copy">Копировать</button></div></li>
+    <li>В пункте «Insecure origins treated as secure» впишите адрес сайта и выберите <b>Enabled</b>:
+      <div class="row"><input readonly value="{{ origin }}"><button type="button" class="ghost copy">Копировать</button></div></li>
+    <li>Нажмите <b>Relaunch</b> внизу экрана: Chrome перезапустится.</li>
+    <li>Установите приложение: меню Chrome ⋮ → «Добавить на главный экран» (или «Установить приложение»).
+      Метка, поднесённая к закрытому телефону, всё равно откроется в Chrome: без HTTPS Android не отдаёт ссылки приложению.
+      А при открытом сайте метка сразу откроет свою коробку или вещь — «Разрешить» выше.</li>
+  </ol>
+  <p class="mut">«Записать на метку» отвечает «Этот браузер не пишет метки»? Откройте сайт именно в Chrome: Samsung Internet и Firefox метки не пишут.
+    Адрес в пункте 3 должен совпадать с адресом сайта в строке браузера.</p>
+</div>
+<div data-os="ios">
+  <p>На iPhone сайты не могут записывать NFC-метки, Apple не даёт им такой возможности. Метку запишет бесплатное приложение NFC Tools.</p>
+  <p><a class="btn" href="https://apps.apple.com/app/nfc-tools/id1252962749">NFC Tools в App Store</a></p>
+  <ol>
+    <li>На странице коробки откройте «Настроить, наклейка» (на карточке вещи — «Метка») и скопируйте «Ссылку для NFC-метки».</li>
+    <li>В NFC Tools: Write (Запись) → Add a record (Добавить запись) → URL / URI → вставьте ссылку → OK.</li>
+    <li>Нажмите Write и поднесите метку к верхнему краю iPhone.</li>
+  </ol>
+  <p>Приложение на экран: Safari → «Поделиться» → «На экран „Домой“».</p>
+</div>
+<div data-os="other"><p>Метки пишутся с телефона. Откройте эту страницу на телефоне: <b>{{ origin }}/settings</b></p></div>
+</details>{% endif %}
+
+<form method="post" action="/settings" id="set">
+<div class="save"{% if not err %} hidden{% endif %}><span id="unsaved" class="mut"></span><button>Сохранить</button></div>
+{% if err and err[0] not in core.DEFAULTS %}<p class="err">{{ err|join(": ") }}</p>{% endif %}
+
+<h2 class="gh">Сканирование</h2>
+<p class="mut sm">Для всех телефонов. Выключенное пропадает из интерфейса</p>
+<div class="card list">
+  {% call row("SCAN_NFC", "Метки NFC", "Чтение и запись меток. Выключено — нет «Записать метку» и «Разрешить NFC»", inline=True) %}{{ tgl("SCAN_NFC") }}{% endcall %}
+  {% call row("SCAN_QR", "QR-коды", "Сканер камерой на сайте. На наклейке QR печатается всегда — его читает и обычная камера телефона", inline=True) %}{{ tgl("SCAN_QR") }}{% endcall %}
+  {% call row("SCAN_DEFAULT", "Кнопка «Скан» по умолчанию", "Авто: NFC, если телефон умеет (Android, Chrome), иначе камера") %}{{ choice("SCAN_DEFAULT", ["auto", "nfc", "qr"], {"auto": "Авто", "nfc": "NFC", "qr": "QR"}) }}{% endcall %}
+</div>
+
+<h2 class="gh">Наклейки</h2>
+<div class="card list">
+  {% call row("PUBLIC_BASE_URL", "Адрес сайта", "Адрес в QR и NFC-метке. Пусто — адрес, по которому открыт сайт") %}<input id="PUBLIC_BASE_URL" name="PUBLIC_BASE_URL" value="{{ vals["PUBLIC_BASE_URL"] }}" inputmode="url" autocomplete="off" placeholder="{{ origin }}"{{ bad("PUBLIC_BASE_URL") }}>{% endcall %}
+  <p class="warn set">⚠ Уже напечатанные наклейки не поменяются: старый адрес должен работать и дальше.</p>
+  {% call row("LABEL_W_MM", "Ширина наклейки, мм") %}{{ num("LABEL_W_MM", 5, step="any") }}{% endcall %}
+  {% call row("LABEL_H_MM", "Высота наклейки, мм") %}{{ num("LABEL_H_MM", 5, step="any") }}{% endcall %}
+  {% set dpis = ["203", "300", "600"] %}
+  {% call row("LABEL_DPI", "Разрешение принтера, DPI") %}{{ choice("LABEL_DPI", dpis if vals["LABEL_DPI"] in dpis else dpis + [vals["LABEL_DPI"]]) }}{% endcall %}
+</div>
+
+<h2 class="gh">Поиск по смыслу</h2>
+{% if not core.SEM_MODEL %}<p class="mut sm">Выключен: в .env пуст SEMANTIC_MODEL</p>{% endif %}
+<div class="card list">
+  {% call row("SEMANTIC_MIN", "Порог похожести", "ниже — не показываем") %}{{ num("SEMANTIC_MIN", 0, 1, "0.01") }}{% endcall %}
+  {% call row("SEMANTIC_MARGIN", "Отступ от лучшего", "насколько хуже лучшего ещё показывать") %}{{ num("SEMANTIC_MARGIN", 0, 1, "0.01") }}{% endcall %}
+  {% call row("SEMANTIC_TOP", "Максимум совпадений", "по смыслу, сверх точных") %}{{ num("SEMANTIC_TOP", 0) }}{% endcall %}
+</div>
+
+<h2 class="gh">Фото</h2>
+<div class="card list">
+  {% call row("PHOTO_MAX_PX", "Длинная сторона, px", "больше — уменьшаем при загрузке") %}{{ num("PHOTO_MAX_PX", 100) }}{% endcall %}
+  {% call row("PHOTO_QUALITY", "Качество, %", "JPEG") %}{{ num("PHOTO_QUALITY", 1, 100) }}{% endcall %}
+</div>
+
+<h2 class="gh">Корзина</h2>
+<div class="card list">
+  {% call row("TRASH_DAYS", "Хранить удалённое, дней", "потом удаляется насовсем") %}{{ num("TRASH_DAYS", 1) }}{% endcall %}
+</div>
+
+<h2 class="gh">Считыватели</h2>
+<div class="card list">
+  {% call row("READER_FORGET_MIN", "Забывать коробку через, мин", "после скана коробки считыватель ждёт вещь") %}{{ num("READER_FORGET_MIN", 1) }}{% endcall %}
+  <div class="set"><a href="/readers">Список считывателей · {{ n["readers"] }}</a></div>
+</div>
+
+<h2 class="gh">GitHub</h2>
+<p class="mut sm">Проекты из репозиториев</p>
+<div class="card list">
+  {% call row("GITHUB_OWNER", "Аккаунт") %}<input id="GITHUB_OWNER" name="GITHUB_OWNER" value="{{ vals["GITHUB_OWNER"] }}" autocomplete="off"{{ bad("GITHUB_OWNER") }}>{% endcall %}
+  {% call row("GITHUB_TOKEN", "Токен", "Значение не показываем — только заменить") %}<input type="password" id="GITHUB_TOKEN" name="GITHUB_TOKEN" value="" autocomplete="new-password" placeholder="{{ 'задан — введите новый, чтобы заменить' if core.setting('GITHUB_TOKEN') else 'не задан' }}"{{ bad("GITHUB_TOKEN") }}>{% endcall %}
+  {% call row("GITHUB_SYNC_MIN", "Проверять раз в, мин", "новые репозитории — во «Входящие» проектов") %}{{ num("GITHUB_SYNC_MIN", 1, step="any") }}{% endcall %}
+</div>
+</form>
+
+<h2 class="gh">Агенты (MCP)</h2>
+<p class="mut sm">Строки собраны из адреса в наклейке</p>
+<div class="card list">
+  {% for name, code in [("Адрес MCP", base ~ "/mcp"),
+                        ("Claude Code", "claude mcp add --transport http inventory " ~ base ~ "/mcp"),
+                        ("Codex · ~/.codex/config.toml", '[mcp_servers.inventory]\nurl = "' ~ base ~ '/mcp"'),
+                        ("Hermes · config.yaml, пример", "mcp_servers:\n  inventory:\n    url: " ~ base ~ "/mcp")] %}
+  <div class="set"><b>{{ name }}</b><div class="code"><pre>{{ code }}</pre><button type="button" class="ghost copy">Копировать</button></div></div>
+  {% endfor %}
+</div>
+
+<h2 class="gh">Карточки</h2>
+<p class="mut sm">Профиль «{{ core.PROFILE.get("name") }}». Меняется в файле профиля, здесь только просмотр</p>
+<div class="card list">
+  {% for c in categories %}{% set k = c.types|length %}
+  <div class="set"><b>{{ c.label }}</b><p class="mut sm">{{ k }} {{ plural(k, "тип", "типа", "типов") }}: {{ c.types|map(attribute="label")|join(", ") }}</p></div>
+  {% endfor %}
+</div>
+
+<h2 class="gh">Данные</h2>
+<div class="card list">
+  <div class="set"><div class="seth"><span class="nm">Резервная копия</span><a class="btn" href="/backup">Скачать</a></div><p class="mut sm">База {{ dbsize }} · фото {{ photos }}</p></div>
+  <div class="set mut sm">Предметы {{ n["items"] }} · Коробки {{ n["boxes"] }} · Места {{ n["places"] }} · Проекты {{ n["projects"] }} · Движения {{ n["moves"] }}</div>
+</div>
+
+<h2 class="gh">Только в .env</h2>
+<p class="mut sm">Меняется в файле .env, нужен перезапуск</p>
+<div class="card list">
+  {% for k, v in envonly %}<div class="set seth"><span class="nm" style="flex:none">{{ k }}</span><span class="mut" style="min-width:0;margin-left:auto;overflow-wrap:anywhere;text-align:right">{{ v or "не задано" }}</span></div>{% endfor %}
+</div>
+
+<script>
+const ua = navigator.userAgent;
+const os = /iPhone|iPad|iPod/.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1) ? "ios" : /Android/.test(ua) ? "android" : "other";
+document.querySelectorAll("[data-os]").forEach(e => e.hidden = e.dataset.os !== os);
+const nfcrow = document.getElementById("nfcrow");
+if (nfcrow && "NDEFReader" in window) {
+  nfcrow.hidden = false;
+  nfcallow.onclick = () => nfcScan().then(() => scanst.textContent = "Готово ✓ Коснитесь метки любой коробки.", e => scanst.textContent = "Не вышло: " + e.message);
+}
+for (const [id, key] of [["askmove", "askMove"], ["asktake", "askTake"]]) {  // kept on this phone, base.html reads them
+  const x = document.getElementById(id);
+  try { x.checked = localStorage[key] !== "no"; } catch {}
+  x.onchange = () => { try { x.checked ? localStorage.removeItem(key) : localStorage[key] = "no"; } catch {} };
+}
+document.querySelectorAll(".copy").forEach(b => b.onclick = () => {
+  const x = b.previousElementSibling;
+  if (x.select) x.select();
+  else { const r = document.createRange(); r.selectNodeContents(x); getSelection().removeAllRanges(); getSelection().addRange(r); }
+  document.execCommand("copy");  // navigator.clipboard needs the secure context the phone steps set up
+  b.textContent = "Скопировано";
+});
+const how = () => location.hash === "#phone" && document.getElementById("howto")?.setAttribute("open", "");
+how(); addEventListener("hashchange", how);
+// The save bar shows what is not saved yet; after a rejected save the page holds the posted values, so it stays up
+const form = document.getElementById("set"), bar = form.querySelector(".save"), un = document.getElementById("unsaved"), hasErr = {{ (err is not none)|tojson }};
+const count = () => {
+  const names = new Set();
+  for (const x of form.querySelectorAll("input[name]"))
+    if (/checkbox|radio/.test(x.type) ? x.checked !== x.defaultChecked : x.value !== x.defaultValue) names.add(x.name);
+  const n = names.size, m = n % 10, h = n % 100;
+  un.textContent = !n ? "Есть ошибка — исправьте и сохраните"
+    : n + " " + (m === 1 && h !== 11 ? "изменение не сохранено" : m >= 2 && m <= 4 && (h < 12 || h > 14) ? "изменения не сохранены" : "изменений не сохранено");
+  bar.hidden = !n && !hasErr;
+};
+form.addEventListener("input", count); form.addEventListener("change", count); count();
+</script>
+{% endblock %}

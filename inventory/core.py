@@ -18,6 +18,75 @@ from PIL import Image, ImageOps
 
 ROOT = Path(__file__).resolve().parent.parent
 DATA = Path(os.environ.get("DATA_DIR", ROOT / "data"))
+# №53: what the /settings page may change, with the defaults. It writes DATA/settings.json, which wins over .env;
+# ENV0 is .env as the process got it — «Сбросить» goes back there.
+DEFAULTS = {"PUBLIC_BASE_URL": "", "LABEL_W_MM": "25", "LABEL_H_MM": "15", "LABEL_DPI": "300",
+            "SCAN_NFC": "1", "SCAN_QR": "1", "SCAN_DEFAULT": "auto",
+            "SEMANTIC_MIN": "0.35", "SEMANTIC_MARGIN": "0.08", "SEMANTIC_TOP": "5",
+            "PHOTO_MAX_PX": "2560", "PHOTO_QUALITY": "90", "TRASH_DAYS": "30", "READER_FORGET_MIN": "10",
+            "GITHUB_OWNER": "", "GITHUB_TOKEN": "", "GITHUB_SYNC_MIN": "60"}
+SETTINGS = DATA / "settings.json"
+ENV0 = dict(os.environ)
+
+
+def overrides():
+    """What /settings changed: key -> value, .env keeps the rest."""
+    try:
+        return {k: v for k, v in json.loads(SETTINGS.read_text()).items() if k in DEFAULTS}
+    except FileNotFoundError:
+        return {}
+
+
+os.environ.update(overrides())
+
+
+def setting(k):
+    return os.environ.get(k, DEFAULTS[k])
+
+
+def read_settings():
+    """Parse the settings from os.environ into the globals below; a bad value raises before any of them changes."""
+    def num(k, cast=float, lo=0.0, hi=float("inf")):
+        try:
+            v = cast(setting(k))
+        except ValueError:
+            raise ValueError(f"{k}: нужно число, а не «{setting(k)}»") from None
+        if not lo <= v <= hi:
+            raise ValueError(f"{k}: не меньше {lo:g}" if hi == float("inf") else f"{k}: от {lo:g} до {hi:g}")
+        return v
+    new = dict(SEM_MIN=num("SEMANTIC_MIN", hi=1), SEM_MARGIN=num("SEMANTIC_MARGIN", hi=1),
+               SEM_TOP=num("SEMANTIC_TOP", int), PHOTO_MAX_PX=num("PHOTO_MAX_PX", int, 100),
+               PHOTO_QUALITY=num("PHOTO_QUALITY", int, 1, 100), TRASH_DAYS=num("TRASH_DAYS", int, 1),
+               READER_FORGET_MIN=num("READER_FORGET_MIN", int, 1), GITHUB_SYNC_MIN=num("GITHUB_SYNC_MIN", lo=1),
+               GITHUB_OWNER=setting("GITHUB_OWNER").strip(), GITHUB_TOKEN=setting("GITHUB_TOKEN").strip(),
+               LABEL=(num("LABEL_W_MM", lo=5), num("LABEL_H_MM", lo=5), num("LABEL_DPI", lo=100)),
+               SCAN_NFC=setting("SCAN_NFC") != "0", SCAN_QR=setting("SCAN_QR") != "0", SCAN_DEFAULT=setting("SCAN_DEFAULT"))
+    if new["SCAN_DEFAULT"] not in ("auto", "nfc", "qr"):
+        raise ValueError("SCAN_DEFAULT: auto, nfc или qr")
+    if not re.match(r"(https?://\S+)?$", setting("PUBLIC_BASE_URL")):
+        raise ValueError("PUBLIC_BASE_URL: пусто или адрес с http:// или https://")
+    globals().update(new)
+
+
+def save_settings(changes):
+    """key -> new value, or None for «Сбросить». A bad value is rolled back and raises: settings.json never gets it."""
+    old = {k: os.environ.get(k) for k in changes}
+    def put(vals):
+        for k, v in vals.items():
+            if v is None:
+                os.environ.pop(k, None)
+            else:
+                os.environ[k] = v
+    put({k: ENV0.get(k) if v is None else v for k, v in changes.items()})
+    try:
+        read_settings()
+    except ValueError:
+        put(old)
+        raise
+    over = {k: v for k, v in (overrides() | changes).items() if v is not None}
+    tmp = SETTINGS.with_suffix(".tmp")
+    tmp.write_text(json.dumps(over, ensure_ascii=False, indent=1))
+    os.replace(tmp, SETTINGS)  # a crash mid-write leaves the old file, not half a new one
 UPLOADS = DATA / "uploads"
 ID_ALPHABET = "23456789ABCDEFGHJKLMNPQRSTUVWXYZ"  # no 0/O/1/I
 # №28: things taken and not put back, or brought home and not put away yet, lie «на руках» — a box of kind
@@ -123,16 +192,14 @@ WEIGHTS = {k: {f["key"]: int(f["search"]) for f in fields_for(k) if f.get("searc
 # Meaning search: a small local model, so "понижайка" finds a buck converter with no alias typed in.
 # Off with SEMANTIC_MODEL= ; keyword search works alone while the model loads or if it can't.
 SEM_MODEL = os.environ.get("SEMANTIC_MODEL", "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2")
-SEM_MIN = float(os.environ.get("SEMANTIC_MIN", "0.35"))  # cosine floor; tune on real data
-SEM_MARGIN = float(os.environ.get("SEMANTIC_MARGIN", "0.08"))  # and no further than this below the best match: cut noise 4x on 22 test queries
-SEM_TOP = int(os.environ.get("SEMANTIC_TOP", "5"))
+# SEMANTIC_MIN: cosine floor, tune on real data; SEMANTIC_MARGIN: and no further than this below the best match —
+# cut noise 4x on 22 test queries; SEMANTIC_TOP: meaning matches shown past the exact ones (read_settings).
 _sem = {"model": None, "vecs": {}}  # vecs: item_id -> (embedded text, unit vector)
 
-# Photos: phones shoot 5-10 MB. Shrunk to this long side and JPEG quality: screw sizes on a box photo stay readable.
-PHOTO_MAX_PX = int(os.environ.get("PHOTO_MAX_PX", "2560"))
-PHOTO_QUALITY = int(os.environ.get("PHOTO_QUALITY", "90"))
-TRASH_DAYS = int(os.environ.get("TRASH_DAYS", "30"))  # deleted things wait this long for «Вернуть», then go for good
-READER_FORGET_MIN = int(os.environ.get("READER_FORGET_MIN", "10"))  # a portable NFC reader forgets its box after this long without a tap
+# Photos: phones shoot 5-10 MB. Shrunk to PHOTO_MAX_PX long side and PHOTO_QUALITY: screw sizes on a box photo stay
+# readable. TRASH_DAYS: deleted things wait this long for «Вернуть». READER_FORGET_MIN: a portable NFC reader forgets
+# its box after this long without a tap. All from read_settings().
+read_settings()
 
 
 def db():
@@ -417,9 +484,7 @@ def project_needs(project_id):
 
 # GitHub: the owner's new repos wait in the inbox (status 'inbox') until a person or an agent takes them in their
 # own words (accept_project) or skips them ('skipped': not offered again). No owner and no token: sync is off.
-GITHUB_OWNER = os.environ.get("GITHUB_OWNER", "")
-GITHUB_TOKEN = os.environ.get("GITHUB_TOKEN", "")
-GITHUB_SYNC_MIN = float(os.environ.get("GITHUB_SYNC_MIN", "60"))
+# GITHUB_OWNER, GITHUB_TOKEN, GITHUB_SYNC_MIN: read_settings().
 
 
 def repo_key(url):
