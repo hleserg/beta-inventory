@@ -38,6 +38,7 @@ def test_read_tools():
     assert any(f["key"] == "value" for f in call("card_template", type="resistor").structured_content["fields"])
     types = call("card_template").structured_content["categories"]
     assert "resistor" in [t["key"] for cat in types for t in cat["types"]]
+    assert any("ESP32" in t["hint"] for cat in types for t in cat["types"])  # which type is which thing
 
 
 def test_http():
@@ -101,6 +102,19 @@ def test_card_tools(monkeypatch):
     assert call("update_item", item_id=card["id"], fields={}, type="nope").is_error
     err = call("create_item", type="module", name="X", agent="Claude", fields={"pinout": "A B"})
     assert err.is_error and "Фото: обязательно" in err.content[0].text
+
+
+def test_agent_queue():
+    """№41: cards a person handed to an agent, with the skill that says how to fill them; update_item takes one off."""
+    box = core.new_boxes(1)[0]
+    iid = call("create_item", type="resistor", name="10k", agent="Claude", box_id=box, fields={"value": "10 кОм"}
+               ).structured_content["id"]
+    assert iid not in [i["id"] for i in call("agent_queue").structured_content["items"]]
+    core.set_for_agent(iid, True)
+    q = call("agent_queue").structured_content
+    assert iid in [i["id"] for i in q["items"]] and "update_item" in q["skill"]
+    call("update_item", item_id=iid, fields={"value": "10 кОм", "power": "0.25 Вт"})
+    assert iid not in [i["id"] for i in call("agent_queue").structured_content["items"]]
 
 
 def test_github_inbox():

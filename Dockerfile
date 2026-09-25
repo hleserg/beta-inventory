@@ -6,6 +6,7 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 COPY inventory inventory
 COPY profiles profiles
+COPY skills skills
 ENV DATA_DIR=/data
 EXPOSE 8000
 CMD ["uvicorn", "inventory.app:app", "--host", "0.0.0.0", "--port", "8000"]

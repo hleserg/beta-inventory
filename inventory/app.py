@@ -314,9 +314,10 @@ def items(req: Request, type: str = "", cat: str = "", q: str = "", hands: str =
     return page(req, "items.html", items=rows, type=type, cat=cat, q=q, hands=hands, reorder=reorder)
 
 
-def card_form(req, status=200, it=None, type="", name="", vals=None, errors=(), box="", qty="", dups=(), nfc=False):
+def card_form(req, status=200, it=None, type="", name="", vals=None, errors=(), box="", qty="", dups=(), nfc=False,
+              agent=False):
     return page(req, "item_form.html", status, it=it, type=type, fields=core.fields_for(type), name=name,
-                vals=vals or {}, errors=errors, box=box, qty=qty, dups=dups, nfc=nfc)
+                vals=vals or {}, errors=errors, box=box, qty=qty, dups=dups, nfc=nfc, agent=agent)
 
 
 def check_type(type):
@@ -337,7 +338,7 @@ async def item_create(req: Request, type: str):
     fields = core.fields_for(check_type(type))
     name, f, errors, form = await read_fields(req, {}, fields)
     box, qty, box_id = str(form.get("box", "")).strip(), str(form.get("qty", "")).strip(), None
-    nfc = bool(form.get("nfc"))  # №42: «Сохранить и записать метку»
+    nfc, agent = bool(form.get("nfc")), bool(form.get("for_agent"))  # №42 «…и записать метку», №41 «Передать агенту»
     try:
         box_id = core.find_box(box) if box else None
     except ValueError as e:
@@ -345,10 +346,12 @@ async def item_create(req: Request, type: str):
     if qty and not qty.isdigit():
         errors.append("Количество — целое число; пусто — «не считал»")
     if errors:
-        return card_form(req, 400, type=type, name=name, vals=f, errors=errors, box=box, qty=qty, nfc=nfc)
+        return card_form(req, 400, type=type, name=name, vals=f, errors=errors, box=box, qty=qty, nfc=nfc, agent=agent)
     if not form.get("dup_ok") and (dups := core.lookalikes(name)):  # asked, not refused: two alike things are real too
-        return card_form(req, 409, type=type, name=name, vals=f, box=box, qty=qty, dups=dups, nfc=nfc)
+        return card_form(req, 409, type=type, name=name, vals=f, box=box, qty=qty, dups=dups, nfc=nfc, agent=agent)
     iid = core.save_item(None, name, type, f)
+    if agent:
+        core.set_for_agent(iid, True)
     if box_id and (not qty or int(qty) > 0):  # empty: «есть, не считал»
         core.move(iid, box_id, int(qty) if qty else None, "put", AUTHOR)
     elif not box_id and qty and int(qty) > 0:  # no box yet: brought home, in hand until put away (№28)
@@ -367,6 +370,12 @@ def item(req: Request, item_id: int):
                     stock=core.stock_of_item(c, item_id), projects=core.projects(c),
                     nfc=f"{public_base(req)}/i/{item_id}".lower(),  # №37: the tag opens this card
                     history=c.execute(MOVES + " AND m.item_id=? ORDER BY m.id DESC LIMIT 50", (item_id,)).fetchall())
+
+
+@app.post("/i/{item_id}/agent")
+async def item_for_agent(req: Request, item_id: int):
+    core.set_for_agent(item_id, bool((await req.form()).get("on")))
+    return go(f"/i/{item_id}")
 
 
 @app.get("/i/{item_id}/label.png")

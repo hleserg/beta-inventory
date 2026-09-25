@@ -28,6 +28,8 @@ addEventListener("keydown", e => { if (e.key == "Escape" && full()) history.back
   <form method="post" action="/i/{{ it.id }}/delete" onsubmit='return confirm({{ ("«" ~ it.name ~ "» уйдёт в корзину"
     ~ ((" и пропадёт из мест, где лежит: " ~ stock|length) if stock else "") ~ ". Вернуть можно " ~ trash_days
     ~ " дней из «Корзины».")|tojson }})'><button class="ghost">Удалить</button></form></div>
+<form method="post" action="/i/{{ it.id }}/agent"><label class="chk"><input type="checkbox" name="on" value="1"{% if it.for_agent %} checked{% endif %}
+  onchange="this.form.submit()"> {{ t.to_agent }}</label></form>
 
 <h2>Где лежит</h2>
 {% set h = stock|selectattr("box_id", "equalto", "HANDS")|first %}{# №28: in hand — put it away (back where it was taken from) or write it off #}

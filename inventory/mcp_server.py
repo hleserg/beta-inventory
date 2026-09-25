@@ -18,6 +18,7 @@ from .core import PROFILE, db
 BASE = os.environ.get("PUBLIC_BASE_URL", "").rstrip("/")  # empty: links come out as site paths
 T = PROFILE["terms"]
 FETCH_LIMIT = 20 * 1024 * 1024
+ENRICH = Path(__file__).parent.parent / "skills" / "inventory-enrich-card" / "SKILL.md"
 READ = ToolAnnotations(readOnlyHint=True, openWorldHint=False)
 LOGGED = ToolAnnotations(readOnlyHint=False, destructiveHint=False, openWorldHint=False)  # history keeps every change
 
@@ -25,7 +26,7 @@ server = MCPServer("inventory", instructions=(
     f"Home inventory «{PROFILE['name']}». {T['items']} (items) lie in {T['boxes']} (boxes); a box has a 5-char id "
     f"printed on its label, may sit in another box and stands in a {T['place']} (place). Quantity belongs to the "
     "box×item pair. Start with search; card fields are defined by the profile, see card_template. "
-    "Search before create_item: the item may exist. Each card_template field's hint says what goes in it. Stock changes go through change_stock under your name. "
+    "Search before create_item: the item may exist. agent_queue: cards a person handed to an agent to fill in. Each card_template field's hint says what goes in it. Stock changes go through change_stock under your name. "
     "Data is in the profile's language: answer the user in it."))
 
 
@@ -76,7 +77,17 @@ def card(item_id):
         return dict(id=it["id"], name=it["name"], type=it["type"], type_label=core.type_label(it["type"]),
                     fields=with_links(core.item_fields(it), it["type"]),
                     unit=core.unit_of(it["type"], core.item_fields(it)), stock=core.stock_of_item(c, item_id),
-                    history=[dict(m) for m in moves], url=link(f"/i/{item_id}"))
+                    history=[dict(m) for m in moves], url=link(f"/i/{item_id}"), for_agent=bool(it["for_agent"]))
+
+
+@server.tool(annotations=READ)
+def agent_queue() -> dict[str, Any]:
+    """Cards a person ticked «Передать агенту»: fill each in (identify, datasheet, right type, every field)
+    as `skill` says, then update_item takes it off this list."""
+    with db() as c:
+        items = [dict(r, url=link(f"/i/{r['id']}")) for r in c.execute(
+            "SELECT id, name, type FROM items WHERE for_agent ORDER BY updated_at")]
+    return dict(items=items, skill=ENRICH.read_text(encoding="utf-8"))
 
 
 @server.tool(annotations=READ)
@@ -104,7 +115,7 @@ def card_template(type: str = "") -> dict[str, Any]:
     """
     if not type:
         return {"categories": [dict(key=c["key"], label=c["label"],
-                                    types=[dict(key=t["key"], label=t["label"]) for t in c.get("types", [])])
+                                    types=[dict(key=t["key"], label=t["label"], hint=t.get("hint", "")) for t in c.get("types", [])])
                                for c in PROFILE["categories"]]}
     if type not in core.TYPES:
         raise ToolError(f"Unknown type {type!r}. Call card_template without type for the list.")
@@ -277,4 +288,5 @@ async def update_item(item_id: int, fields: dict[str, Any], name: str = "", type
     f = await fill(type, core.item_fields(it), fields)
     check(name, type, f)
     core.save_item(item_id, name, type, f)
+    core.set_for_agent(item_id, False)  # an agent filled it in: off agent_queue
     return card(item_id)

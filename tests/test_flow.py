@@ -310,6 +310,19 @@ def test_item_tag():
     assert r.status_code == 409 and 'name="nfc" value="1"' in r.text  # «Всё равно создать» keeps the wish
 
 
+def test_for_agent():
+    """№41: «Передать агенту» — the card waits for an agent to fill it in (agent_queue); an agent's update clears it."""
+    flag = lambda iid: core.db().__enter__().execute("SELECT for_agent FROM items WHERE id=?", (iid,)).fetchone()[0]
+    assert 'name="for_agent"' in c.get("/items/new?type=resistor").text
+    c.post("/items/new?type=resistor", data={"name": "плата без надписей", "value": "x", "for_agent": "1"})
+    iid = newest()
+    assert flag(iid) == 1 and 'name="on" value="1" checked' in c.get(f"/i/{iid}").text
+    assert c.post(f"/i/{iid}/agent", follow_redirects=False).headers["location"] == f"/i/{iid}"
+    assert flag(iid) == 0 and "Передать агенту" in c.get(f"/i/{iid}").text
+    c.post(f"/i/{iid}/agent", data={"on": "1"})
+    assert flag(iid) == 1
+
+
 def test_hands():
     """№28: a thing with a count and no box is «на руках»; a take puts it there, a put or return takes it back out."""
     def stock(iid):

@@ -28,6 +28,7 @@
   {% if not it %}
   <label>Куда положить</label>
   <div class="row">{{ box_input(value=box, placeholder="название или скан, можно пусто") }}<input type="number" name="qty" value="{{ qty }}" min="0" placeholder="не считал"></div>
+  <label class="chk"><input type="checkbox" name="for_agent" value="1"{% if agent %} checked{% endif %}> {{ t.to_agent }}</label>
   {% endif %}
   {% if it %}<p id="savest" class="mut">Изменения сохраняются сами.</p><p><button>Готово</button></p>
   {% else %}{% if nfc %}<input type="hidden" name="nfc" value="1">{% endif %}

@@ -22,6 +22,7 @@ terms:
   hands: На руках
   transit: В пути
   reorder: Докупить
+  to_agent: Передать агенту  # the card waits for an agent to fill it in (MCP agent_queue)
   unit: шт
 
 item_fields:

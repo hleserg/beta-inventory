@@ -42,6 +42,7 @@ CREATE TABLE IF NOT EXISTS boxes(
   created_at TEXT NOT NULL DEFAULT (datetime('now','localtime')));
 CREATE TABLE IF NOT EXISTS items(
   id INTEGER PRIMARY KEY, name TEXT NOT NULL, type TEXT NOT NULL DEFAULT '', fields TEXT NOT NULL DEFAULT '{}',
+  for_agent INTEGER NOT NULL DEFAULT 0,
   created_at TEXT NOT NULL DEFAULT (datetime('now','localtime')),
   updated_at TEXT NOT NULL DEFAULT (datetime('now','localtime')));
 """ + STOCK + """
@@ -137,6 +138,8 @@ def init():
                             "INSERT INTO stock SELECT * FROM stock_v0; DROP TABLE stock_v0; COMMIT;")
         if "kind" not in [r["name"] for r in c.execute("PRAGMA table_info(boxes)")]:  # boxes from before shelves
             c.execute("ALTER TABLE boxes ADD COLUMN kind TEXT NOT NULL DEFAULT 'box'")
+        if "for_agent" not in [r["name"] for r in c.execute("PRAGMA table_info(items)")]:  # cards from before №41
+            c.execute("ALTER TABLE items ADD COLUMN for_agent INTEGER NOT NULL DEFAULT 0")
         for bid, kind, name in ((HANDS, "hands", "На руках"), (TRANSIT, "transit", "В пути")):
             c.execute("INSERT INTO boxes(id, name, kind) VALUES (?, ?, ?) ON CONFLICT(id) DO UPDATE SET name=excluded.name",
                       (bid, PROFILE["terms"].get(kind, name), kind))
@@ -436,6 +439,13 @@ def save_item(item_id, name, type_key, f):
         c.execute("UPDATE items SET name=?, type=?, fields=?, updated_at=datetime('now','localtime') WHERE id=?",
                   (name, type_key, json.dumps(f, ensure_ascii=False), item_id))
         return item_id
+
+
+def set_for_agent(item_id, on):
+    """№41 «Передать агенту»: the card waits in MCP agent_queue until an agent's update_item."""
+    with db() as c:
+        c.execute("UPDATE items SET for_agent=? WHERE id=?", (int(on), item_id))
+
 
 def own_upload(v):
     """Name of our own upload, given as a /u/ link or bare, or None: a form or an agent can't point at other files."""
