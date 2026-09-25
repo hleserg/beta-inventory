@@ -119,9 +119,35 @@ def author(agent):
 
 @server.tool(annotations=READ)
 def list_projects() -> dict[str, Any]:
-    """Active projects, for project_id when stock is taken for a project."""
+    """Active projects, for project_id when stock is taken for a project.
+
+    inbox: new repos from the user's GitHub, not projects yet. Each goes to accept_project or skip_project.
+    """
     with db() as c:
-        return {"projects": [dict(p) for p in core.projects(c)]}
+        inbox = c.execute("SELECT id, name, description, git_url FROM projects WHERE status='inbox' ORDER BY name")
+        return {"projects": [dict(p) for p in core.projects(c)], "inbox": [dict(p) for p in inbox]}
+
+
+@server.tool(annotations=LOGGED)
+def accept_project(git_url: str, name: str, description: str) -> dict[str, Any]:
+    """Make a repo an active project: one from list_projects' inbox, or any other (a private repo the sync can't see).
+
+    name and description are what the user reads: short, in the profile's language, what it is for in plain words,
+    not the repo's slug and English blurb.
+    """
+    if not git_url.strip() or not name.strip():
+        raise ToolError("git_url and name are needed.")
+    return {"project_id": core.accept_project(git_url, name, description)}
+
+
+@server.tool(annotations=LOGGED)
+def skip_project(git_url: str) -> dict[str, Any]:
+    """An inbox repo that is not a project to take stock for: it leaves the inbox for good. accept_project undoes it."""
+    try:
+        core.skip_project(git_url)
+    except ValueError as e:
+        raise ToolError(f"{e}. See list_projects' inbox.") from None
+    return {"skipped": git_url}
 
 
 @server.tool(annotations=LOGGED)

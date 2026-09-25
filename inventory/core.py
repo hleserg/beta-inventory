@@ -6,6 +6,7 @@ import re
 import secrets
 import sqlite3
 import threading
+import urllib.request
 import uuid
 from pathlib import Path
 
@@ -346,6 +347,67 @@ def transfer(item_id, src, dst, author, qty=None):
 
 def projects(c):
     return c.execute("SELECT id, name FROM projects WHERE status='active' ORDER BY name").fetchall()
+
+
+# GitHub: the owner's new repos wait in the inbox (status 'inbox') until a person or an agent takes them in their
+# own words (accept_project) or skips them ('skipped': not offered again). No owner and no token: sync is off.
+GITHUB_OWNER = os.environ.get("GITHUB_OWNER", "")
+GITHUB_TOKEN = os.environ.get("GITHUB_TOKEN", "")
+GITHUB_SYNC_MIN = float(os.environ.get("GITHUB_SYNC_MIN", "60"))
+
+
+def repo_key(url):
+    return url.strip().lower().rstrip("/").removesuffix(".git")
+
+
+def fetch_repos():
+    """The owner's repos; a token sees the private ones too."""
+    url = ("https://api.github.com/user/repos?affiliation=owner&per_page=100" if GITHUB_TOKEN
+           else f"https://api.github.com/users/{GITHUB_OWNER}/repos?per_page=100")
+    headers = {"Accept": "application/vnd.github+json"} | ({"Authorization": f"Bearer {GITHUB_TOKEN}"} if GITHUB_TOKEN else {})
+    repos, page = [], 1
+    while True:
+        with urllib.request.urlopen(urllib.request.Request(f"{url}&page={page}", headers=headers), timeout=30) as r:
+            batch = json.load(r)
+        repos += batch
+        if len(batch) < 100:
+            return repos
+        page += 1
+
+
+def sync_projects(repos):
+    """Repos not known in any status, forks aside, go to the inbox. → how many."""
+    with db() as c:
+        known = {repo_key(r[0]) for r in c.execute("SELECT git_url FROM projects")}
+        new = [r for r in repos if not r.get("fork") and repo_key(r["html_url"]) not in known]
+        c.executemany("INSERT INTO projects(name, description, git_url, status) VALUES (?, ?, ?, 'inbox')",
+                      [(r["name"], r.get("description") or "", r["html_url"]) for r in new])
+    return len(new)
+
+
+def project_by_url(c, git_url):
+    return next((r for r in c.execute("SELECT id, status, git_url FROM projects WHERE git_url != ''")
+                 if repo_key(r["git_url"]) == repo_key(git_url)), None)
+
+
+def accept_project(git_url, name, description):
+    """Inbox repo → active project under the given name; a repo the sync can't see (private) is made. → id."""
+    with db() as c:
+        p = project_by_url(c, git_url)
+        if p is None:
+            return c.execute("INSERT INTO projects(name, description, git_url) VALUES (?, ?, ?)",
+                             (name.strip(), description.strip(), git_url.strip())).lastrowid
+        c.execute("UPDATE projects SET name=?, description=?, status='active' WHERE id=?",
+                  (name.strip(), description.strip(), p["id"]))
+        return p["id"]
+
+
+def skip_project(git_url):
+    with db() as c:
+        p = project_by_url(c, git_url)
+        if p is None or p["status"] not in ("inbox", "skipped"):
+            raise ValueError(f"{git_url} не во входящих")
+        c.execute("UPDATE projects SET status='skipped' WHERE id=?", (p["id"],))
 
 
 def clean_fields(name, fields, f):

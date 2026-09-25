@@ -3,6 +3,14 @@
 <h1>Проекты</h1>
 <details {% if not projects %}open{% endif %}><summary>+ проект</summary>
 <form method="post" action="/projects"><label>Название</label><input name="name" required><label>Описание</label><textarea name="description"></textarea><label>Git</label><input name="git_url" type="url" placeholder="https://github.com/…"><p><button>Добавить</button></p></form></details>
+{% if inbox %}<h2>Новые из GitHub <span class="mut">{{ inbox|length }}</span></h2>
+<p class="mut">Назови проект так, как будешь его искать, и опиши в двух словах.</p>
+{% for p in inbox %}
+<form class="card" method="post" action="/projects/{{ p.id }}"><a href="{{ p.git_url }}" target="_blank" rel="noopener">{{ p.git_url }}</a>
+  <input name="name" value="{{ p.name }}" required><textarea name="description">{{ p.description }}</textarea>
+  <input type="hidden" name="git_url" value="{{ p.git_url }}">
+  <p class="row"><button name="status" value="active">Взять</button><button class="ghost" name="status" value="skipped" formnovalidate>Пропустить</button></p></form>
+{% endfor %}<h2>Проекты</h2>{% endif %}
 {% for p in projects %}
 <div class="card"><b>{{ p.name }}</b>{% if p.status != "active" %} <span class="mut">(архив)</span>{% endif %}
   {% if p.description %}<div>{{ p.description }}</div>{% endif %}
@@ -14,4 +22,8 @@
     <p><button>Сохранить</button></p></form></details>
 </div>
 {% endfor %}
+{% if skipped %}<details><summary class="mut">Пропущенные репо ({{ skipped|length }})</summary>
+{% for p in skipped %}<form class="row" method="post" action="/projects/{{ p.id }}"><a href="{{ p.git_url }}" target="_blank" rel="noopener">{{ p.name }}</a>
+  <input type="hidden" name="name" value="{{ p.name }}"><input type="hidden" name="description" value="{{ p.description }}"><input type="hidden" name="git_url" value="{{ p.git_url }}">
+  <button class="ghost mini" name="status" value="inbox">вернуть</button></form>{% endfor %}</details>{% endif %}
 {% endblock %}

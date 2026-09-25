@@ -1,5 +1,7 @@
 """Agents see the same inventory as the site, through MCP."""
 import asyncio
+import io
+import json
 import os
 
 from fastapi.testclient import TestClient
@@ -93,3 +95,44 @@ def test_card_tools(monkeypatch):
     assert call("update_item", item_id=card["id"], fields={"photo": "../inventory.db"}).is_error  # only own uploads
     err = call("create_item", type="module", name="X", agent="Claude", fields={"pinout": "A B"})
     assert err.is_error and "Фото: обязательно" in err.content[0].text
+
+
+def test_github_inbox():
+    """New repos wait in «Новые из GitHub» until a person or an agent takes them, in their own words, or skips."""
+    c = TestClient(app)
+    c.post("/projects", data={"name": "Часы", "git_url": "https://github.com/me/Clock"})
+    repo = lambda name, fork=False: {"name": name, "description": f"{name} repo", "fork": fork,
+                                     "html_url": f"https://github.com/me/{name}"}
+    assert core.sync_projects([repo("clock.git"), repo("Clock"), repo("upstream", fork=True), repo("feeder"),
+                               repo("dotfiles"), repo("lamp")]) == 3  # «Часы» are known: .git and case aside
+    assert core.sync_projects([repo("feeder")]) == 0  # hourly: known repos stay as they are
+    with core.db() as db:
+        assert "feeder" not in [p["name"] for p in core.projects(db)]  # not offered for «забрать» yet
+        inbox = {p["name"]: p["id"] for p in db.execute("SELECT * FROM projects WHERE status='inbox'")}
+    assert "Новые из GitHub" in c.get("/projects").text
+    c.post(f"/projects/{inbox['dotfiles']}", data={"name": "dotfiles", "git_url": "https://github.com/me/dotfiles",
+                                                   "status": "skipped"})
+
+    assert [p["name"] for p in call("list_projects").structured_content["inbox"]] == ["feeder", "lamp"]
+    call("accept_project", git_url="https://github.com/me/feeder.git", name="Страж миски", description="Кошка не ест")
+    call("accept_project", git_url="https://github.com/me/private", name="Голова", description="")  # not listed
+    call("skip_project", git_url="https://github.com/me/lamp")
+    with core.db() as db:
+        assert {"Голова", "Страж миски", "Часы"} <= {p["name"] for p in core.projects(db)}
+        assert "lamp" not in {p["name"] for p in core.projects(db)}
+    assert call("list_projects").structured_content["inbox"] == []
+    assert call("skip_project", git_url="https://github.com/me/nope").is_error
+
+
+def test_fetch_repos(monkeypatch):
+    """All pages, and with a token the account's own list (private repos too)."""
+    asked = []
+
+    def urlopen(req, timeout):
+        asked.append(req)
+        return io.BytesIO(json.dumps([{"name": "r"}] * (100 if len(asked) == 1 else 3)).encode())
+    monkeypatch.setattr(core.urllib.request, "urlopen", urlopen)
+    monkeypatch.setattr(core, "GITHUB_TOKEN", "t")
+    assert len(core.fetch_repos()) == 103
+    assert asked[1].full_url.endswith("page=2") and "/user/repos" in asked[0].full_url
+    assert asked[0].get_header("Authorization") == "Bearer t"

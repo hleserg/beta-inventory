@@ -58,11 +58,13 @@ weight.
 - **Search** by name, other names, description and typed fields, ranked by
   relevance; box IDs and places too. Below the word matches, a small local
   model adds items close in meaning, so "step-down" finds a buck converter.
-- **Projects** with a git link, to charge takes against.
+- **Projects** with a git link, to charge takes against. With `GITHUB_OWNER`
+  set, new repos of that account wait in an inbox until you take or skip them.
 - **MCP for agents** at `http://<host>/mcp` (streamable HTTP, same port and
   data as the site): `search`, `get_item`, `get_box`, `card_template`,
   `list_projects`; `create_item`, `update_item` (photos and files by URL, the
-  server downloads them), `change_stock` (history names the agent as author).
+  server downloads them), `change_stock` (history names the agent as author),
+  `accept_project` / `skip_project` for the GitHub inbox.
   Each field's `hint` in the profile tells agents what goes in it, so any MCP
   client writes a full card. Claude Code and Codex also get a skill:
   `ln -s "$PWD/skills/inventory-new-card" ~/.agents/skills/` (Claude Code:
@@ -70,7 +72,6 @@ weight.
 
 ## Planned
 
-- Projects synced from a GitHub account into an inbox.
 - Markdown editor with toolbar, batch label printing, English UI.
 
 ## Non-goals

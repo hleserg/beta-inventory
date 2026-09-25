@@ -1,7 +1,9 @@
 """Web pages. Plain HTML forms, no JS framework: works on any phone in the LAN."""
+import asyncio
 import io
 import json
 import os
+from contextlib import asynccontextmanager
 from pathlib import Path
 from urllib.parse import urlsplit
 from types import SimpleNamespace
@@ -21,7 +23,28 @@ from .core import MOVES, PROFILE, db
 from .mcp_server import server as mcp_server
 
 core.init()
-app = FastAPI(title="beta-inventory", lifespan=lambda _: mcp_server.session_manager.run())
+
+
+async def github_sync():
+    while True:
+        try:
+            if n := await asyncio.to_thread(lambda: core.sync_projects(core.fetch_repos())):
+                print(f"github: {n} new repos in the projects inbox", flush=True)
+        except Exception as e:  # network down, token revoked: try again next round
+            print(f"github sync failed: {e}", flush=True)
+        await asyncio.sleep(core.GITHUB_SYNC_MIN * 60)
+
+
+@asynccontextmanager
+async def lifespan(_):
+    sync = asyncio.create_task(github_sync()) if core.GITHUB_OWNER or core.GITHUB_TOKEN else None
+    async with mcp_server.session_manager.run():
+        yield
+    if sync:
+        sync.cancel()
+
+
+app = FastAPI(title="beta-inventory", lifespan=lifespan)
 # Agents: MCP at /mcp, same port and data as the site. Host 0.0.0.0 turns the localhost-only Host check
 # off: agents come by LAN name, and the site has no auth by design (LAN only).
 app.router.routes.extend(mcp_server.streamable_http_app(stateless_http=True, json_response=True, host="0.0.0.0").routes)
@@ -490,7 +513,8 @@ def trash_restore(trash_id: int):
 def projects_page(req: Request):
     with db() as c:
         rows = c.execute("SELECT * FROM projects ORDER BY status, name").fetchall()
-    return page(req, "projects.html", projects=rows)
+    by = lambda *status: [r for r in rows if r["status"] in status]
+    return page(req, "projects.html", projects=by("active", "archived"), inbox=by("inbox"), skipped=by("skipped"))
 
 
 @app.post("/projects")
