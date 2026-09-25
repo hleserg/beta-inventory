@@ -185,8 +185,14 @@ addEventListener("click", async e => {  // «Записать на метку» 
   try {
     await new NDEFReader().write({records: [{recordType: "url", data: b.dataset.nfcw}]});
     st.textContent = "Записано ✓ Проверьте: коснитесь метки телефоном.";
-  } catch (e) { st.textContent = "Не записалось: " + e.message; }
+  } catch (e) { st.textContent = e.name == "NotAllowedError" ? "Нажмите «Записать на метку» — телефон ждёт нажатия." : "Не записалось: " + e.message; }
   finally { window.nfcBusy = false; }
+});
+addEventListener("DOMContentLoaded", () => {  // №42: «Сохранить и записать метку» lands on the card with ?nfc=1
+  const b = new URLSearchParams(location.search).has("nfc") && document.querySelector("[data-nfcw]");
+  if (!b) return;
+  history.replaceState(null, "", location.pathname);  // a reload doesn't write again
+  (b.closest("details") || {}).open = true; b.scrollIntoView({block: "center"}); b.click();
 });
 if ("NDEFReader" in window) navigator.permissions.query({name: "nfc"})
   .then(p => p.state === "granted" && nfcScan().catch(() => addEventListener("click", nfcScan, {once: true}))).catch(() => {});

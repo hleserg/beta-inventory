@@ -314,9 +314,9 @@ def items(req: Request, type: str = "", cat: str = "", q: str = "", hands: str =
     return page(req, "items.html", items=rows, type=type, cat=cat, q=q, hands=hands, reorder=reorder)
 
 
-def card_form(req, status=200, it=None, type="", name="", vals=None, errors=(), box="", qty="", dups=()):
+def card_form(req, status=200, it=None, type="", name="", vals=None, errors=(), box="", qty="", dups=(), nfc=False):
     return page(req, "item_form.html", status, it=it, type=type, fields=core.fields_for(type), name=name,
-                vals=vals or {}, errors=errors, box=box, qty=qty, dups=dups)
+                vals=vals or {}, errors=errors, box=box, qty=qty, dups=dups, nfc=nfc)
 
 
 def check_type(type):
@@ -337,6 +337,7 @@ async def item_create(req: Request, type: str):
     fields = core.fields_for(check_type(type))
     name, f, errors, form = await read_fields(req, {}, fields)
     box, qty, box_id = str(form.get("box", "")).strip(), str(form.get("qty", "")).strip(), None
+    nfc = bool(form.get("nfc"))  # №42: «Сохранить и записать метку»
     try:
         box_id = core.find_box(box) if box else None
     except ValueError as e:
@@ -344,14 +345,16 @@ async def item_create(req: Request, type: str):
     if qty and not qty.isdigit():
         errors.append("Количество — целое число; пусто — «не считал»")
     if errors:
-        return card_form(req, 400, type=type, name=name, vals=f, errors=errors, box=box, qty=qty)
+        return card_form(req, 400, type=type, name=name, vals=f, errors=errors, box=box, qty=qty, nfc=nfc)
     if not form.get("dup_ok") and (dups := core.lookalikes(name)):  # asked, not refused: two alike things are real too
-        return card_form(req, 409, type=type, name=name, vals=f, box=box, qty=qty, dups=dups)
+        return card_form(req, 409, type=type, name=name, vals=f, box=box, qty=qty, dups=dups, nfc=nfc)
     iid = core.save_item(None, name, type, f)
     if box_id and (not qty or int(qty) > 0):  # empty: «есть, не считал»
         core.move(iid, box_id, int(qty) if qty else None, "put", AUTHOR)
     elif not box_id and qty and int(qty) > 0:  # no box yet: brought home, in hand until put away (№28)
         core.move(iid, core.HANDS, int(qty), "buy", AUTHOR)
+    if nfc:  # the card writes its tag on arrival (base.html)
+        return go(f"/i/{iid}?nfc=1")
     return go(f"/b/{box_id}" if box_id else f"/i/{iid}")  # filling a box: back to it for the next item
 
 

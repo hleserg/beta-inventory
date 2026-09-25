@@ -30,7 +30,8 @@
   <div class="row">{{ box_input(value=box, placeholder="название или скан, можно пусто") }}<input type="number" name="qty" value="{{ qty }}" min="0" placeholder="не считал"></div>
   {% endif %}
   {% if it %}<p id="savest" class="mut">Изменения сохраняются сами.</p><p><button>Готово</button></p>
-  {% else %}<p><button>Сохранить</button></p>{% endif %}
+  {% else %}{% if nfc %}<input type="hidden" name="nfc" value="1">{% endif %}
+  <p class="row"><button>Сохранить</button><button name="nfc" value="1" class="ghost">Сохранить и записать метку</button></p>{% endif %}
 </form>
 <script>{
 // Photos: each pick adds to the ones before (a phone camera gives one shot per pick), ✕ drops one.

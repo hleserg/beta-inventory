@@ -302,6 +302,12 @@ def test_item_tag():
     assert f'data-nfcw="http://testserver/i/{iid}"' in c.get(f"/i/{iid}").text
     box = core.new_boxes(1)[0]
     assert f'data-nfcw="http://testserver/b/{box.lower()}"' in c.get(f"/b/{box}").text
+    # №42: a tag at creation too — to the card, not back to the box, and the card starts writing (base.html)
+    assert 'name="nfc"' in c.get("/items/new?type=resistor").text
+    r = c.post("/items/new?type=resistor", follow_redirects=False, data={"name": "шуруповёрт", "value": "x", "box": box, "nfc": "1"})
+    assert r.headers["location"] == f"/i/{newest()}?nfc=1"
+    r = c.post("/items/new?type=resistor", follow_redirects=False, data={"name": "шуруповёрт", "value": "x", "nfc": "1"})
+    assert r.status_code == 409 and 'name="nfc" value="1"' in r.text  # «Всё равно создать» keeps the wish
 
 
 def test_hands():
