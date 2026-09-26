@@ -26,11 +26,30 @@ It asks whether labels carry an IP or a name (like `inv.lan`) and which port,
 writes `.env` and starts the site. Both ways work; a name survives the server
 changing its IP. Update: `git pull && ./install.sh`.
 
-`install.sh` builds the image on the box. A ready one for amd64 and arm64
-(Raspberry Pi) is built from every commit to `main`:
-`ghcr.io/hleserg/beta-inventory:latest` (or `:sha-<commit>`). To use it, put
-`image: ghcr.io/hleserg/beta-inventory:latest` in place of `build:` in
-`compose.yaml` and run `docker compose pull && docker compose up -d`.
+`install.sh` pulls the ready image, built for amd64 and arm64 (Raspberry Pi)
+from every commit to `main`: `ghcr.io/hleserg/beta-inventory:latest` (or
+`:sha-<commit>`). With no image to pull, it builds one on the box. To run your
+own changes: `docker compose up -d --build`.
+
+### A Windows laptop, no Docker
+
+1. Install Python 3.12 or newer from [python.org](https://www.python.org/downloads/).
+2. Download the code: **Code → Download ZIP** on this page, unpack it.
+3. Double-click `start.bat`.
+
+The first run takes a few minutes: it installs the packages into `.venv` and
+writes `.env` with the laptop's address. When Windows asks whether Python may
+use the network, allow private networks; if your Wi-Fi is set to Public, phones
+won't reach the site (Settings → Network → Wi-Fi → Private).
+
+- The site works while the window is open and the laptop is awake: on power,
+  sleep Never and closing the lid Does nothing. To start with Windows, put a
+  shortcut to `start.bat` into `shell:startup`.
+- Labels carry the laptop's address, so reserve its IP in the router
+  (docs/setup.md).
+- Update: unpack the new ZIP over the old folder (`data` and `.env` stay), run
+  `start.bat`.
+- `TZ` in `.env` is skipped here: the history uses the laptop's time zone.
 
 **[docs/setup.md](docs/setup.md)**: name or IP, a DNS record in the router,
 the Android phone (app + writing NFC tags), iPhone, labels.

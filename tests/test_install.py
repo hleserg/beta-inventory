@@ -4,6 +4,9 @@ import shutil
 import subprocess
 from pathlib import Path
 
+import pytest
+
+pytestmark = pytest.mark.skipif(os.name == "nt", reason="install.sh is for Linux; Windows has start.bat")
 ROOT = Path(__file__).parent.parent
 
 

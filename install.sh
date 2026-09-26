@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Install or update: asks for the site address once, writes .env, starts the container.
+# Install or update: asks for the site address once, writes .env, starts the ready image.
 # Run again to update (git pull first). Delete .env to answer the questions again.
 set -euo pipefail
 cd "$(dirname "$0")"
@@ -38,7 +38,8 @@ else
   fi
 fi
 
-docker compose up -d --build
+docker compose pull || echo "No ready image, building one here (a few minutes)."
+docker compose up -d
 port=$(sed -n 's/^PORT=//p' .env); base=$(sed -n 's/^PUBLIC_BASE_URL=//p' .env)
 base=${base:-http://localhost:${port:-8000}}
 echo
