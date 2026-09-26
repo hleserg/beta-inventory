@@ -33,7 +33,7 @@ ENV0 = dict(os.environ)
 def overrides():
     """What /settings changed: key -> value, .env keeps the rest."""
     try:
-        return {k: v for k, v in json.loads(SETTINGS.read_text()).items() if k in DEFAULTS}
+        return {k: v for k, v in json.loads(SETTINGS.read_text("utf-8")).items() if k in DEFAULTS}
     except FileNotFoundError:
         return {}
 
@@ -90,7 +90,7 @@ def save_settings(changes):
         raise
     over = {k: v for k, v in (overrides() | changes).items() if v is not None}
     tmp = SETTINGS.with_suffix(".tmp")
-    tmp.write_text(json.dumps(over, ensure_ascii=False, indent=1))
+    tmp.write_text(json.dumps(over, ensure_ascii=False, indent=1), "utf-8")
     os.replace(tmp, SETTINGS)  # a crash mid-write leaves the old file, not half a new one
 UPLOADS = DATA / "uploads"
 ID_ALPHABET = "23456789ABCDEFGHJKLMNPQRSTUVWXYZ"  # no 0/O/1/I
@@ -197,7 +197,7 @@ WEIGHTS = {k: {f["key"]: int(f["search"]) for f in fields_for(k) if f.get("searc
 
 # Meaning search: a small local model, so "понижайка" finds a buck converter with no alias typed in.
 # Off with SEMANTIC_MODEL= ; keyword search works alone while the model loads or if it can't.
-SEM_MODEL = os.environ.get("SEMANTIC_MODEL", "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2")
+SEM_MODEL = os.environ.get("SEMANTIC_MODEL", "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2").strip()
 # SEMANTIC_MIN: cosine floor, tune on real data; SEMANTIC_MARGIN: and no further than this below the best match —
 # cut noise 4x on 22 test queries; SEMANTIC_TOP: meaning matches shown past the exact ones (read_settings).
 _sem = {"model": None, "vecs": {}}  # vecs: item_id -> (embedded text, unit vector)

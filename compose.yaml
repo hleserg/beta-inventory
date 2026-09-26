@@ -1,6 +1,7 @@
 # Settings go in .env next to this file (see README), not here.
 services:
   inventory:
+    image: ghcr.io/hleserg/beta-inventory:latest  # ready image from CI; `up -d --build` builds this checkout instead
     build:
       context: .
       args:

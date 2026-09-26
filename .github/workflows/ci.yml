@@ -20,6 +20,24 @@ jobs:
       - run: pip install -r requirements-dev.txt
       - run: pytest -q
 
+  windows:  # start.bat on a laptop without Docker, with the Python people download today
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.x"
+          cache: pip
+          cache-dependency-path: requirements*.txt
+      - run: pip install -r requirements-dev.txt
+      - run: pytest -q
+      - name: start.bat serves the site
+        shell: pwsh
+        run: |
+          Start-Process cmd -ArgumentList '/c','start.bat' -RedirectStandardOutput out.txt -RedirectStandardError err.txt
+          for ($i=0; $i -lt 60; $i++) { try { Invoke-WebRequest http://localhost:8000/ -UseBasicParsing | Out-Null; exit 0 } catch { Start-Sleep 5 } }
+          Get-Content out.txt, err.txt; exit 1
+
   image:
     needs: test
     if: github.event_name != 'pull_request'
