@@ -783,12 +783,19 @@ def places(req: Request, new: str = ""):
             "(SELECT count(*) FROM boxes k WHERE k.parent_id=b.id) AS kids, "
             "(SELECT i.name FROM stock s JOIN items i ON i.id=s.item_id WHERE s.box_id=b.id) AS one "
             "FROM boxes b WHERE kind='box' ORDER BY name='', name, id")]
+        things = {}  # №71: what lies in each box and on each shelf, shown when its row is opened
+        for r in c.execute("SELECT s.box_id, s.qty, i.id, i.name, i.type, i.fields FROM stock s "
+                           "JOIN items i ON i.id=s.item_id ORDER BY i.name"):
+            things.setdefault(r["box_id"], []).append(dict(r, fields=json.loads(r["fields"])))
         under = {}
         for b in boxes:
             under.setdefault(b["parent_id"], []).append(b)
+        for b in boxes:
+            b.update(things=things.get(b["id"], []), inner=under.get(b["id"], []))
         shelves = c.execute("SELECT b.*, (SELECT count(*) FROM stock WHERE box_id=b.id) AS n "
                             "FROM boxes b WHERE kind='shelf' ORDER BY rowid").fetchall()
-        rows = [dict(p, shelves=[dict(s, boxes=under.get(s["id"], [])) for s in shelves if s["place_id"] == p["id"]],
+        rows = [dict(p, shelves=[dict(s, boxes=under.get(s["id"], []), things=things.get(s["id"], []))
+                                 for s in shelves if s["place_id"] == p["id"]],
                      boxes=[b for b in under.get(None, []) if b["place_id"] == p["id"]],
                      gone=c.execute("SELECT count(*) FROM stock JOIN boxes b ON b.id=box_id "  # things on its shelves
                                     "WHERE b.place_id=? AND b.kind='shelf'", (p["id"],)).fetchone()[0])

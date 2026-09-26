@@ -7,15 +7,28 @@
     ~ ((" Коробок внутри: " ~ b.kids ~ " — переедут уровнем выше.") if b.kids else "")
     ~ " Вернуть можно " ~ core.TRASH_DAYS ~ " дней из «Корзины».")|tojson }})'><button class="bad">Удалить</button></form>{% endmacro %}
 {% macro label_btn(id) %}<a class="btn ghost" href="/b/{{ id }}/label.png" download="{{ id }}.png">Наклейка</a>{{ print_btn("/b/" ~ id ~ "/label.png") }}{% endmacro %}
+{% macro things(xs, lvl) %}{% for i in xs %}{# №71: what lies there, one tap to the thing #}
+<a class="tn it l{{ [lvl, 4]|min }}" href="/i/{{ i.id }}"><span class="ti"></span><span class="grow nm">{{ i.name }}</span><span class="qty">{{ i.qty|qty(unit=unit_of(i.type, i.fields)) }}</span></a>
+{%- endfor %}{% endmacro %}
 {% macro box_row(b, lvl) %}{# №54 screen 3: the name leads, the ID and what's inside go grey below; ⋯ opens the rest #}
-<div class="tn l{{ lvl }}"><span class="ti"></span><a class="grow" href="/b/{{ b.id }}">
-  {% if b.pics %}<img class="thumb" src="/u/{{ b.pics[0] }}" alt="">{% else %}<span class="ti">{{ ico(I_BOX) }}</span>{% endif %}
+{% set head %}{% if b.pics %}<img class="thumb" src="/u/{{ b.pics[0] }}" alt="">{% else %}<span class="ti">{{ ico(I_BOX) }}</span>{% endif %}
   <span class="grow"><span class="nm">{{ b.name or b.id }}</span><span class="path">{% if b.name %}{{ b.id }} · {% endif %}
-  {%- if b.n == 1 %}{{ b.one }}{% else %}{{ t.items|lower }}: {{ b.n }}{% endif %}{% if b.kids %} · {{ t.boxes|lower }}: {{ b.kids }}{% endif %}</span></span></a>
-  {{ dots(b.name or b.id) }}</div>
-<div class="tacts" hidden>{{ label_btn(b.id) }}
+  {%- if b.n == 1 %}{{ b.one }}{% else %}{{ t.items|lower }}: {{ b.n }}{% endif %}{% if b.kids %} · {{ t.boxes|lower }}: {{ b.kids }}{% endif %}</span></span>{% endset %}
+{% set acts %}{{ label_btn(b.id) }}
   {% if core.SCAN_NFC %}<span><button type="button" class="ghost" data-nfcw="{{ nfc_base ~ '/b/' ~ b.id|lower }}">NFC</button></span><span class="mut" data-nfcst></span>{% endif %}
-  {{ box_del(b) }}</div>
+  {{ box_del(b) }}{% endset %}
+{% if b.things or b.inner %}{# №71: a box with something inside opens like a shelf; «Открыть» moves under ⋯ #}
+<details id="b{{ b.id }}"><summary class="tn l{{ [lvl, 4]|min }}"><span class="ti chev">{{ ico(I_DOWN) }}</span><span class="grow hb">{{ head }}</span>
+  {{ dots(b.name or b.id) }}</summary>
+<div class="tacts" hidden><a class="btn ghost" href="/b/{{ b.id }}">Открыть</a>{{ acts }}</div>
+{{ things(b.things, lvl + 1) }}
+{% for k in b.inner %}{{ box_row(k, lvl + 1) }}{% endfor %}
+</details>
+{% else %}
+<div class="tn l{{ [lvl, 4]|min }}"><span class="ti"></span><a class="grow" href="/b/{{ b.id }}">{{ head }}</a>
+  {{ dots(b.name or b.id) }}</div>
+<div class="tacts" hidden>{{ acts }}</div>
+{% endif %}
 {% endmacro %}
 {% block main %}
 {% if add %}{# №19: a picker's «+ Место»; the new place goes back into that field (base.html pickMade) #}
@@ -58,6 +71,7 @@
   <span class="grow"><span class="nm">{{ s.name }}</span><span class="path">{{ s.id }} · {{ t.boxes|lower }}: {{ s.boxes|length }}{% if s.n %} · {{ t.items|lower }}: {{ s.n }}{% endif %}</span></span>
   {{ dots(s.name) }}</summary>
 <div class="tacts" hidden>{{ label_btn(s.id) }}<a class="btn ghost" href="/b/{{ s.id }}">Открыть</a>{{ box_del(dict(s, kids=s.boxes|length)) }}</div>
+{{ things(s.things, 2) }}
 {% for b in s.boxes %}{{ box_row(b, 2) }}{% endfor %}
 </details>
 {% endfor %}

@@ -249,6 +249,8 @@ def test_new_box_and_shelves():
     c.post("/items/new?type=hand_tool", files=photo(), data={"name": "макетка", "box": bid})
     assert (f'<div class="crumbs"><a href="/places#p{pid}">Стеллаж</a> › <a href="/b/{shelf}">Полка 2</a> › '
             f'<a href="/b/{bid}">Макетки</a></div>') in c.get(f"/i/{newest()}").text  # №44: a thing in one place shows the way to it
+    places = c.get("/places").text  # №71: opening the box in the tree shows what lies in it
+    assert f'<details id="b{bid}">' in places and f'href="/i/{newest()}"' in places
     other = core.db().execute("SELECT id FROM places WHERE name='Шкаф'").fetchone()[0]
     assert "макетка" in c.get(f"/?place={pid}").text and "макетка" not in c.get(f"/?place={other}").text  # №57: box on a shelf → the cabinet
     j = c.post(f"/b/{bid}", data={"name": "Макетки", "place": str(pid)}, headers={"X-Autosave": "1"}).json()
