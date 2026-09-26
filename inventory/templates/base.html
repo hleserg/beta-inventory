@@ -180,6 +180,7 @@ body:has(main :is(input:not([type=checkbox],[type=radio],[type=file]),textarea):
 .fab{width:auto;height:44px;border-radius:10px;display:flex;justify-content:flex-start;gap:12px;padding:0 12px;margin-top:12px;font-size:15px}
 .fab svg{width:24px;height:24px}
 .fbar,.save{left:var(--nav)}
+body:not(:has(.bar)){--nav:0px;--top:0px}body:not(:has(.bar)) main{max-width:720px;margin:0 auto}
 .fbar{top:var(--top);bottom:auto;border-top:0;border-bottom:1px solid var(--line);padding:8px 32px}.fbar>div{max-width:none;margin:0}
 body:has(.fbar) main{padding-top:calc(var(--top) + 77px);padding-bottom:32px}
 .put{left:auto;top:var(--top);width:var(--detail);max-height:none;padding:24px;border-top:0;border-left:1px solid var(--line)}
@@ -187,11 +188,11 @@ body:has(.put) main{max-width:none;margin-right:var(--detail);padding-bottom:32p
 .more{min-height:0}.more>h1{flex:none}
 html{scroll-padding-top:calc(var(--top) + 16px)}html:has(.fbar){scroll-padding-top:calc(var(--top) + 77px)}
 /* the main list as a table: name · type · where · qty, fixed qty width so the columns line up */
-.thd{display:flex;color:var(--mut);font-size:13px;padding:4px 0}.line.thd .thumb{height:0;visibility:hidden}.thd .qty{font-weight:400}
+.thd{display:flex;color:var(--mut);font-size:13px;padding:4px 0}.thd .qty{font-weight:400}
 .line>a>.grow:has(>.nm),.thd>.grow{display:grid;grid-template-columns:minmax(0,2fr) minmax(0,1fr) minmax(0,1.2fr);column-gap:16px;align-items:center}
 .line .grow:has(>.nm)>br{display:none}.line .grow:has(>.nm)>.src{grid-column:1;justify-self:start}
 .line .grow:has(>.nm)>span:not(.src){overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.line:has(.nm) .qty{width:7rem;max-width:none;flex:none}.line:has(.nm) .thumb{width:40px;height:40px}
+.line:has(.nm) .qty{width:7rem;max-width:none;flex:none}.line:has(.nm) .thumb{width:40px;height:40px}.line.thd .thumb{height:0;visibility:hidden}
 }
 </style>
 </head>
@@ -634,13 +635,13 @@ addEventListener("pointerdown", e => {
   };
   for (const [n, f] of [["pointermove", move], ["pointerup", up], ["pointercancel", up]]) addEventListener(n, f);
 });
-// №58 keyboard: «/» goes to search, ↑↓ walk the list rows (from search too), Enter opens the row — a link does that itself
+// №58 keyboard: «/» goes to search, ↑↓ walk the list rows (↓ from search too), Enter opens the row — a link does that itself
 addEventListener("keydown", e => {
   const q = document.querySelector("form[role=search] input");
   if (e.ctrlKey || e.metaKey || e.altKey || e.target.closest?.("input,textarea,select,[contenteditable],.pickl,.pickm") && !(e.target === q && e.key == "ArrowDown")) return;
   if (e.key == "/" && q) { e.preventDefault(); q.focus(); return; }
-  if (e.key != "ArrowDown" && e.key != "ArrowUp") return;
-  const rows = [...document.querySelectorAll("main .line>a, main .card>a.row")], i = rows.indexOf(document.activeElement);
+  if (e.key != "ArrowDown" && e.key != "ArrowUp" || !matchMedia("(min-width:1024px)").matches) return;
+  const rows = [...document.querySelectorAll("main .line>a:first-child, main .card>a.row")], i = rows.indexOf(document.activeElement);
   const n = rows[i < 0 ? 0 : Math.max(0, Math.min(rows.length - 1, i + (e.key == "ArrowDown" ? 1 : -1)))];
   if (n) { e.preventDefault(); n.focus(); }
 });

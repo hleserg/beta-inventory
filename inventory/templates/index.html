@@ -37,7 +37,7 @@
   {% for b in taken %}{{ taken_box(b) }}{% endfor %}
   {% for r in inhand %}{% call row(r) %}<a class="btn ghost" href="/i/{{ r.id }}">Положить</a>{% endcall %}{% endfor %}{% endif %}
 {% if recent %}<h2>Недавно положил</h2>
-  {% for r, b in recent %}<div class="line"><a href="/i/{{ r.id }}">{{ thumb(r) }}<span class="grow">{{ r.name }}<br><span class="mut">→ {{ b.name or b.box_id }}{% if b.where %} · {{ b.where }}{% endif %}</span></span>
+  {% for r, b in recent %}<div class="line"><a href="/i/{{ r.id }}">{{ thumb(r) }}<span class="grow"><span class="nm">{{ r.name }}</span>{% set tl = type_label(r.type) %}<span class="dt mut" title="{{ tl }}">{{ tl.split(" › ")|last }}</span><br><span class="mut">→ {{ b.name or b.box_id }}{% if b.where %} · {{ b.where }}{% endif %}</span></span>
     <span class="qty">{{ b.qty|qty(unit=unit_of(r.type, r.fields)) }}</span></a></div>{% endfor %}{% endif %}
 {% if filtered %}{% for b in taken %}{{ taken_box(b) }}{% endfor %}{% else %}<h2>Все · А–Я</h2>{% endif %}
 {% if rows %}<div class="line thd" aria-hidden="true"><span class="thumb"></span><span class="grow"><span class="nm">Название</span><span>Тип</span><span>Где</span></span><span class="qty">Кол-во</span></div>{% endif %}
