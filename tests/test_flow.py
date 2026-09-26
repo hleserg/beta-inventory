@@ -434,9 +434,11 @@ def test_hands():
     c.post("/stock", data={"box": box, "item": iid, "action": "add", "kind": "put", "qty": 2})
     assert stock(iid) == {core.HANDS: 1, box: 2}
     c.post("/stock", data={"box": box, "item": iid, "action": "take", "qty": 1})
-    assert stock(iid) == {core.HANDS: 2, box: 1} and f"взят из {box}" in c.get(f"/i/{iid}").text
+    card = c.get(f"/i/{iid}").text
+    assert stock(iid) == {core.HANDS: 2, box: 1} and f"взят из {box}" in card and "Положить на место" in card
     c.post("/stock", data={"box": core.HANDS, "item": iid, "action": "take", "qty": 2})
-    assert stock(iid) == {box: 1} and "списал" in c.get(f"/i/{iid}").text
+    card = c.get(f"/i/{iid}").text  # №72: lying in its box, the pinned panel takes it rather than asks where to put it
+    assert stock(iid) == {box: 1} and "списал" in card and f"Взять из {box}" in card and "data-put hidden" in card
     assert "модуль с ПВЗ" not in c.get("/items?hands=1").text
     places = c.get("/places").text  # a box with no place is under «Без места», a placed one under its place
     loose = places[places.index('id="loose"'):]

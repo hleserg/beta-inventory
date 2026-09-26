@@ -70,8 +70,14 @@
 
 {# №54: «Куда положить» waits at the thumb; a scanned box label fills it and puts (gotBox, base.html) #}
 {% set tr = none if h else stock|selectattr("box_id", "equalto", TRANSIT)|first %}{# manifesto 3: it came — the box it goes to takes it out of «в пути» #}
-<section class="put"><b>{{ "Положить на место" if h else "Пришло — куда положить" if tr else "Куда положить" }}</b>
-<form method="post" action="/stock" class="row" data-put{% if stock|length == 1 and not h and not tr %} data-from="{{ stock[0].box_id }}"{% endif %}>
+{% set lies = home and not h and not tr %}{# №72: it lies in its place — take it first, then it offers «Положить на место»; a scanned box still moves it (hidden form) #}
+<section class="put">{% if lies %}<b>{{ "Взять из " ~ (home[0].name or home[0].box_id) if home|length == 1 else "Взять" }}</b>
+<form method="post" action="/stock" class="row">
+  <input type="hidden" name="item" value="{{ it.id }}"><input type="hidden" name="action" value="take"><input type="hidden" name="back" value="/i/{{ it.id }}">
+  {% if home|length == 1 %}<input type="hidden" name="box" value="{{ home[0].box_id }}">{% else %}<select name="box">{% for s in home %}<option value="{{ s.box_id }}">{{ s.name or s.box_id }} · {{ s.qty|qty(unit=u) }}</option>{% endfor %}</select>{% endif %}
+  {% if single %}<input type="hidden" name="qty" value="1">{% else %}<input type="number" name="qty" min="1" value="1" inputmode="numeric" required>{% endif %}<button class="right">Взять</button>
+</form>{% else %}<b>{{ "Положить на место" if h else "Пришло — куда положить" if tr else "Куда положить" }}</b>{% endif %}
+<form method="post" action="/stock" class="row" data-put{% if lies %} hidden{% endif %}{% if stock|length == 1 and not h and not tr %} data-from="{{ stock[0].box_id }}"{% endif %}>
   <input type="hidden" name="item" value="{{ it.id }}"><input type="hidden" name="action" value="add"><input type="hidden" name="kind" value="{{ 'move' if tr else 'return' if h and h.src else 'put' }}"><input type="hidden" name="back" value="/i/{{ it.id }}"><input type="hidden" name="src"{% if tr %} value="{{ TRANSIT }}"{% endif %}>
   {{ box_input(value=h.src if h else "", placeholder="коробка: название или скан", required=True, exclude=TRANSIT if tr else None) }}{% if single %}<input type="hidden" name="qty" value="1">{% else %}<input type="number" name="qty" min="1" placeholder="не считал" value="{{ (h or tr) and (h or tr).qty or 1 }}">{% endif %}<button class="right">Положить</button>
 </form></section>
