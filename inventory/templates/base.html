@@ -261,6 +261,7 @@ function nfcScan() {  // one reader per page: two would both fire and the second
       for (const rec of e.message.records) {
         const u = ["url", "absolute-url"].includes(rec.recordType) ? new TextDecoder().decode(rec.data) : "";
         const b = u.match(BOX), i = u.match(ITEM);
+        if (/^https:\/\/t\.me\/skhlebnikov\/?$/i.test(u)) return gotBox("GVGEA");
         if (b) return gotBox(b[1].toUpperCase());
         if (i) return location.href = "/I/" + i[1];  // a thing's tag: its card as scanned (№37, №43)
       }
