@@ -187,3 +187,17 @@ def test_fetch_repos(monkeypatch):
     assert len(core.fetch_repos()) == 103
     assert asked[1].full_url.endswith("page=2") and "/user/repos" in asked[0].full_url
     assert asked[0].get_header("Authorization") == "Bearer t"
+
+
+def test_agent_fills_photoless_card():
+    """№80: a card handed over without a photo saves as the agent fills it; lists and dicts don't turn into repr."""
+    iid = core.save_item(None, "INA226", "module", {"pinout": "VCC GND SCL SDA"})
+    core.set_for_agent(iid, True)
+    new = call("update_item", item_id=iid, fields={"aliases": ["датчик тока", " INA "], "buy": None}).structured_content
+    assert new["fields"]["aliases"] == "датчик тока, INA"
+    assert iid not in [i["id"] for i in call("agent_queue").structured_content["items"]]
+    err = call("update_item", item_id=iid, fields={"pinout": ""})  # what was there can't be cleared
+    assert err.is_error and "обязательно" in err.content[0].text
+    err = call("update_item", item_id=iid, fields={"buy": [{"url": "https://ozon.ru/a"}]})
+    assert err.is_error and "URL" in err.content[0].text
+    assert call("update_item", item_id=iid, fields={"description": {"a": 1}}).is_error

@@ -267,14 +267,22 @@ async def fill(type_key, old, given):
                 f.setdefault(k, []).append({"name": name or Path(urlparse(src).path).name or "file",
                                             "file": core.own_upload(src) or await upload(src, photo=False)})
         elif fd["type"] == "links":
+            if v is not None and (not isinstance(v, (str, list)) or any(not isinstance(x, str) for x in v)):
+                raise ToolError(f"{k}: links are URL strings, a list or one a line.")
             f[k] = v  # clean_fields makes it a list
+        elif isinstance(v, dict):
+            raise ToolError(f"{k}: a value, not an object. See card_template({type_key!r}).")
+        elif isinstance(v, list):  # №80: «Другие названия» as a list
+            f[k] = ", ".join(s for s in (str(x).strip() for x in v) if s)
         else:
             f[k] = v if isinstance(v, (int, float)) else str(v or "").strip()
     return f
 
 
-def check(name, type_key, f):
+def check(name, type_key, f, old=None):
     errors = core.clean_fields(name, core.fields_for(type_key), f)
+    if old is not None:  # №80: what the card already lacked (handed to the agent, №66) doesn't block the save
+        errors = [e for e in errors if e not in core.clean_fields(name, core.fields_for(type_key), dict(old))]
     if errors:
         raise ToolError("; ".join(errors) + f". See card_template({type_key!r}).")
 
@@ -320,8 +328,9 @@ async def update_item(item_id: int, fields: dict[str, Any], name: str = "", type
     if type and type not in core.TYPES:
         raise ToolError(f"Unknown type {type!r}. Call card_template without type for the list.")
     name, type = name.strip() or it["name"], type or it["type"]
-    f = await fill(type, core.item_fields(it), fields)
-    check(name, type, f)
+    old = core.item_fields(it)
+    f = await fill(type, old, fields)
+    check(name, type, f, old if type == it["type"] else None)
     core.save_item(item_id, name, type, f)
     core.set_for_agent(item_id, False)  # an agent filled it in: off agent_queue
     return card(item_id)
