@@ -251,9 +251,11 @@ async def fill(type_key, old, given):
     for k, v in given.items():
         fd = defs.get(k)
         if not fd:
-            if k in old:
+            if k in old and v == old[k]:
                 continue  # a field of the card's former type, kept but hidden: get_item returns it too
-            raise ToolError(f"No field {k!r} for type {type_key!r}. See card_template({type_key!r}).")
+            raise ToolError(f"No field {k!r} for type {type_key!r}"
+                            + (" (kept from the card's former type, not shown)" if k in old else "")
+                            + f". Put it into the description. See card_template({type_key!r}).")
         if fd["type"] == "photo":
             pics = [v] if isinstance(v, str) else v or []  # one photo as a plain string is fine too
             f[k] = [core.own_upload(x) or await upload(x, photo=True) for x in pics if x]
