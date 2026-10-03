@@ -181,6 +181,16 @@ def test_for_agent_needs_only_a_name():
     assert c.post(f"/i/{newest()}/edit?type=module", data={"name": "ESP32-CAM"}).status_code == 400
 
 
+def test_share_from_a_shop():
+    """A shop's «Поделиться» → the type picker → a new card with the name and the shop link, handed to an agent."""
+    r = c.get("/share", params={"text": "Драйвер моторов DRV8833 https://ozon.ru/t/Ab1"}, follow_redirects=False)
+    assert r.status_code == 302
+    pick = c.get(r.headers["location"]).text
+    assert "type=module&name=" in pick and "ozon.ru" in pick
+    form = c.get("/items/new", params={"type": "module", "name": "Драйвер моторов DRV8833", "link": "https://ozon.ru/t/Ab1"}).text
+    assert 'value="Драйвер моторов DRV8833"' in form and ">https://ozon.ru/t/Ab1</textarea>" in form
+    assert 'name="for_agent" value="1" checked' in form and "d = null;" in form
+
 def test_box_by_name():
     """A box field takes what people know: part of the name in any case, «Name (ID)» from the list, or the ID."""
     a, b, d = core.new_boxes(3)

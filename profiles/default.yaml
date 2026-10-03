@@ -53,6 +53,7 @@ item_fields:
     label: Где купить
     type: links
     hint: по ссылке на строку — где заказывал
+    share: true  # a shop's «Поделиться» (/share) puts its link here
   - key: unit
     label: Единица
     type: choice

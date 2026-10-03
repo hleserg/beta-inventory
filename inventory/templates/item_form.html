@@ -99,7 +99,8 @@ const store = () => { const v = vals();
   if (JSON.stringify(v) === shown && !unsaved) localStorage.removeItem(key);
   else localStorage[key] = JSON.stringify({t: Date.now(), name: v.name, url: location.pathname + location.search, v}); };
 let d = JSON.parse(localStorage[key] || "null");
-{% if not it %}// №54: a type chip carries what was typed to the new type's form — as a fresh start, not as a draft to restore
+{% if shared %}d = null;  // a shop's «Поделиться» is a fresh card, not the old draft
+{% endif %}{% if not it %}// №54: a type chip carries what was typed to the new type's form — as a fresh start, not as a draft to restore
 const rt = JSON.parse(sessionStorage.retype || "null");
 sessionStorage.removeItem("retype");
 if (rt && Date.now() - rt.t < 120000) {

@@ -8,7 +8,7 @@ import tempfile
 from datetime import date
 from contextlib import asynccontextmanager
 from pathlib import Path
-from urllib.parse import urlsplit
+from urllib.parse import urlencode, urlsplit
 from types import SimpleNamespace
 
 import qrcode
@@ -482,11 +482,11 @@ def items(req: Request):  # №57: the list lives on the main page now; old link
 
 
 def card_form(req, status=200, it=None, type="", name="", vals=None, errors=(), box="", qty="1", dups=(), nfc=False,
-              agent=False, single=None):  # qty 1: what a new thing mostly is (№47); single None: the card's, else the type's
+              agent=False, single=None, shared=False):  # qty 1: what a new thing mostly is (№47); single None: the card's, else the type's
     if single is None:
         single = bool(it["single"]) if it and it["single"] is not None else core.TYPES.get(type, {}).get("single", False)
     return page(req, "item_form.html", status, it=it, type=type, fields=core.fields_for(type), name=name,
-                vals=vals or {}, errors=errors, box=box, qty=qty, dups=dups, nfc=nfc, agent=agent, single=single)
+                vals=vals or {}, errors=errors, box=box, qty=qty, dups=dups, nfc=nfc, agent=agent, single=single, shared=shared)
 
 
 def check_type(type):
@@ -495,11 +495,22 @@ def check_type(type):
     return type
 
 
+@app.get("/share")
+def share(title: str = "", text: str = "", url: str = ""):
+    """A shop's «Поделиться» (Web Share Target names; over plain HTTP on Android — the HTTP Shortcuts app): a new card
+    with the shop link, handed to an agent, who reads the rest off the shop page."""
+    link = url or next(iter(re.findall(r"https?://\S+", text)), "")
+    name = " ".join((title or text.replace(link, "")).split())
+    return RedirectResponse("/items/new?" + urlencode({"name": name, "link": link}), 302)
+
+
 @app.get("/items/new")
-def item_new(req: Request, box: str = "", type: str = ""):
-    if not type:
-        return page(req, "type_pick.html", box=box.upper())
-    return card_form(req, type=check_type(type), box=box.upper())
+def item_new(req: Request, box: str = "", type: str = "", name: str = "", link: str = ""):
+    if not type:  # the query rides through the picker: a box, or what a shop shared
+        return page(req, "type_pick.html", keep=urlencode(dict(req.query_params)))
+    key = next((fd["key"] for fd in core.fields_for(check_type(type)) if fd.get("share")), None)
+    return card_form(req, type=type, box=box.upper(), name=name, vals={key: link} if key and link else None,
+                     agent=bool(link), shared=bool(link))
 
 
 @app.post("/items/new")
