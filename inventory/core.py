@@ -175,6 +175,13 @@ PROFILE = load_profile()
 TYPES = {t["key"]: dict({"single": c.get("single", False)}, **t, category=c)  # a category's `single` goes to its types
          for c in PROFILE["categories"] for t in c.get("types", [])}
 assert len(TYPES) == sum(len(c.get("types", [])) for c in PROFILE["categories"]), "type keys must be unique"
+REORDER = next((f["key"] for f in PROFILE["item_fields"] if f.get("reorder")), None)  # the «докупить» threshold
+
+
+def low(fields, have, uncounted):
+    """Manifesto 3: fewer than the card's threshold, «в пути» and hands counted; «не считал» is never flagged."""
+    v = str(fields.get(REORDER, ""))
+    return bool(REORDER and not uncounted and v.isdigit() and have < int(v))
 
 
 def fields_for(type_key):
@@ -969,6 +976,11 @@ def alerts():
                 "SELECT id AS item_id, name AS item, for_agent_at AS at FROM items WHERE for_agent "
                 "AND for_agent_at < datetime('now','localtime',?) ORDER BY for_agent_at", (f"-{cfg['agent_queue_hours']} hours",))]
         inbox = c.execute("SELECT count(*) FROM projects WHERE status='inbox'").fetchone()[0]
+        buy = sum(low(json.loads(r["fields"]), r["have"], r["uncounted"]) for r in c.execute(
+            "SELECT i.fields, COALESCE(SUM(s.qty), 0) AS have, MAX(s.box_id IS NOT NULL AND s.qty IS NULL) AS uncounted "
+            "FROM items i LEFT JOIN stock s ON s.item_id=i.id GROUP BY i.id"))
+    if buy:
+        out.append(dict(kind="reorder", n=buy))
     if inbox:
         out.append(dict(kind="inbox", n=inbox))
     return out + [dict(kind="photo", **r) for r in no_photo()]

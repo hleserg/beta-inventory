@@ -83,7 +83,7 @@ T.env.globals.update(
     unit_of=core.unit_of,
     core=core,  # settings change at run time (/settings): templates read core.TRASH_DAYS, core.SCAN_NFC…
     pk=next((f["key"] for f in PROFILE["item_fields"] if f["type"] == "photo"), None), TRANSIT=core.TRANSIT,
-    rk=(RK := next((f["key"] for f in PROFILE["item_fields"] if f.get("reorder")), None)))  # the «докупить» threshold
+    rk=core.REORDER)
 
 
 def all_boxes():  # for box fields: named first, by name; each with its place — the top box's (№39: filter, grey hint)
@@ -187,8 +187,8 @@ def index(req: Request, q: str = "", put: str = "", type: str = "", cat: str = "
             "SELECT r.item_id, r.box_id FROM (SELECT item_id, box_id, MAX(id) AS mid FROM movements "
             "WHERE kind IN ('put','return','buy','move') AND delta>=0 AND box_id NOT IN (?,?) GROUP BY item_id) r "
             "JOIN stock s ON s.item_id=r.item_id AND s.box_id=r.box_id ORDER BY r.mid DESC LIMIT 3", (core.HANDS, core.TRANSIT)).fetchall()
-    for r in rows:  # manifesto 3: fewer than the card's threshold; «не считал» is never flagged
-        r["low"] = bool(RK and not r["uncounted"] and str(r["fields"].get(RK, "")).isdigit() and r["have"] < int(r["fields"][RK]))
+    for r in rows:
+        r["low"] = core.low(r["fields"], r["have"], r["uncounted"])
     counts = {"reorder": sum(r["low"] for r in rows), "transit": sum(bool(r["tr"]) for r in rows),
               "hands": sum(bool(r["hands"]) for r in rows) + len(taken)}
     recent = [(by_id[m["item_id"]], next(b for b in by_id[m["item_id"]]["boxes"] if b["box_id"] == m["box_id"])) for m in recent]

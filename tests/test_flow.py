@@ -777,3 +777,7 @@ def test_alerts():
     old = (core.DATA / "backup-ok").stat().st_mtime - 3 * 86400
     os.utime(core.DATA / "backup-ok", (old, old))
     assert "Бэкап" in c.get("/alerts").text
+
+    box = core.new_boxes(1)[0]  # fewer than the card's «докупить» threshold: the list's chip, in the bell too
+    c.post("/items/new?type=resistor", data={"dup_ok": "1", "name": "Мало осталось", "value": "x", "reorder_at": "5", "box": box, "qty": 2})
+    assert 'href="/items?reorder=1"' in c.get("/alerts").text

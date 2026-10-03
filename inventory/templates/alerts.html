@@ -12,6 +12,8 @@
 <div class="card"><b>Бэкап давно не приходил</b><br><span class="sm mut">последний — {{ a.at[8:10] }}.{{ a.at[5:7] }} {{ a.at[11:16] }}</span></div>
 {% elif a.kind == "agent" %}
 <a class="card lrow" href="/i/{{ a.item_id }}"><span>{{ a.item }}</span><span class="mut">ждёт агента с {{ a.at[8:10] }}.{{ a.at[5:7] }}</span></a>
+{% elif a.kind == "reorder" %}
+<a class="card lrow" href="/items?reorder=1"><span>{{ t.reorder }}</span><b class="qty">{{ a.n }}</b></a>
 {% elif a.kind == "inbox" %}
 <a class="card lrow" href="/projects"><span>Новые репозитории</span><b class="qty">{{ a.n }}</b></a>
 {% endif %}
