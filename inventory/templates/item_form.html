@@ -75,7 +75,7 @@ for (const pf of document.querySelectorAll("[data-pf]")) {
     need();
   };
   const add = files => {
-    for (const file of files) {
+    for (const file of [...files].sort((a, b) => a.lastModified - b.lastModified)) {  // a gallery pick: oldest shot first
       const s = document.createElement("span");
       s.className = "pic new"; s.file = file;
       s.innerHTML = `<img class="thumb" alt=""><input type="hidden" name="${k}"><button type="button" class="mini" aria-label="Убрать фото">✕</button>`;
