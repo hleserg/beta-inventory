@@ -6,6 +6,7 @@ import sqlite3
 import tempfile
 import zipfile
 from pathlib import Path
+from urllib.parse import parse_qsl, urlsplit
 
 from fastapi.testclient import TestClient
 from PIL import Image
@@ -181,8 +182,9 @@ def test_for_agent_needs_only_a_name():
     assert c.post(f"/i/{newest()}/edit?type=module", data={"name": "ESP32-CAM"}).status_code == 400
 
 
-def test_share_from_a_shop():
+def test_share_from_a_shop(monkeypatch):
     """A shop's «Поделиться» → the type picker → a new card with the name and the shop link, handed to an agent."""
+    monkeypatch.setattr("inventory.app.resolve_link", lambda link: link)  # no network in tests
     r = c.get("/share", params={"text": "Драйвер моторов DRV8833 https://ozon.ru/t/Ab1"}, follow_redirects=False)
     assert r.status_code == 302
     pick = c.get(r.headers["location"]).text
@@ -191,6 +193,19 @@ def test_share_from_a_shop():
     assert 'value="Драйвер моторов DRV8833"' in form and ">https://ozon.ru/t/Ab1</textarea>" in form
     assert 'name="for_agent" value="1" checked' in form and "d = null;" in form
     assert "Другое…" in form and form.count("link=https%3A%2F%2Fozon.ru%2Ft%2FAb1") >= 2  # another type keeps what was shared
+
+
+def test_share_cleans_up(monkeypatch):
+    """The short link opens into the full one (its path names the product); a name no shop gave comes from that path;
+    the profile's junk phrases («Смотри, что есть на AliExpress!») go."""
+    full = {"https://ya.cc/t/X1": "https://market.yandex.ru/card/esp32-p4c6-iot-hmi-43-ips-panel-sensornaya/5784623557",
+            "https://aliexpress.ru/item/1.html": "https://aliexpress.ru/item/1.html"}
+    monkeypatch.setattr("inventory.app.resolve_link", full.get)
+    def shared(text):
+        loc = c.get("/share", params={"text": text}, follow_redirects=False).headers["location"]
+        return dict(parse_qsl(urlsplit(loc).query))
+    assert shared("https://ya.cc/t/X1") == {"name": "esp32 p4c6 iot hmi 43 ips panel sensornaya", "link": full["https://ya.cc/t/X1"]}
+    assert shared("Смотри, что есть на AliExpress! ESP32-P4 плата https://aliexpress.ru/item/1.html")["name"] == "ESP32-P4 плата"
 
 def test_box_by_name():
     """A box field takes what people know: part of the name in any case, «Name (ID)» from the list, or the ID."""

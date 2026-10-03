@@ -5,6 +5,7 @@ import json
 import os
 import re
 import tempfile
+import urllib.request
 from datetime import date
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -495,13 +496,32 @@ def check_type(type):
     return type
 
 
+def resolve_link(link):
+    """A short shop link → the full one: its path holds the product id and often a name. Anti-bot pages and failures keep the link."""
+    try:
+        opener = urllib.request.build_opener(urllib.request.HTTPCookieProcessor())  # AliExpress bounces through a cookie page
+        req = urllib.request.Request(link, headers={"User-Agent": "Mozilla/5.0 (Linux; Android 14) Chrome/130 Mobile"})
+        with opener.open(req, timeout=5) as r:
+            u = urlsplit(r.url)
+    except Exception:
+        return link
+    # ponytail: drops the query (tracking); a shop with its id in the query would lose it. Ozon's short link lands on "/".
+    return f"{u.scheme}://{u.netloc}{u.path}" if u.path.strip("/") else link
+
+
 @app.get("/share")
 def share(title: str = "", text: str = "", url: str = ""):
     """A shop's «Поделиться» (Web Share Target names; over plain HTTP on Android — the HTTP Shortcuts app): a new card
-    with the shop link, handed to an agent, who reads the rest off the shop page."""
-    link = url or next(iter(re.findall(r"https?://\S+", text)), "")
-    name = " ".join((title or text.replace(link, "")).split())
-    return RedirectResponse("/items/new?" + urlencode({"name": name, "link": link}), 302)
+    with the shop link, handed to an agent. Shop pages turn bots away, so the agent goes by the name: clean it up here."""
+    short = url or next(iter(re.findall(r"https?://\S+", text)), "")
+    name = title or text.replace(short, "")
+    for junk in PROFILE.get("share_junk", []):
+        name = re.sub(junk, " ", name, flags=re.I)
+    link = resolve_link(short) if short else ""
+    if not name.strip():  # Yandex shares the link alone; its path has the name: /card/<name-slug>/<id>
+        slugs = [p for p in urlsplit(link).path.split("/") if "-" in p and re.search(r"[^\W\d_]", p)]
+        name = max(slugs, key=lambda p: p.count("-"), default="").replace("-", " ")
+    return RedirectResponse("/items/new?" + urlencode({"name": " ".join(name.split()), "link": link}), 302)
 
 
 @app.get("/items/new")

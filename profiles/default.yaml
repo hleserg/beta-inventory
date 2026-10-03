@@ -27,6 +27,11 @@ terms:
   to_agent: Передать агенту  # the card waits for an agent to fill it in (MCP agent_queue)
   unit: шт
 
+# A shop's «Поделиться» puts these phrases before the name; /share drops them (regexes, any case)
+share_junk:
+  - "(По)?смотри,? что (есть|я нашёл|я нашел|нашёл|нашел) на AliExpress!?"
+  - "Look what I found on AliExpress!?"
+
 item_fields:
   - key: photo
     label: Фото
