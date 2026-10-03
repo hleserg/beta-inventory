@@ -923,7 +923,8 @@ def search(q):
         for b in c.execute("SELECT b.*, p.name AS place FROM boxes b LEFT JOIN places p ON p.id=b.place_id WHERE b.kind!='hands'"):
             text = norm(f"{b['id']} {b['name']} {b['place'] or ''}")
             if all(w in text for w in words):
-                boxes.append(dict(id=b["id"], name=b["name"], where=box_where(c, b["id"])))
+                boxes.append(dict(id=b["id"], name=b["name"], where=box_where(c, b["id"]),
+                                  n=c.execute("SELECT COUNT(*) FROM stock WHERE box_id=?", (b["id"],)).fetchone()[0]))
     return items, boxes
 
 

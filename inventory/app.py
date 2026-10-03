@@ -156,7 +156,15 @@ def index(req: Request, q: str = "", put: str = "", type: str = "", cat: str = "
           reorder: str = "", transit: str = "", hands: str = ""):
     if q:
         items, boxes = core.search(q)
-        return page(req, "index.html", q=q, put=put.upper(), items=items, boxes=boxes)
+        for i in items:  # the chips narrow by the home page's own filters: a category, in hand
+            here = [s for s in i["stock"] if s["box_id"] != core.TRANSIT]
+            i["total"], i["uncounted"] = sum(s["qty"] or 0 for s in here), any(s["qty"] is None for s in here)
+            i["cat"] = core.TYPES[i["type"]]["category"]["key"] if i["type"] in core.TYPES else ""
+            i["hands"] = any(s["box_id"] == core.HANDS for s in here)
+        cats = [c for c in PROFILE["categories"] if any(i["cat"] == c["key"] for i in items)]
+        shown = [i for i in items if (not cat or i["cat"] == cat) and (not hands or i["hands"])]
+        return page(req, "index.html", q=q, put=put.upper(), items=shown, boxes=[] if cat or hands else boxes,
+                    cats=cats, any_hands=any(i["hands"] for i in items), f=dict(cat=cat, hands=hands))
     # №51/№57: no query — what is where. The type list's group heading picks a whole category
     if any(c["key"] == type for c in PROFILE["categories"]):
         cat, type = type, ""
