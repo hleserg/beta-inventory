@@ -1,1 +1,8 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="260" height="54" viewBox="0 0 260 54" role="img" aria-labelledby="t d"><title id="t">Где что — вариант 01-shelf</title><desc id="d">Знак домашнего инвентаря и надпись Где что</desc><g transform="translate(1 6) scale(1.25)"><g fill="none" stroke="#1C2928" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 9.5h20v7H8zM8 20.5h20v7H8z"/><path d="M12 9.5V7h12v2.5M12 20.5V18h12v2.5"/><path d="M12 13h7M12 24h9"/></g><circle cx="25" cy="13" r="2.1" fill="#B83B20"/></g><text x="53" y="35" fill="#1C2928" font-family="Arial, sans-serif" font-weight="700" font-size="27" letter-spacing="-1.1">Где что</text></svg>
+<svg xmlns="http://www.w3.org/2000/svg" width="270" height="64" viewBox="0 0 270 64" role="img" aria-labelledby="t d"><title id="t">Где что — Домашняя полка</title><desc id="d">Домашняя полка и надпись Где что</desc><g transform="translate(2 1) scale(.62)"><g stroke="#15313D" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round">
+ <path d="M15 28h70v8H15zM15 68h70v8H15z" fill="#126985"/>
+ <path d="M20 36v32M80 36v32" fill="none"/>
+ <path d="M25 19h10v9H25z" fill="#E8B85E"/><path d="M38 15h10v13H38z" fill="#62B6AD"/><path d="M51 21h11v7H51z" fill="#F7FBFC"/>
+ <path d="M66 24c0-6 5-10 10-10s9 4 9 10M72 24v4M64 28h20" fill="none" stroke="#62B6AD"/>
+ <path d="M38 55h25v13H38z" fill="#E8B85E"/><path d="M38 55l12-7 13 7M50 48v7" fill="none"/>
+ <path d="M11 79h78" fill="none" stroke="#15313D" stroke-width="5"/>
+</g></g><text x="70" y="43" fill="#15313D" font-family="Arial,sans-serif" font-size="31" font-weight="700" letter-spacing="-.9">Где что</text></svg>
