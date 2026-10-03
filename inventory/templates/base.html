@@ -60,6 +60,19 @@ a.line,.line{display:flex;gap:10px;align-items:center;text-decoration:none;color
 .line>a:not(.btn){display:flex;gap:10px;align-items:center;flex:1;min-width:0;color:inherit;text-decoration:none}
 .line .grow{flex:1;min-width:0}.line form{margin:0}
 .line .qty{white-space:normal;text-align:right;max-width:6em}  /* «есть, не считал» wraps instead of running over the name */
+/* design: home — search field, «под рукой сейчас», rows in a white card */
+.search-field{display:flex;align-items:center;gap:12px;min-height:50px;border:1.5px solid var(--line);border-radius:14px;background:var(--card);padding:0 14px;margin:14px 0;color:var(--mut)}
+.search-field:focus-within{outline:2px solid var(--acc);outline-offset:1px}
+.search-field input{flex:1;min-width:0;border:0;outline:0;background:none;margin:0;padding:0;min-height:46px;font-size:16px;color:var(--fg)}
+.now{display:flex;align-items:center;gap:12px;background:var(--accent-soft);border:1px solid var(--line);border-radius:18px;padding:16px 18px;margin:14px 0;color:var(--accent-deep)}
+.now small{display:block;font-size:12px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--mut)}
+.now b{display:block;font-size:22px;font-weight:850;color:var(--fg);margin:6px 0 2px}.now p{margin:0;font-size:13px;color:var(--mut)}
+.sec{display:flex;align-items:baseline;justify-content:space-between;gap:8px}.sec a{font-weight:800;font-size:14px;text-decoration:none;min-height:44px;display:inline-flex;align-items:center}
+h2{font-size:17px;font-weight:850}
+.card.list>.line{padding:10px 12px;min-height:110px}.card.list>.line:last-child{border-bottom:0}
+.line .nm{font-size:14px;font-weight:800;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+.line .grow>.mut{font-size:12px}.line .grow:has(>.nm)>br{display:none}
+.line .qty{font-size:15px;font-weight:850}
 .line .dots[aria-expanded=true]{background:var(--acc);color:var(--on-acc);border-color:var(--acc)}
 .fbar{position:fixed;z-index:9;left:0;right:0;bottom:calc(var(--bar) + env(safe-area-inset-bottom));background:var(--card);border-top:1px solid var(--line);padding:8px 12px}
 .fbar>div{max-width:720px;margin:0 auto;display:flex;gap:6px;overflow-x:auto;scrollbar-width:none}
@@ -200,7 +213,7 @@ html{scroll-padding-top:calc(var(--top) + 16px)}html:has(.fbar){scroll-padding-t
 .line>a>.grow:has(>.nm),.thd>.grow{display:grid;grid-template-columns:minmax(0,2fr) minmax(0,1fr) minmax(0,1.2fr);column-gap:16px;align-items:center}
 .line .grow:has(>.nm)>br{display:none}.line .grow:has(>.nm)>.src{grid-column:1;justify-self:start}
 .line .grow:has(>.nm)>span:not(.src){overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.line:has(.nm) .qty{width:7rem;max-width:none;flex:none}.line:has(.nm) .thumb{width:40px;height:40px}.line.thd .thumb{height:0;visibility:hidden}
+.line:has(.nm) .qty{width:7rem;max-width:none;flex:none}.card.list>.line{min-height:0}.line .nm{display:inline}.line:has(.nm) .thumb{width:40px;height:40px}.line.thd .thumb{height:0;visibility:hidden}
 }
 </style>
 </head>
