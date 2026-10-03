@@ -756,9 +756,9 @@ def reader_delete(id: str = Form()):
 @app.get("/manifest.webmanifest")
 def manifest():
     return JSONResponse({"name": PROFILE["name"], "short_name": PROFILE["name"], "start_url": "/", "id": "/", "scope": "/", "display": "standalone",
-                         "background_color": "#f7f6f2", "theme_color": "#1f6feb",
-                         "icons": [{"src": f"/static/icon-{n}.png", "sizes": f"{n}x{n}", "type": "image/png",
-                                    "purpose": "any maskable"} for n in (192, 512)]},
+                         "background_color": "#EFF6F8", "theme_color": "#126985",
+                         "icons": [{"src": f"/static/icon{m}-{n}.png", "sizes": f"{n}x{n}", "type": "image/png", "purpose": p}
+                                   for m, p in (("", "any"), ("-maskable", "maskable")) for n in (192, 512)]},
                         media_type="application/manifest+json")
 
 
