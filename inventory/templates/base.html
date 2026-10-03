@@ -193,6 +193,20 @@ details:not([open])>summary .chev{transform:rotate(-90deg)}
 .bell{position:fixed;z-index:11;top:calc(8px + env(safe-area-inset-top));right:12px;width:44px;height:44px;border-radius:50%;background:var(--card);border:1px solid var(--line);color:var(--fg);display:grid;place-items:center}
 .bell b{position:absolute;top:-4px;right:-4px;min-width:20px;height:20px;padding:0 5px;border-radius:10px;background:var(--bad);color:#fff;font-size:12px;line-height:20px;text-align:center;font-variant-numeric:tabular-nums}
 body:has(.bell) main>h1{padding-right:52px}
+/* №54 item card: a card per place; its action opens a bottom sheet (dialog.sheet) */
+.kind{margin-top:12px;font-size:12px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--mut)}
+.spot{padding:12px 14px}.spot .top{display:flex;gap:12px;align-items:center;color:inherit;text-decoration:none}.spot .top .thumb{width:44px;height:44px}
+.spot .grow{flex:1;min-width:0}.spot .qty{font-weight:850}.spot>button{width:100%;margin-top:10px;display:flex;align-items:center;justify-content:center;gap:8px}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}.two button{display:flex;align-items:center;justify-content:center;gap:8px}
+.ghost.bad{background:transparent;color:var(--bad);border-color:var(--bad)}
+dialog.sheet{position:fixed;inset:auto 0 0;width:100%;max-width:560px;margin:0 auto;border:0;border-radius:26px 26px 0 0;padding:22px 18px calc(18px + env(safe-area-inset-bottom));max-height:90dvh;overflow:auto}
+dialog.sheet::before{content:"";position:absolute;top:8px;left:50%;width:36px;height:4px;margin-left:-18px;border-radius:2px;background:var(--line)}
+.sheet small{display:block;font-size:12px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--mut)}.sheet h2{margin:4px 0;font-size:24px;font-weight:900}
+.sheet .nm{margin:0 0 6px;font-weight:700;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+.sheet form>button,.sheet .sure button{width:100%;margin-top:10px}.sheet .num{gap:8px}.sheet .num button{width:52px;height:52px;flex:none;font-size:22px}
+.sheet .num input{flex:1;font-size:29px;font-weight:900;text-align:center;font-variant-numeric:tabular-nums}
+.sheet .sure{margin-top:12px;padding:12px;border:1.5px solid var(--bad);border-radius:14px}
+body:has(dialog.sheet[open]){overflow:hidden}
 /* №58 desktop: the bottom bar becomes a left column, search runs across the top, bottom panels start after the column */
 @media (min-width:1024px){
 :root{--bar:0px;--nav:220px;--top:73px;--detail:clamp(300px,28vw,360px)}
@@ -673,6 +687,23 @@ document.addEventListener("pointerdown", e => {
   addEventListener("pointermove", move); addEventListener("pointerup", up); addEventListener("pointercancel", up);
 });
 addEventListener("pageshow", e => { if (e.persisted) location.reload(); });  // back button: the page from memory has old counts
+// №54 bottom sheets: [data-sheet] opens dialog#id; backdrop, «Отмена» or the phone's «назад» close it, nothing moves.
+// The count sets [data-n] (the button's words) and [data-left] (what stays in the box). «Списать» asks once more inside.
+addEventListener("click", e => {
+  const o = e.target.closest?.("[data-sheet]"), d = e.target.closest?.("dialog.sheet");
+  if (o) { document.getElementById(o.dataset.sheet).showModal(); history.pushState({sheet: 1}, ""); }
+  else if (d && (e.target == d || e.target.closest("[value=cancel]"))) history.back();
+  else if (d && e.target.closest("[data-ask]")) { e.target.closest("[data-ask]").hidden = true; d.querySelector(".sure").hidden = false; }
+});
+addEventListener("popstate", () => document.querySelector("dialog.sheet[open]")?.close());
+addEventListener("cancel", e => { if (e.target.matches?.("dialog.sheet")) { e.preventDefault(); history.back(); } }, true);  // Esc
+addEventListener("input", e => {
+  const d = e.target.closest?.("dialog.sheet");
+  if (!d || e.target.name != "qty") return;
+  const n = +e.target.value || 0;
+  for (const s of d.querySelectorAll("[data-n]")) s.textContent = n;
+  for (const s of d.querySelectorAll("[data-left]")) s.textContent = Math.max(0, s.dataset.left - n);
+});
 // №40: every number field gets − and + by its step (none: one). Card numbers are text ("1,5"), so no stepUp; never below min (else 0).
 // An empty field: + starts it, − leaves it empty («не считал»). Events as if typed: drafts and autosave see it.
 addEventListener("DOMContentLoaded", () => {
