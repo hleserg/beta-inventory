@@ -86,7 +86,7 @@ def test_main_path():
     assert c.post("/stock", data={"box": box, "item": iid, "action": "take", "qty": 99}).status_code == 400
 
     c.post(f"/b/{box}/clear")
-    assert "Что кладём" in c.get(f"/b/{box}").text
+    assert "Здесь пока пусто." in c.get(f"/b/{box}").text
     assert "Метеостанция" in c.get("/history").text
     assert "Освободил · " in c.get("/more").text  # №54: the last moves under the menu
 
@@ -158,7 +158,7 @@ def test_uncounted():
     c.post("/stock", data={"box": box, "item": rid, "action": "add", "kind": "return", "qty": 2})
     assert "2 шт" in c.get(f"/b/{box}").text  # «вернул 2» to an uncounted pair: now there are 2 (№34)
     c.post(f"/b/{box}/clear")
-    assert "Что кладём" in c.get(f"/b/{box}").text
+    assert "Здесь пока пусто." in c.get(f"/b/{box}").text
 
 
 def test_lookalike_asks():
@@ -237,7 +237,7 @@ def test_box_by_name():
     places = c.get("/places").text  # №54: the tree names the box, its ID leads the grey line
     assert '<span class="nm">Клеммники WAGO</span>' in places and f'<span class="path">{b} ·' in places
     page = c.get(f"/b/{b}").text
-    assert f'<h1>Клеммники WAGO <span class="mut">{b}</span></h1>' in page
+    assert f'<h1 id="bname">Клеммники WAGO</h1><span class="idchip">{b}</span>' in page  # the name, the ID in a chip
     assert '<span class="nm">Ящик</span>' in page and f'<span class="path">{d}' in page  # №54 screen 4: a box inside reads as on «Места»
 
 
@@ -519,7 +519,7 @@ def test_box_lists_what_is_inside():
     iid = newest()
     page = c.get(f"/b/{outer}").text
     assert "светодиод 5мм" in page and "коробка мелочь" in page and f'name="box" value="{inner}"' in page
-    assert "Пустые · 1" in page and "+ Положить сюда" in page
+    assert "Пустые · 1" in page and f'href="/?put={outer}">Добавить +' in page
     c.post("/stock", data={"box": inner, "item": iid, "action": "take", "qty": 2, "back": f"/b/{outer}"})
     assert core.db().execute("SELECT qty FROM stock WHERE box_id=? AND item_id=?", (inner, iid)).fetchone()[0] == 5
 

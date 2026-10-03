@@ -4,35 +4,42 @@
   <span class="grow"><span class="nm">{{ k.name or k.id }}</span><span class="path">{% if k.name %}{{ k.id }}{% endif %}{% if k.n or k.kids %}{% if k.name %} · {% endif %}{{ t.items|lower }}: {{ k.n }}{% if k.kids %} · {{ t.boxes|lower }}: {{ k.kids }}{% endif %}{% endif %}</span></span><span class="ti">›</span></a></div>{% endmacro %}
 {% block title %}{{ b.name or b.id }}{% endblock %}
 {% block main %}{# №54 screen 4: what's inside, each with «Взять» at the thumb; the box's own settings behind «⋯» #}
+{% set bare = not contents and not children %}{% set kind = t.shelf if b.kind == "shelf" else t.box %}
+<div class="head"><a class="back" href="/places" aria-label="Назад">{{ ico('<path d="M19 12H5m6-6-6 6 6 6"/>', 22, "2") }}</a>
+  <div class="grow"><small>{{ kind }}{% if bare %} · {{ b.id }}{% elif request.url.path.startswith("/B/") %} · открыта по метке{% endif %}</small>{% if bare %}<h1 id="bname">{{ b.name or b.id }}</h1>{% endif %}</div>
+  {% if not picking %}<button type="button" class="back sq" aria-label="Настройки: наклейка, NFC, место" onclick="const m=document.getElementById('more');m.open=!m.open;if(m.open)m.scrollIntoView({block:'start'})"><svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="19" cy="12" r="1.8"/></svg></button>{% endif %}</div>
 <div class="crumbs" id="where">{% if where %}{{ crumbs(where) }}{% else %}место не указано{% endif %}</div>
-{% if pics %}{{ carousel(pics, "/b/" ~ b.id ~ "/rotate") }}{% endif %}
-<h1>{% if b.name %}{{ b.name }} <span class="mut">{{ b.id }}</span>{% else %}{{ b.id }}{% endif %}</h1>
+{% if pics %}{{ carousel(pics, "/b/" ~ b.id ~ "/rotate") }}{% else %}<div class="hero">{{ ico(I_BOX, 56, "1.6") }}</div>{% endif %}
+{% if not bare %}{% set n = items|length %}
+<div class="bhead"><div class="grow"><h1 id="bname">{{ b.name or b.id }}</h1>{% if b.name %}<span class="idchip">{{ b.id }}</span>{% endif %}</div>
+  <div class="cnt"><b>{{ n }}</b><small>{{ 'предмет' if n % 10 == 1 and n % 100 != 11 else 'предмета' if n % 10 in [2, 3, 4] and n % 100 not in [12, 13, 14] else 'предметов' }}</small></div></div>
+{% endif %}
 {% if b.kind == "box" and not draft and b.parent_id == core.HANDS %}{% set bb = all_boxes()|selectattr("id", "equalto", b.back)|first %}{# №56: in hand, going back #}
 <form method="post" action="/b/{{ b.id }}/back" class="row"><button>Положить на место</button>
   <span class="mut">→ {{ (bb.name or bb.id) if bb else (places|selectattr("id", "equalto", b.place_id)|first or {}).name or "стоит сама" }}</span></form>
 {% endif %}
-{% if not contents and not children %}
-<div class="card">
-  <h2 style="margin-top:0">Пусто. Что кладём?</h2>
-  <form action="/" class="row"><input type="hidden" name="put" value="{{ b.id }}"><input name="q" placeholder="найти, что уже есть"><button data-act>Найти</button></form>
-  <p><a class="btn" data-act href="/items/new?box={{ b.id }}">+ {{ t.item }}</a></p>
-</div>
+{% if bare %}
+<h2>Здесь пока пусто.</h2>
+<p class="mut">Положите уже заведённую вещь или создайте новую карточку сразу в этой коробке.</p>
+<a class="btn wide" data-act href="/?put={{ b.id }}">{{ ico('<circle cx="10.8" cy="10.8" r="6.8"/><path d="m16 16 4.5 4.5"/>', 22, "2") }} Найти предмет</a>
+<a class="btn ghost wide" data-act href="/items/new?box={{ b.id }}">+ Новый предмет</a>
 {% else %}
-<p class="mut">{% if children %}{{ t.boxes|lower }}: {{ children|length }} · {% endif %}{{ t.items|lower }}: {{ items|length }}</p>
-{% for i in items %}
-<div class="line"><a href="/i/{{ i.id }}">{% if pk and i.fields[pk] %}<img class="thumb" src="/u/{{ i.fields[pk][0] }}" alt="" loading="lazy">{% else %}<span class="thumb"></span>{% endif %}
-  <span class="grow">{{ i.name }}{% if i.src %}<br><span class="mut">{{ t.box|lower }} {{ i.src }}</span>{% endif %}</span><span class="qty">{{ i.qty|qty(unit=unit_of(i.type, i.fields)) }}</span></a>
-  {% if i.qty != 0 %}<button type="button" class="ghost dots" aria-expanded="false">Взять</button>{% endif %}</div>
+{% if items %}<div class="sec"><h2>В коробке</h2><a data-act href="/?put={{ b.id }}">Добавить +</a></div>
+<div class="card list">{% for i in items %}
+<div class="line"><a href="/i/{{ i.id }}">{% if pk and i.fields[pk] %}<img class="thumb" src="/u/{{ i.fields[pk][0] }}" alt="" loading="lazy">{% else %}<span class="thumb bx">{{ ico(I_BOX) }}</span>{% endif %}
+  <span class="grow"><span class="nm">{{ i.name }}</span><span class="mut">{{ type_label(i.type).split(" › ")|last }}{% if i.src %} · {{ t.box|lower }} {{ i.src }}{% endif %}</span></span></a>
+  <span class="side"><span class="qty">{{ i.qty|qty(unit=unit_of(i.type, i.fields)) }}</span>{% if i.qty != 0 %}<button type="button" class="ghost dots" aria-expanded="false">Взять</button>{% endif %}</span></div>
 {% if i.qty != 0 %}<form method="post" action="/stock" class="tacts" hidden>
   <input type="hidden" name="box" value="{{ i.box }}"><input type="hidden" name="item" value="{{ i.id }}"><input type="hidden" name="back" value="/b/{{ b.id }}">
   {% if projects %}<select name="project"><option value="">Без проекта</option>{% for p in projects %}<option value="{{ p.id }}">{{ p.name }}</option>{% endfor %}</select>{% endif %}
   {% if i.single %}<input type="hidden" name="qty" value="1">{% else %}<input type="number" name="qty" value="1" min="1"{% if i.qty is not none %} max="{{ i.qty }}"{% endif %} inputmode="numeric" required>{% if i.qty is not none %}<span class="mut">из {{ i.qty }}</span>{% endif %}{% endif %}
   <button name="action" value="take">Взять</button></form>{% endif %}
-{% endfor %}
+{% endfor %}</div>{% else %}<div class="sec"><h2>{{ t.boxes }}</h2><a data-act href="/?put={{ b.id }}">Добавить +</a></div>{% endif %}
 {% for k in nested %}{{ kid(k) }}{% endfor %}
 {% if empty %}<details><summary>Пустые · {{ empty|length }}</summary>{% for k in empty %}{{ kid(k) }}{% endfor %}</details>{% endif %}
+{% if not picking %}<p class="mut">Наклейка, NFC и настройки коробки — в меню ⋯</p>{% endif %}
 {% endif %}
-<details id="more"{% if not contents and not children %} open{% endif %}><summary>Настроить, наклейка{% if contents %}, освободить{% endif %}</summary>
+<details id="more"{% if draft or picking %} open{% endif %}><summary>Настроить, наклейка{% if contents %}, освободить{% endif %}</summary>
   <p><img src="/b/{{ b.id }}/label.png" alt="наклейка" style="width:240px;max-width:100%;background:#fff;border:1px solid var(--line)"><br>
   <a data-act href="/b/{{ b.id }}/label.png" download="{{ b.id }}.png">Скачать наклейку</a> {{ print_btn("/b/" ~ b.id ~ "/label.png") }}</p>
   {{ nfc_tag(nfc) }}
@@ -70,9 +77,8 @@
           st.textContent = new DOMParser().parseFromString(text, "text/html").querySelector(".err")?.textContent || "Не сохранилось";
           return false;
         }
-        const j = JSON.parse(text), h = document.querySelector("h1");
-        h.textContent = j.name || j.id;
-        if (j.name) h.insertAdjacentHTML("beforeend", ` <span class="mut">${j.id}</span>`);
+        const j = JSON.parse(text);
+        document.getElementById("bname").textContent = j.name || j.id;
         document.title = j.name || j.id;
         const w = document.getElementById("where");  // the crumbs, as _box.html draws them
         w.replaceChildren(...j.crumbs.flatMap(([label, href], i) => {
@@ -133,5 +139,4 @@
     ~ ((" Коробок внутри: " ~ children|length ~ " — переедут уровнем выше.") if children else "")
     ~ " Вернуть можно " ~ core.TRASH_DAYS ~ " дней из «Корзины».")|tojson }})'><p><button class="bad">Удалить</button></p></form>
 </details>
-{% if not picking %}<div class="save"><button type="button" class="ghost" onclick="const m=document.getElementById('more');m.open=!m.open;if(m.open)m.scrollIntoView({block:'start'})">⋯ {{ t.shelf if b.kind == "shelf" else t.box }}</button><a class="btn" data-act href="/?put={{ b.id }}">+ Положить сюда</a></div>{% endif %}
 {% endblock %}

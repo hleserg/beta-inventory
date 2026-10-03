@@ -216,6 +216,14 @@ body:has(dialog.sheet[open]){overflow:hidden}
 .card.list.types>.line{min-height:64px;padding:10px 14px;border:0}  /* inset dividers that skip filtered-out lines */
 .types>.line:not([hidden])~.line:not([hidden]){background:linear-gradient(var(--line),var(--line)) 14px 0/calc(100% - 28px) 1px no-repeat}
 .types .ico{color:var(--acc);display:grid;flex:none}.types .grow>.mut{font-size:12px}
+/* box page: hero, name with id chip and count, «В коробке», empty state */
+.head .back.sq{border-radius:14px;margin-left:auto}body:has(.bell) .head .sq{margin-right:52px}
+.hero{display:grid;place-items:center;height:140px;border-radius:20px;background:var(--accent-soft);color:var(--acc);margin:8px 0 14px}
+.bhead{display:flex;gap:12px;align-items:flex-start}.bhead .grow{flex:1;min-width:0}.bhead h1{margin:0 0 6px}
+.idchip{display:inline-block;font-size:12px;font-weight:800;padding:2px 8px;border:1px solid var(--line);border-radius:8px;color:var(--mut)}
+.cnt{text-align:center;color:var(--acc)}.cnt b{display:block;font-size:32px;font-weight:900;line-height:1}.cnt small{font-size:12px;font-weight:800;color:var(--mut)}
+.line .side{display:flex;flex-direction:column;align-items:flex-end;gap:6px}
+.btn.wide{display:flex;justify-content:center;width:100%;gap:8px;margin-top:10px}
 /* №58 desktop: the bottom bar becomes a left column, search runs across the top, bottom panels start after the column */
 @media (min-width:1024px){
 :root{--bar:0px;--nav:220px;--top:73px;--detail:clamp(300px,28vw,360px)}
