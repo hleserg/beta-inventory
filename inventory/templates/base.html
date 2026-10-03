@@ -90,9 +90,10 @@ input[type=checkbox],input[type=radio]{width:20px;height:20px;min-height:0;paddi
 .row .num{flex:0 0 auto}.row .num input{flex:0 0 4em}
 .stock .num{flex-direction:column-reverse}.stock .num input{font-size:1.2em;padding:6px 2px}.stock .num button{padding:4px 0}
 .stock select{grid-column:1/-1}
-.mini{padding:6px 9px;font-size:.85em}.mini.on{background:var(--acc);color:var(--on-acc)}
+.mini{padding:6px 9px;font-size:.85em}.mini.on,dialog .ghost.on{background:var(--acc);color:var(--on-acc)}
 dialog{border:1px solid var(--line);border-radius:12px;background:var(--card);color:var(--fg)}dialog::backdrop{background:#0008}
-dialog video{width:min(80vw,480px);display:block;margin-bottom:8px}
+dialog video{width:min(80vw,480px);display:block}.cam{position:relative;margin-bottom:8px}.cam canvas{position:absolute;inset:0;pointer-events:none}
+.cam .peek{position:absolute;transform:translate(-50%,calc(-100% - 6px));min-height:0;padding:6px 10px;white-space:pre-line;text-align:left;font-size:14px;max-width:60%;box-shadow:0 2px 8px #0006}
 /* №54 the bar: at the thumb, the reach grows left to right; the screen's own action rides above it (.save, .act) */
 .bar{position:fixed;z-index:10;left:0;right:0;bottom:0;padding:8px 12px calc(8px + env(safe-area-inset-bottom));background:var(--card);border-top:1px solid var(--line)}
 .bar>div{max-width:720px;margin:0 auto;display:flex;align-items:center;gap:8px}.bar form{flex:1;min-width:0}
@@ -278,37 +279,77 @@ function fab() {  // the corner button: NFC where the phone reads tags (unless t
   if (document.getElementById("scan").classList.contains("on")) return SCAN.qr && qrScan();  // NFC listens already, the ring says so; a second tap is the camera
   nfcScan().catch(e => alert("NFC не включился: " + e.message));
 }
+const peekCache = {};  // «Обзор»: box id → {name, items, more} from /api/boxes, fetched once per page
+function peekFetch(ids) {
+  ids = ids.filter(id => !(id in peekCache));
+  if (!ids.length) return;
+  ids.forEach(id => peekCache[id] = null);
+  fetch("/api/boxes?ids=" + ids.join(",")).then(r => r.json()).then(o => Object.assign(peekCache, o)).catch(() => ids.forEach(id => delete peekCache[id]));
+}
+function blip() {  // the snap: a short buzz and a click
+  navigator.vibrate?.(30);
+  try { const a = new AudioContext(), o = a.createOscillator(), g = a.createGain();
+    o.frequency.value = 1800; g.gain.setValueAtTime(.15, a.currentTime); g.gain.exponentialRampToValueAtTime(.001, a.currentTime + .05);
+    o.connect(g).connect(a.destination); o.start(); o.stop(a.currentTime + .05); o.onended = () => a.close(); } catch {}
+}
 async function qrScan(f) {  // f: the box field whose QR button was pressed; none: the corner button, it opens what it reads
   if (!("BarcodeDetector" in window && navigator.mediaDevices)) {
     if (await ask(`Этот браузер не читает QR с сайта. Наведите на наклейку камеру телефона — страница откроется сама. `
       + `Сканер на сайте работает в Chrome на Android, когда адрес ${location.origin} добавлен в исключения Chrome.`, "Как настроить")) location.href = "/settings#phone";
     return;
   }
-  const d = document.createElement("dialog"), p = document.createElement("p"), v = document.createElement("video"), x = document.createElement("button");
-  let s;
-  p.textContent = f ? "Наведите на QR коробки" : "Наведите на QR наклейки";
-  v.playsInline = v.muted = true;
-  x.type = "button"; x.className = "ghost"; x.textContent = "Закрыть"; x.onclick = () => d.close();
+  const d = document.createElement("dialog"), p = document.createElement("p"), cam = document.createElement("div"),
+    v = document.createElement("video"), cv = document.createElement("canvas"), x = document.createElement("button"), o = document.createElement("button");
+  let s, peek = false;  // peek: «Обзор», a label over each of our codes, nothing opens until one is tapped
+  const hint = () => p.textContent = peek ? "Нажмите на подпись коробки" : f ? "Наведите на QR коробки" : "Наведите на QR наклейки";
+  const go = u => {  // open what a code names, as the scanner always did
+    d.close();
+    const b = u.match(BOX)?.[1].toUpperCase(), i = u.match(ITEM)?.[1];
+    if (f) { armed = f; return gotBox(b); }  // a label read: straight into the field, no questions
+    if (i) return location.href = "/I/" + i;  // a thing: its card as scanned, «Взять?» (№37, №43)
+    if (location.pathname.toLowerCase() !== "/b/" + b.toLowerCase()) location.href = "/b/" + b;
+  };
+  hint(); cam.className = "cam"; v.playsInline = v.muted = true; cam.append(v, cv);
+  cam.onclick = e => { const l = e.target.closest(".peek"); if (l) go(l.dataset.u); };
+  x.type = o.type = "button"; x.className = o.className = "ghost"; x.textContent = "Закрыть"; x.onclick = () => d.close();
+  o.textContent = "Обзор"; o.hidden = !!f; o.onclick = () => { peek = !peek; o.classList.toggle("on", peek); hint(); };
   d.onclose = () => { s?.getTracks().forEach(t => t.stop()); d.remove(); };
-  d.append(p, v, x); document.body.append(d); d.showModal();
+  const row = document.createElement("p"); row.className = "row"; row.append(o, x);
+  d.append(p, cam, row); document.body.append(d); d.showModal();
   try {
     s = await navigator.mediaDevices.getUserMedia({video: {facingMode: "environment"}});
     if (!d.open) return s.getTracks().forEach(t => t.stop());
     v.srcObject = s; await v.play();
-    const det = new BarcodeDetector({formats: ["qr_code"]});
+    const det = new BarcodeDetector({formats: ["qr_code"]}), g = cv.getContext("2d"), css = getComputedStyle(d);
     while (d.open) {
-      const codes = (await det.detect(v).catch(() => [])).map(c => c.rawValue);
-      const u = codes.find(u => BOX.test(u) || !f && ITEM.test(u));  // a field takes boxes only: a thing's label would leave the form
-      if (u) {
-        d.close();
-        const b = u.match(BOX)?.[1].toUpperCase(), i = u.match(ITEM)?.[1];
-        if (f) { armed = f; return gotBox(b); }  // a label read: straight into the field, no questions
-        if (i) return location.href = "/I/" + i;  // a thing: its card as scanned, «Взять?» (№37, №43)
-        if (location.pathname.toLowerCase() !== "/b/" + b.toLowerCase()) location.href = "/b/" + b;
-        return;
+      const codes = await det.detect(v).catch(() => []);
+      const ours = c => BOX.test(c.rawValue) || !f && ITEM.test(c.rawValue);  // a field takes boxes only: a thing's label would leave the form
+      const k = v.clientWidth / (v.videoWidth || 1);
+      cv.width = v.clientWidth; cv.height = v.clientHeight; g.lineWidth = 4;
+      for (const c of codes) {  // corner brackets on each code: ours in the accent colour, others red
+        const q = c.cornerPoints.map(({x, y}) => [x * k, y * k]), a = Math.min(18, Math.hypot(q[1][0] - q[0][0], q[1][1] - q[0][1]) / 3);
+        g.strokeStyle = css.getPropertyValue(ours(c) ? "--acc" : "--bad").trim();
+        q.forEach((pt, n) => { const [pa, nx] = [q[(n + 3) % 4], q[(n + 1) % 4]], to = (b, l = Math.hypot(b[0] - pt[0], b[1] - pt[1]) || 1) => [pt[0] + (b[0] - pt[0]) * a / l, pt[1] + (b[1] - pt[1]) * a / l];
+          g.beginPath(); g.moveTo(...to(pa)); g.lineTo(...pt); g.lineTo(...to(nx)); g.stroke(); });
       }
-      if (codes.length) p.textContent = "Это не наша наклейка";
-      await new Promise(r => setTimeout(r, 200));
+      const mine = codes.filter(ours);
+      if (!f && !peek && mine.length > 1) { peek = true; o.classList.add("on"); hint(); }  // a shelf of boxes in sight: look first
+      if (peek) {
+        peekFetch(mine.map(c => c.rawValue.match(BOX)?.[1].toUpperCase()).filter(Boolean));
+        cam.querySelectorAll(".peek").forEach(l => Date.now() - l.dataset.t > 500 && l.remove());  // out of sight half a second: gone
+        for (const c of mine) {
+          let l = [...cam.querySelectorAll(".peek")].find(l => l.dataset.u === c.rawValue);
+          if (!l) { l = document.createElement("button"); l.type = "button"; l.className = "peek"; l.dataset.u = c.rawValue; cam.append(l); }
+          const id = c.rawValue.match(BOX)?.[1].toUpperCase(), b = id && peekCache[id];
+          const text = !id ? "Вещь — открыть" : b ? [b.name || id, ...b.items, b.more ? `…ещё ${b.more}` : "", b.items.length ? "" : "пусто"].filter(Boolean).join("\n") : id;
+          if (l.textContent !== text) l.textContent = text;
+          l.dataset.t = Date.now(); l.style.left = (c.boundingBox.x + c.boundingBox.width / 2) * k + "px"; l.style.top = c.boundingBox.y * k + "px";
+        }
+      } else if (mine.length) {  // snapped: buzz, a beat to see the brackets, then open
+        blip(); await new Promise(r => setTimeout(r, 300));
+        if (d.open) return go(mine[0].rawValue);
+      } else if (codes.length) p.textContent = "Это не наша наклейка"; else hint();
+      await new Promise(r => setTimeout(r, peek ? 100 : 200));
     }
   } catch (e) { d.close(); alert("Камера недоступна: " + e.message); }
 }

@@ -781,3 +781,16 @@ def test_alerts():
     box = core.new_boxes(1)[0]  # fewer than the card's «докупить» threshold: the list's chip, in the bell too
     c.post("/items/new?type=resistor", data={"dup_ok": "1", "name": "Мало осталось", "value": "x", "reorder_at": "5", "box": box, "qty": 2})
     assert 'href="/items?reorder=1"' in c.get("/alerts").text
+
+
+def test_boxes_peek():
+    a, b, inner = core.new_boxes(3)  # the scanner's «Обзор»: a label over each box in sight
+    c.post(f"/b/{a}", data={"name": "Шкаф-обзор"})
+    for n in ("Бета", "Альфа", "Гамма"):
+        c.post("/items/new?type=resistor", data={"dup_ok": "1", "name": n, "value": "x", "box": a, "qty": 1})
+    with core.db() as db:
+        db.execute("UPDATE boxes SET parent_id=? WHERE id=?", (a, inner))
+    r = c.get(f"/api/boxes?ids={a.lower()},{b},NOPE1")
+    assert r.status_code == 200
+    assert r.json() == {a: {"name": "Шкаф-обзор", "items": ["Альфа", "Бета"], "more": 2},  # 3 items + a box inside
+                        b: {"name": "", "items": [], "more": 0}}  # unknown ids: left out

@@ -260,6 +260,20 @@ def box(req: Request, box_id: str):
     return box_page(req, b)
 
 
+@app.get("/api/boxes")
+def boxes_peek(ids: str = ""):
+    """The scanner's «Обзор»: for each box in sight its name, the first two things in it, how many more."""
+    out = {}
+    with db() as c:
+        for bid in dict.fromkeys(x.strip() for x in ids.upper().split(",")[:20]):
+            b = c.execute("SELECT name FROM boxes WHERE id=?", (bid,)).fetchone()
+            if b:
+                names = [r["name"] for r in core.box_contents(c, bid)]
+                names += [r["name"] or r["id"] for r in c.execute("SELECT id, name FROM boxes WHERE parent_id=? ORDER BY id", (bid,))]
+                out[bid] = dict(name=b["name"] or "", items=names[:2], more=max(len(names) - 2, 0))
+    return out
+
+
 def box_page(req, b, draft=False):
     with db() as c:
         contents = core.box_contents(c, b["id"])
