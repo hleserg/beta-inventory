@@ -169,8 +169,12 @@ summary.lrow{list-style:none;cursor:pointer} summary.lrow::-webkit-details-marke
 /* №54 screen 6: the new-item form */
 body:not(:has(.bar)){--bar:0px}
 .chips.scroll{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none}.chips.scroll a{flex:none}
-.tiles{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px}
-label.tile{position:relative;margin:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;min-height:88px;border:1px dashed var(--line);border-radius:12px;font-weight:400;color:var(--mut)}
+.tiles{display:grid;grid-template-columns:1fr 1fr;margin-top:8px;border:1.5px dashed var(--line);border-radius:14px}
+label.tile{position:relative;margin:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;min-height:88px;font-weight:600;color:var(--mut)}
+label.tile+label.tile{border-left:1px solid var(--line)}
+.cols{display:grid;grid-template-columns:1fr 1fr;gap:0 12px}.cols>div{min-width:0}.cols>.w,.cols>div:last-child:nth-child(odd){grid-column:1/-1}
+.plain{margin-top:18px;border-top:1px solid var(--line)}.plain>.lrow,.plain summary.lrow{padding:12px 0;border-bottom:1px solid var(--line)}.plain details>div{padding:0 0 12px}.plain .more-f{border:0;min-height:44px}
+.save.wide button{flex:1;min-height:52px;font-size:17px}
 .tile input{position:absolute;inset:0;opacity:0;width:100%}
 .ell{min-width:0}.ell .sm{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .card.acc{border-color:var(--acc)}.card.acc .row{margin-top:8px}
