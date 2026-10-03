@@ -1,6 +1,7 @@
 """One walk through the main path: box → card → search → take → clear."""
 import io
 import json
+import os
 import re
 import sqlite3
 import tempfile
@@ -747,3 +748,32 @@ def test_stats_page():
     assert 'href="/stats"' in c.get("/more").text
     assert c.post(f"/stats/findings/{fid}/delete", follow_redirects=False).status_code == 303
     assert "<strong>JST</strong>" not in c.get("/stats").text
+
+
+def test_alerts():
+    c.post("/items/new?type=resistor", follow_redirects=False, data={"dup_ok": "1", "name": "Голый резистор", "value": "1 кОм"})
+    bare = newest()
+    r = c.get("/alerts")
+    assert r.status_code == 200 and f'href="/i/{bare}"' in r.text  # a card without a photo
+    assert 'href="/alerts"' in c.get("/").text  # the bell, with its count, on every page
+
+    core.set_for_agent(bare, True)
+    with core.db() as db:  # handed to the agent two days ago and still not filled in
+        db.execute("UPDATE items SET for_agent_at=datetime('now','localtime','-2 days') WHERE id=?", (bare,))
+    assert "ждёт агента" in c.get("/alerts").text
+
+    qid = core.ask_owner("Какой это корпус: 0805 или 1206?", "Codex", bare)
+    assert not core.db().execute("SELECT for_agent FROM items WHERE id=?", (bare,)).fetchone()[0]  # waits for the owner now
+    assert "0805 или 1206" in c.get("/alerts").text
+    core.set_for_agent(bare, True)  # handed back to the agent: the question is answered
+    assert "0805 или 1206" not in c.get("/alerts").text
+    qid = core.ask_owner("Где лежит паяльник?", "Мара")
+    assert c.post(f"/alerts/questions/{qid}/delete", follow_redirects=False).status_code == 303
+    assert "Где лежит паяльник" not in c.get("/alerts").text
+
+    assert "Бэкап" not in c.get("/alerts").text  # no backup ever reported: the alert is off
+    assert c.post("/backup/done").status_code == 200
+    assert "Бэкап" not in c.get("/alerts").text
+    old = (core.DATA / "backup-ok").stat().st_mtime - 3 * 86400
+    os.utime(core.DATA / "backup-ok", (old, old))
+    assert "Бэкап" in c.get("/alerts").text

@@ -897,6 +897,24 @@ def finding_delete(finding_id: int):
     return go("/stats")
 
 
+@app.get("/alerts")
+def alerts_page(req: Request):
+    return page(req, "alerts.html", alerts=core.alerts())
+
+
+@app.post("/alerts/questions/{question_id}/delete")
+def question_delete(question_id: int):
+    core.delete_question(question_id)
+    return go("/alerts")
+
+
+@app.post("/backup/done")
+def backup_done():
+    """The backup script's last line: its absence for too long rings the bell (profile alerts.backup_hours)."""
+    (core.DATA / "backup-ok").touch()
+    return {"ok": True}
+
+
 @app.get("/trash")
 def trash_page(req: Request):
     return page(req, "trash.html", rows=core.trash_list())

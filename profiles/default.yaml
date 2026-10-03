@@ -32,6 +32,12 @@ share_junk:
   - "(По)?смотри,? что (есть|я нашёл|я нашел|нашёл|нашел) на AliExpress!?"
   - "Look what I found on AliExpress!?"
 
+# The bell (/alerts): after how many hours a card handed to an agent, or the last backup (POST /backup/done), is
+# late. Leave a key out and that alert is off.
+alerts:
+  agent_queue_hours: 24
+  backup_hours: 26
+
 item_fields:
   - key: photo
     label: Фото

@@ -7,9 +7,11 @@ import secrets
 import sqlite3
 import tempfile
 import threading
+import time
 import urllib.request
 import uuid
 import zipfile
+from datetime import datetime
 from pathlib import Path
 
 import numpy as np
@@ -144,6 +146,9 @@ CREATE TABLE IF NOT EXISTS readers(
 CREATE TABLE IF NOT EXISTS findings(
   id INTEGER PRIMARY KEY, text TEXT NOT NULL, author TEXT NOT NULL,
   at TEXT NOT NULL DEFAULT (datetime('now','localtime')));
+CREATE TABLE IF NOT EXISTS questions(
+  id INTEGER PRIMARY KEY, item_id INTEGER REFERENCES items(id) ON DELETE CASCADE, text TEXT NOT NULL, author TEXT NOT NULL,
+  at TEXT NOT NULL DEFAULT (datetime('now','localtime')));
 CREATE TABLE IF NOT EXISTS trash(
   id INTEGER PRIMARY KEY, kind TEXT NOT NULL, label TEXT NOT NULL, data TEXT NOT NULL,
   at TEXT NOT NULL DEFAULT (datetime('now','localtime')));
@@ -234,6 +239,9 @@ def init():
             c.execute("ALTER TABLE boxes ADD COLUMN back TEXT")
         if "for_agent" not in [r["name"] for r in c.execute("PRAGMA table_info(items)")]:  # cards from before №41
             c.execute("ALTER TABLE items ADD COLUMN for_agent INTEGER NOT NULL DEFAULT 0")
+        if "for_agent_at" not in [r["name"] for r in c.execute("PRAGMA table_info(items)")]:  # the bell: how long it waits
+            c.execute("ALTER TABLE items ADD COLUMN for_agent_at TEXT")
+            c.execute("UPDATE items SET for_agent_at=updated_at WHERE for_agent")
         if "single" not in [r["name"] for r in c.execute("PRAGMA table_info(items)")]:  # cards from before №43
             c.execute("ALTER TABLE items ADD COLUMN single INTEGER")
             one = [k for k, t in TYPES.items() if t["single"]]  # a tool put in «не считал» is one
@@ -605,7 +613,23 @@ def tag_item(item_id):
 def set_for_agent(item_id, on):
     """№41 «Передать агенту»: the card waits in MCP agent_queue until an agent's update_item."""
     with db() as c:
-        c.execute("UPDATE items SET for_agent=? WHERE id=?", (int(on), item_id))
+        c.execute("UPDATE items SET for_agent=?, for_agent_at=datetime('now','localtime') WHERE id=?", (int(on), item_id))
+        if on:  # handed back: the owner has answered the agent's questions on it
+            c.execute("DELETE FROM questions WHERE item_id=?", (item_id,))
+
+
+def ask_owner(text, author, item_id=None):
+    """An agent's question in the bell; a card it is about leaves agent_queue until the owner hands it back."""
+    with db() as c:
+        if item_id:
+            c.execute("UPDATE items SET for_agent=0 WHERE id=?", (item_id,))
+        return c.execute("INSERT INTO questions(item_id, text, author) VALUES (?, ?, ?)",
+                         (item_id, text.strip(), author)).lastrowid
+
+
+def delete_question(question_id):
+    with db() as c:
+        c.execute("DELETE FROM questions WHERE id=?", (question_id,))
 
 
 def own_upload(v):
@@ -898,14 +922,12 @@ def search(q):
 
 def stats():
     """The stats page and MCP stats(): overall numbers from the stock and history, plus what agents noticed."""
-    pics = {fd["key"] for t in [*TYPES, ""] for fd in fields_for(t) if fd["type"] == "photo"}
+    bare = no_photo()
     with db() as c:
         n = lambda sql, *a: c.execute(sql, a).fetchone()[0]
         rows = lambda sql, *a: [dict(r) for r in c.execute(sql, a)]
         held = lambda box: rows("SELECT i.id AS item_id, i.name AS item, s.qty FROM stock s JOIN items i ON i.id=s.item_id "
                                 "WHERE s.box_id=? ORDER BY i.name", box)
-        bare = [dict(item_id=r["id"], item=r["name"]) for r in c.execute("SELECT id, name, fields FROM items ORDER BY id DESC")
-                if not any(item_fields(r).get(k) for k in pics)]
         return dict(
             items=n("SELECT count(*) FROM items"), boxes=n("SELECT count(*) FROM boxes WHERE kind NOT IN ('hands','transit')"),
             places=n("SELECT count(*) FROM places"),
@@ -922,6 +944,34 @@ def stats():
                 "LEFT JOIN movements m ON m.box_id=b.id WHERE b.kind NOT IN ('hands','transit') GROUP BY b.id ORDER BY last LIMIT 1")), None),
             no_photo=len(bare), no_photo_items=bare[:5],
             findings=rows("SELECT * FROM findings ORDER BY id DESC LIMIT 30"))
+
+
+def no_photo():
+    """Cards without a photo, newest first."""
+    pics = {fd["key"] for t in [*TYPES, ""] for fd in fields_for(t) if fd["type"] == "photo"}
+    with db() as c:
+        return [dict(item_id=r["id"], item=r["name"]) for r in c.execute("SELECT id, name, fields FROM items ORDER BY id DESC")
+                if not any(item_fields(r).get(k) for k in pics)]
+
+
+def alerts():
+    """The bell: what waits for the owner. Each alert is a dict with kind; the template words it.
+    ponytail: recomputed on every page (a scan of all cards), cache it if pages slow down."""
+    cfg, out = PROFILE.get("alerts", {}), []
+    with db() as c:
+        out += [dict(kind="question", **r) for r in c.execute(
+            "SELECT q.*, i.name AS item FROM questions q LEFT JOIN items i ON i.id=q.item_id ORDER BY q.id DESC")]
+        stamp = DATA / "backup-ok"  # POST /backup/done touches it; never touched = no backup set up, no alert
+        if "backup_hours" in cfg and stamp.exists() and time.time() - stamp.stat().st_mtime > cfg["backup_hours"] * 3600:
+            out.append(dict(kind="backup", at=datetime.fromtimestamp(stamp.stat().st_mtime).strftime("%Y-%m-%d %H:%M")))
+        if "agent_queue_hours" in cfg:
+            out += [dict(kind="agent", **r) for r in c.execute(
+                "SELECT id AS item_id, name AS item, for_agent_at AS at FROM items WHERE for_agent "
+                "AND for_agent_at < datetime('now','localtime',?) ORDER BY for_agent_at", (f"-{cfg['agent_queue_hours']} hours",))]
+        inbox = c.execute("SELECT count(*) FROM projects WHERE status='inbox'").fetchone()[0]
+    if inbox:
+        out.append(dict(kind="inbox", n=inbox))
+    return out + [dict(kind="photo", **r) for r in no_photo()]
 
 
 def add_finding(text, author):

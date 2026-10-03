@@ -349,6 +349,18 @@ def stats() -> dict[str, Any]:
 
 
 @server.tool(annotations=LOGGED)
+def ask_owner(question: str, agent: str, item_id: int | None = None) -> dict[str, Any]:
+    """Ask the owner what only they know: a name too vague to identify, a marking you can't read, which of two
+    variants it is. The question waits in the site's bell; with item_id the card leaves agent_queue until the owner
+    answers and hands it back. Short, in the profile's language. agent: your name, shown as the author."""
+    if not question.strip():
+        raise ToolError("question is empty: write the question itself.")
+    if item_id and not db().execute("SELECT 1 FROM items WHERE id=?", (item_id,)).fetchone():
+        raise ToolError(f"No item {item_id}. Find item ids with search.")
+    return dict(id=core.ask_owner(question, author(agent), item_id), url=link("/alerts"))
+
+
+@server.tool(annotations=LOGGED)
 def post_finding(text: str, agent: str) -> dict[str, Any]:
     """Put a short note on the stats page, newest first: something funny or curious in the inventory —
     a correlation, a habit, an oddity, with the numbers behind it. Markdown, two or three sentences, in the profile's

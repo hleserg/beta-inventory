@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block title %}Требует внимания{% endblock %}
+{% block main %}
+<h1>Требует внимания</h1>
+{% for a in alerts %}
+{% if a.kind == "question" %}
+<form method="post" action="/alerts/questions/{{ a.id }}/delete" class="card">
+  <div class="md">{{ a.text|md }}</div>
+  <div class="row"><span class="sm mut">{{ a.author }} · {{ a.at[8:10] }}.{{ a.at[5:7] }} {{ a.at[11:16] }}{% if a.item_id %} · <a href="/i/{{ a.item_id }}">{{ a.item }}</a>{% endif %}</span>
+  <button class="ghost right" aria-label="Убрать вопрос">×</button></div></form>
+{% elif a.kind == "backup" %}
+<div class="card"><b>Бэкап давно не приходил</b><br><span class="sm mut">последний — {{ a.at[8:10] }}.{{ a.at[5:7] }} {{ a.at[11:16] }}</span></div>
+{% elif a.kind == "agent" %}
+<a class="card lrow" href="/i/{{ a.item_id }}"><span>{{ a.item }}</span><span class="mut">ждёт агента с {{ a.at[8:10] }}.{{ a.at[5:7] }}</span></a>
+{% elif a.kind == "inbox" %}
+<a class="card lrow" href="/projects"><span>Новые репозитории</span><b class="qty">{{ a.n }}</b></a>
+{% endif %}
+{% endfor %}
+{% set bare = alerts|selectattr("kind", "eq", "photo")|list %}
+{% if bare %}<h2>Без фото</h2>
+<div class="card lrows">{% for a in bare %}<a class="lrow" href="/i/{{ a.item_id }}">{{ a.item }}</a>{% endfor %}</div>{% endif %}
+{% if not alerts %}<p class="mut">Всё спокойно.</p>{% endif %}
+{% endblock %}

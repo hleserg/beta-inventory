@@ -220,3 +220,10 @@ def test_stats_and_findings():
     assert any(m["author"] == "Сергей" and m["kind"] == "take" for m in s["moves30"])
     f = s["findings"][0]
     assert f["text"] == "Резисторы берут **по вторникам**" and f["author"] == "Codex"
+
+
+def test_ask_owner():
+    assert call("ask_owner", question=" ", agent="Codex").is_error
+    r = call("ask_owner", question="Что за плата с надписью **HW-131**?", agent="Codex").structured_content
+    assert r["url"].endswith("/alerts")
+    assert "HW-131" in TestClient(app).get("/alerts").text

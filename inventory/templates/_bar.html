@@ -13,3 +13,5 @@
 <a class="tab{% if on == 'more' %} on{% endif %}" href="/more"{% if on == "more" %} aria-current="page"{% endif %}>{{ ico('<path d="M4 7h16M4 12h16M4 17h16"/>') }}<span>Ещё</span></a>
 {% if core.SCAN_NFC or core.SCAN_QR %}<button class="fab" id="scan" type="button" aria-label="Сканировать метку" title="Сканировать метку">{{ ico('<path d="M4 8V4h4M16 4h4v4M20 16v4h-4M8 20H4v-4M4 12h16"/>', 28, "2") }}<span class="dt">Сканировать</span></button>{% endif %}
 </div></nav>
+{# the bell: what waits for the owner — a card without a photo, an agent's question, a late backup (/alerts) #}
+{% set alerts_n = core.alerts()|length %}{% if alerts_n %}<a class="bell" href="/alerts" aria-label="Требует внимания: {{ alerts_n }}">{{ ico('<path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/>', 22) }}<b>{{ alerts_n if alerts_n < 100 else "99+" }}</b></a>{% endif %}

@@ -166,6 +166,9 @@ details:not([open])>summary .chev{transform:rotate(-90deg)}
 .tacts{display:flex;flex-wrap:wrap;align-items:center;gap:6px;padding:8px 8px 10px 56px;background:var(--bg);border-bottom:1px solid var(--line)}
 .tacts form{margin:0}.tacts .stock{flex:1 1 100%}.tacts .row{flex:1 1 100%}.tacts .row input{flex:1 1 100%}.tacts details[open]{flex:1 1 100%}.tacts .btn,.tacts button{padding:0 10px;font-size:14px}
 .dt,.thd{display:none}
+.bell{position:fixed;z-index:11;top:calc(8px + env(safe-area-inset-top));right:12px;width:44px;height:44px;border-radius:50%;background:var(--card);border:1px solid var(--line);color:var(--fg);display:grid;place-items:center}
+.bell b{position:absolute;top:-4px;right:-4px;min-width:20px;height:20px;padding:0 5px;border-radius:10px;background:var(--bad);color:#fff;font-size:12px;line-height:20px;text-align:center;font-variant-numeric:tabular-nums}
+body:has(.bell) main>h1{padding-right:52px}
 /* №58 desktop: the bottom bar becomes a left column, search runs across the top, bottom panels start after the column */
 @media (min-width:1024px){
 :root{--bar:0px;--nav:220px;--top:73px;--detail:clamp(300px,28vw,360px)}
@@ -181,6 +184,7 @@ body:has(main :is(input:not([type=checkbox],[type=radio],[type=file]),textarea):
 .fab{width:auto;height:44px;border-radius:10px;display:flex;justify-content:flex-start;gap:12px;padding:0 12px;margin-top:12px;font-size:15px}
 .fab svg{width:24px;height:24px}
 .fbar,.save{left:var(--nav)}
+.bell{top:14px;right:32px}body:has(.bell) .bar form{padding-right:96px}body:has(.bell) main>h1{padding-right:0}
 body:not(:has(.bar)){--nav:0px;--top:0px}body:not(:has(.bar)) main{max-width:720px;margin:0 auto}
 .fbar{top:var(--top);bottom:auto;border-top:0;border-bottom:1px solid var(--line);padding:8px 32px}.fbar>div{max-width:none;margin:0}
 body:has(.fbar) main{padding-top:calc(var(--top) + 77px);padding-bottom:32px}
