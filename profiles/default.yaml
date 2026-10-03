@@ -74,6 +74,7 @@ item_fields:
 categories:
   - key: electronics
     label: Компоненты
+    icon: plug  # the type picker's picture: plug, tool, roll, home; anything else — a box
     fields:
       - key: description
         hint: "разделы: что это, простыми словами → 3–5 главных характеристик → подключение к ESP32 (если не сказано к чему) → подводные камни → ссылки на инструкции. Без жаргона; не уверен — «сверьте с шелкографией»"
@@ -272,6 +273,7 @@ categories:
 
   - key: tools
     label: Инструменты
+    icon: tool
     single: true
     types:
       - key: hand_tool
@@ -288,6 +290,7 @@ categories:
 
   - key: consumables
     label: Расходники
+    icon: roll
     fields:
       - key: photo
         required: false
@@ -321,6 +324,7 @@ categories:
 
   - key: home  # №59: household things — same box × thing, just other fields
     label: Дом
+    icon: home
     fields:
       - key: description
         hint: "разделы: что это → как пользоваться → уход и чистка (кофеварка: удаление накипи) → расходники и фильтры → ссылка на инструкцию"

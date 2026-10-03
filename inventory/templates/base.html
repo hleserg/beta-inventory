@@ -207,6 +207,11 @@ dialog.sheet::before{content:"";position:absolute;top:8px;left:50%;width:36px;he
 .sheet .num input{flex:1;font-size:29px;font-weight:900;text-align:center;font-variant-numeric:tabular-nums}
 .sheet .sure{margin-top:12px;padding:12px;border:1.5px solid var(--bad);border-radius:14px}
 body:has(dialog.sheet[open]){overflow:hidden}
+/* type picker: steps bar, a card of types per category, a filter over them */
+.steps{display:flex;gap:6px;margin:12px 0 4px}.steps i{flex:1;height:4px;border-radius:2px;background:var(--line)}.steps i.on{background:var(--acc)}
+.card.list.types>.line{min-height:64px;padding:10px 14px;border:0}  /* inset dividers that skip filtered-out lines */
+.types>.line:not([hidden])~.line:not([hidden]){background:linear-gradient(var(--line),var(--line)) 14px 0/calc(100% - 28px) 1px no-repeat}
+.types .ico{color:var(--acc);display:grid;flex:none}.types .grow>.mut{font-size:12px}
 /* №58 desktop: the bottom bar becomes a left column, search runs across the top, bottom panels start after the column */
 @media (min-width:1024px){
 :root{--bar:0px;--nav:220px;--top:73px;--detail:clamp(300px,28vw,360px)}
@@ -703,6 +708,14 @@ addEventListener("input", e => {
   const n = +e.target.value || 0;
   for (const s of d.querySelectorAll("[data-n]")) s.textContent = n;
   for (const s of d.querySelectorAll("[data-left]")) s.textContent = Math.max(0, s.dataset.left - n);
+});
+// type picker: [data-filter] hides the lines whose [data-q] lacks the words, then the emptied sections.
+addEventListener("input", e => {
+  if (!e.target.matches?.("[data-filter]")) return;
+  const w = e.target.value.toLowerCase().split(/\s+/).filter(Boolean);
+  for (const l of document.querySelectorAll("[data-q]")) l.hidden = !w.every(x => l.dataset.q.includes(x));
+  for (const s of document.querySelectorAll("main section")) s.hidden = !s.querySelector("[data-q]:not([hidden])");
+  document.querySelector("[data-none]").hidden = !!document.querySelector("[data-q]:not([hidden])");
 });
 // №40: every number field gets − and + by its step (none: one). Card numbers are text ("1,5"), so no stepUp; never below min (else 0).
 // An empty field: + starts it, − leaves it empty («не считал»). Events as if typed: drafts and autosave see it.
