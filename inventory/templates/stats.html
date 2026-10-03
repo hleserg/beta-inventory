@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block title %}Статистика{% endblock %}
+{% block main %}
+<h1>Статистика</h1>
+<div class="card lrows">
+{% for name, v, href in [
+  (t.items|capitalize, s["items"], "/items"), (t.boxes|capitalize, s.boxes, None), ("Места", s.places, "/places"),
+  ("Штук всего", s.pieces, None), ("Есть, не считал", s.uncounted, None), ("Без фото", s.no_photo, None),
+] %}<{{ "a" if href else "div" }} class="lrow"{% if href %} href="{{ href }}"{% endif %}><span>{{ name }}</span><b class="qty">{{ v }}</b></{{ "a" if href else "div" }}>
+{% endfor %}</div>
+{% for title, rows in [("В пути", s.transit), ("На руках", s.hands)] if rows %}
+<h2>{{ title }}</h2>
+<div class="card lrows">{% for r in rows %}<a class="lrow" href="/i/{{ r.item_id }}"><span>{{ r.item }}</span><b class="qty">{{ r.qty|qty }}</b></a>{% endfor %}</div>
+{% endfor %}
+{% if s.top_taken %}<h2>Чаще всего берут</h2>
+<div class="card lrows">{% for r in s.top_taken %}<a class="lrow" href="/i/{{ r.item_id }}"><span>{{ r.item }}</span><b class="qty">{{ r.taken }}</b></a>{% endfor %}</div>{% endif %}
+{% if s.stale_box %}<h2>Дольше всех не трогали</h2>
+<div class="card lrows"><a class="lrow" href="/b/{{ s.stale_box.id }}"><span>{{ s.stale_box.name or s.stale_box.id }}</span><span class="mut">с {{ s.stale_box.last[8:10] }}.{{ s.stale_box.last[5:7] }}.{{ s.stale_box.last[:4] }}</span></a></div>{% endif %}
+{% if s.no_photo_items %}<h2>Без фото</h2>
+<div class="card lrows">{% for r in s.no_photo_items %}<a class="lrow" href="/i/{{ r.item_id }}">{{ r.item }}</a>{% endfor %}</div>{% endif %}
+{% if s.moves30 %}<h2>За 30 дней</h2>
+<div class="card lrows">{% for r in s.moves30 %}<div class="lrow"><span>{{ r.author }} · {{ kinds[r.kind] }}</span><b class="qty">{{ r.n }}</b></div>{% endfor %}</div>{% endif %}
+<h2>Находки</h2>
+{% for f in s.findings %}
+<form method="post" action="/stats/findings/{{ f.id }}/delete" class="card">
+  <div class="md">{{ f.text|md }}</div>
+  <div class="row"><span class="sm mut">{{ f.author }} · {{ f.at[8:10] }}.{{ f.at[5:7] }} {{ f.at[11:16] }}</span>
+  <button class="ghost right" aria-label="Удалить находку">×</button></div></form>
+{% else %}<p class="mut">Пока пусто. Агенты пишут сюда через MCP: post_finding.</p>{% endfor %}
+{% endblock %}

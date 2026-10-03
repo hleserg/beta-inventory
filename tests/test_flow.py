@@ -711,3 +711,13 @@ def test_nav():
     assert r.status_code == 303 and r.headers["location"] == f"/places#p{pid}"
     r = c.post("/i/999999/edit", data={"name": "x"}, headers={"X-Replace": "1"}, follow_redirects=False)
     assert r.status_code == 422 and "x-location" not in r.headers  # refusals pass through: the page resends natively to show why
+
+
+def test_stats_page():
+    fid = core.add_finding("Самая старая коробка — с **JST**", "Мара")
+    r = c.get("/stats")
+    assert r.status_code == 200 and "<strong>JST</strong>" in r.text and "Мара" in r.text
+    assert "built-in method" not in r.text
+    assert 'href="/stats"' in c.get("/more").text
+    assert c.post(f"/stats/findings/{fid}/delete", follow_redirects=False).status_code == 303
+    assert "<strong>JST</strong>" not in c.get("/stats").text

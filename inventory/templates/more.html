@@ -14,6 +14,7 @@
   ("/readers", "Считыватели", (readers ~ " в работе" if readers else "NFC-ридеры у коробок") ~ (" · ждут приёма: " ~ readers_new if readers_new else ""),
    '<rect x="5" y="10" width="14" height="10" rx="2"/><path d="M9 6.5a4.5 4.5 0 0 1 6 0M6.5 4a8 8 0 0 1 11 0"/>'),
   ("/trash", "Корзина", (trash if trash else "пусто") ~ " · хранится " ~ core.TRASH_DAYS ~ " дн.", '<path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/>'),
+  ("/stats", "Статистика", "общие цифры и находки агентов", '<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>'),
   ("/projects", "Проекты", (projects ~ " в работе" if projects else "куда уходят вещи") ~ (" · новых из GitHub: " ~ inbox if inbox else ""), '<path d="M3 6h6l2 2h10v11H3z"/>'),
 ] %}<a class="lrow" href="{{ href }}"><span class="thumb bx">{{ ico(d, 22) }}</span><span class="ell grow"><b>{{ name }}</b><span class="sm mut">{{ sub }}</span></span>{{ chev }}</a>
 {% endfor %}</div>

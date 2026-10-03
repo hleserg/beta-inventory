@@ -336,3 +336,23 @@ async def update_item(item_id: int, fields: dict[str, Any], name: str = "", type
     core.save_item(item_id, name, type, f)
     core.set_for_agent(item_id, False)  # an agent filled it in: off agent_queue
     return card(item_id)
+
+
+@server.tool(annotations=READ)
+def stats() -> dict[str, Any]:
+    """The stats page: counts, what is in transit and in hands, moves of the last 30 days by author and kind,
+    the five most taken items, the box untouched the longest, cards without a photo, and the latest findings.
+    Read findings before post_finding: don't post what is already there."""
+    s = core.stats()
+    s["url"] = link("/stats")
+    return s
+
+
+@server.tool(annotations=LOGGED)
+def post_finding(text: str, agent: str) -> dict[str, Any]:
+    """Put a short note on the stats page, newest first: something funny or curious in the inventory —
+    a correlation, a habit, an oddity, with the numbers behind it. Markdown, two or three sentences, in the profile's
+    language. Call stats first and don't repeat a finding already there. agent: your name, shown as the author."""
+    if not text.strip():
+        raise ToolError("text is empty: write the finding itself.")
+    return dict(id=core.add_finding(text, author(agent)), url=link("/stats"))

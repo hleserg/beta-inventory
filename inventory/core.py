@@ -141,6 +141,9 @@ CREATE TABLE IF NOT EXISTS readers(
   portable INTEGER NOT NULL DEFAULT 0, accepted INTEGER NOT NULL DEFAULT 0,
   box_id TEXT REFERENCES boxes(id) ON DELETE SET NULL, tapped_at TEXT,
   created_at TEXT NOT NULL DEFAULT (datetime('now','localtime')));
+CREATE TABLE IF NOT EXISTS findings(
+  id INTEGER PRIMARY KEY, text TEXT NOT NULL, author TEXT NOT NULL,
+  at TEXT NOT NULL DEFAULT (datetime('now','localtime')));
 CREATE TABLE IF NOT EXISTS trash(
   id INTEGER PRIMARY KEY, kind TEXT NOT NULL, label TEXT NOT NULL, data TEXT NOT NULL,
   at TEXT NOT NULL DEFAULT (datetime('now','localtime')));
@@ -891,3 +894,41 @@ def search(q):
             if all(w in text for w in words):
                 boxes.append(dict(id=b["id"], name=b["name"], where=box_where(c, b["id"])))
     return items, boxes
+
+
+def stats():
+    """The stats page and MCP stats(): overall numbers from the stock and history, plus what agents noticed."""
+    pics = {fd["key"] for t in [*TYPES, ""] for fd in fields_for(t) if fd["type"] == "photo"}
+    with db() as c:
+        n = lambda sql, *a: c.execute(sql, a).fetchone()[0]
+        rows = lambda sql, *a: [dict(r) for r in c.execute(sql, a)]
+        held = lambda box: rows("SELECT i.id AS item_id, i.name AS item, s.qty FROM stock s JOIN items i ON i.id=s.item_id "
+                                "WHERE s.box_id=? ORDER BY i.name", box)
+        bare = [dict(item_id=r["id"], item=r["name"]) for r in c.execute("SELECT id, name, fields FROM items ORDER BY id DESC")
+                if not any(item_fields(r).get(k) for k in pics)]
+        return dict(
+            items=n("SELECT count(*) FROM items"), boxes=n("SELECT count(*) FROM boxes WHERE kind NOT IN ('hands','transit')"),
+            places=n("SELECT count(*) FROM places"),
+            pieces=n("SELECT coalesce(sum(qty), 0) FROM stock WHERE box_id!=?", TRANSIT),
+            uncounted=n("SELECT count(*) FROM stock WHERE qty IS NULL AND box_id!=?", TRANSIT),
+            transit=held(TRANSIT), hands=held(HANDS),
+            moves30=rows("SELECT author, kind, count(*) AS n FROM movements WHERE at >= datetime('now','localtime','-30 days') "
+                         "GROUP BY author, kind ORDER BY n DESC"),
+            top_taken=rows("SELECT m.item_id, i.name AS item, -sum(m.delta) AS taken FROM movements m JOIN items i ON i.id=m.item_id "
+                           "WHERE m.kind='take' AND m.delta<0 GROUP BY m.item_id ORDER BY taken DESC LIMIT 5"),
+            # a box with something in it that nobody has touched the longest; never touched counts from its creation
+            stale_box=next(iter(rows(
+                "SELECT b.id, b.name, coalesce(max(m.at), b.created_at) AS last FROM boxes b JOIN stock s ON s.box_id=b.id "
+                "LEFT JOIN movements m ON m.box_id=b.id WHERE b.kind NOT IN ('hands','transit') GROUP BY b.id ORDER BY last LIMIT 1")), None),
+            no_photo=len(bare), no_photo_items=bare[:5],
+            findings=rows("SELECT * FROM findings ORDER BY id DESC LIMIT 30"))
+
+
+def add_finding(text, author):
+    with db() as c:
+        return c.execute("INSERT INTO findings(text, author) VALUES (?, ?)", (text.strip(), author)).lastrowid
+
+
+def delete_finding(finding_id):
+    with db() as c:
+        c.execute("DELETE FROM findings WHERE id=?", (finding_id,))

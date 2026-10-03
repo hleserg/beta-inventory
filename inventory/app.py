@@ -855,6 +855,17 @@ def more_page(req: Request):  # №54: whatever the bar has no room for, the cou
                     projects=n("SELECT count(*) FROM projects WHERE status='active'"), inbox=n("SELECT count(*) FROM projects WHERE status='inbox'"))
 
 
+@app.get("/stats")
+def stats_page(req: Request):
+    return page(req, "stats.html", s=core.stats())
+
+
+@app.post("/stats/findings/{finding_id}/delete")
+def finding_delete(finding_id: int):
+    core.delete_finding(finding_id)
+    return go("/stats")
+
+
 @app.get("/trash")
 def trash_page(req: Request):
     return page(req, "trash.html", rows=core.trash_list())

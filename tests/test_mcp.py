@@ -204,3 +204,19 @@ def test_agent_fills_photoless_card():
     err = call("update_item", item_id=iid, fields={"buy": [{"url": "https://ozon.ru/a"}]})
     assert err.is_error and "URL" in err.content[0].text
     assert call("update_item", item_id=iid, fields={"description": {"a": 1}}).is_error
+
+
+def test_stats_and_findings():
+    """The stats page's numbers and the cron agent's findings: what it posted comes back so it doesn't repeat itself."""
+    iid = core.save_item(None, "Стат-резистор", "resistor", {"value": "1k"})
+    box = core.new_boxes(1)[0]
+    core.move(iid, box, 5, "put", "Сергей")
+    core.move(iid, box, -2, "take", "Сергей")
+    assert call("post_finding", text="Резисторы берут по вторникам", agent=" ").is_error
+    call("post_finding", text="Резисторы берут **по вторникам**", agent="Codex")
+    s = call("stats").structured_content
+    assert s["items"] >= 1 and s["pieces"] >= 3
+    assert any(t["item_id"] == iid and t["taken"] == 2 for t in s["top_taken"])
+    assert any(m["author"] == "Сергей" and m["kind"] == "take" for m in s["moves30"])
+    f = s["findings"][0]
+    assert f["text"] == "Резисторы берут **по вторникам**" and f["author"] == "Codex"
