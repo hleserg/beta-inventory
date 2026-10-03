@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" role="img" aria-labelledby="title desc">
+<title id="title">Где что — путь к вещи, maskable</title>
+<desc id="desc">Указатель места, короткий путь и открытая коробка с ключом</desc>
+<rect width="512" height="512" fill="#0D526B"/>
+<g transform="translate(256 256) scale(.95) translate(-256 -256)">
+<path d="M159 240c-8 43 13 69 56 65 39-4 32-61 91-59" fill="none" stroke="#E7F5F6" stroke-width="15" stroke-linecap="round" stroke-dasharray="1 27"/>
+<g stroke="#15313D" stroke-width="10" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M159 97c-39 0-68 29-68 67 0 50 68 104 68 104s68-54 68-104c0-38-29-67-68-67Z" fill="#6BC8C0"/>
+  <circle cx="159" cy="163" r="25" fill="#F6FCFD"/>
+  <path d="M266 280 326 251l60 29v22l-60 29-60-29Z" fill="#F8CC77"/>
+  <path d="M266 294 326 326l60-32v88l-60 32-60-32Z" fill="#E8B85E"/>
+  <path d="M326 326v88" fill="none"/>
+  <path d="m266 280-32 32 64 34 28-20Z" fill="#FFF4D7"/>
+  <path d="m386 280 32 32-64 34-28-20Z" fill="#FFD989"/>
+  <circle cx="300" cy="216" r="24" fill="#F5FCFD"/>
+  <circle cx="300" cy="216" r="9" fill="#0D526B" stroke="none"/>
+  <path d="M324 216h70m-11 0v19m-18-19v12" fill="none" stroke="#15313D" stroke-width="23"/>
+  <path d="M324 216h70m-11 0v19m-18-19v12" fill="none" stroke="#F5FCFD" stroke-width="13"/>
+</g>
+</g>
+</svg>
