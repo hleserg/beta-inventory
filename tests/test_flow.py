@@ -190,6 +190,7 @@ def test_share_from_a_shop():
     form = c.get("/items/new", params={"type": "module", "name": "Драйвер моторов DRV8833", "link": "https://ozon.ru/t/Ab1"}).text
     assert 'value="Драйвер моторов DRV8833"' in form and ">https://ozon.ru/t/Ab1</textarea>" in form
     assert 'name="for_agent" value="1" checked' in form and "d = null;" in form
+    assert "Другое…" in form and form.count("link=https%3A%2F%2Fozon.ru%2Ft%2FAb1") >= 2  # another type keeps what was shared
 
 def test_box_by_name():
     """A box field takes what people know: part of the name in any case, «Name (ID)» from the list, or the ID."""

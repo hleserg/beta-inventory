@@ -482,7 +482,7 @@ def items(req: Request):  # №57: the list lives on the main page now; old link
 
 
 def card_form(req, status=200, it=None, type="", name="", vals=None, errors=(), box="", qty="1", dups=(), nfc=False,
-              agent=False, single=None, shared=False):  # qty 1: what a new thing mostly is (№47); single None: the card's, else the type's
+              agent=False, single=None, shared=""):  # qty 1: what a new thing mostly is (№47); single None: the card's, else the type's
     if single is None:
         single = bool(it["single"]) if it and it["single"] is not None else core.TYPES.get(type, {}).get("single", False)
     return page(req, "item_form.html", status, it=it, type=type, fields=core.fields_for(type), name=name,
@@ -510,7 +510,7 @@ def item_new(req: Request, box: str = "", type: str = "", name: str = "", link: 
         return page(req, "type_pick.html", keep=urlencode(dict(req.query_params)))
     key = next((fd["key"] for fd in core.fields_for(check_type(type)) if fd.get("share")), None)
     return card_form(req, type=type, box=box.upper(), name=name, vals={key: link} if key and link else None,
-                     agent=bool(link), shared=bool(link))
+                     agent=bool(link), shared=urlencode({"name": name, "link": link}) if link else "")
 
 
 @app.post("/items/new")

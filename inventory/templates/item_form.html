@@ -35,7 +35,7 @@
   {# №54 screen 6, top to bottom as the thumb reaches: type, photo, name, what must be filled; the rest folds away #}
   {% for c in categories if type in c.types|map(attribute="key")|list %}
   <label>Тип · {{ c.label }}</label>
-  <div class="chips scroll" data-retype>{% for ty in c.types %}<a href="/items/new?type={{ ty.key }}{% if box %}&box={{ box }}{% endif %}"{% if ty.key == type %} class="on" aria-current="page"{% endif %}>{{ ty.label }}</a>{% endfor %}<a href="/items/new{% if box %}?box={{ box }}{% endif %}">Другое…</a></div>
+  <div class="chips scroll" data-retype>{% for ty in c.types %}<a href="/items/new?type={{ ty.key }}{% if box %}&box={{ box }}{% endif %}{% if shared %}&{{ shared }}{% endif %}"{% if ty.key == type %} class="on" aria-current="page"{% endif %}>{{ ty.label }}</a>{% endfor %}<a href="/items/new?box={{ box }}{% if shared %}&{{ shared }}{% endif %}">Другое…</a></div>
   {% endfor %}
   {% for fd in fields if fd.type == "photo" %}{{ fld(fd) }}{% endfor %}
   <label>Название *</label><input name="name" value="{{ name }}" required>
