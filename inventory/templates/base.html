@@ -531,10 +531,14 @@ addEventListener("DOMContentLoaded", () => {
   if (s) pickSet(s, s.dl ? [...s.dl.options].map(o => o.value).find(v => v == got.id || v.endsWith(` (${got.id})`)) ?? got.id : got.id);
 });
 addEventListener("focusin", e => { const s = e.target.closest?.(".pick"); if (s && e.target === s.vis && pk !== s) pickOpen(s); });
+// A tap on the search field focuses it, focus hides the bar and a fixed sheet («Положить на место») drops by its height
+// before the click lands, so the click hits what is now under the finger: judge «outside» by where the press began too.
+let pkDown = null;
+addEventListener("pointerdown", e => pkDown = e.target, true);
 addEventListener("click", e => {
   const b = e.target.closest?.(".pick>button");
   if (b) pk === b.parentElement ? pickClose(true) : pickOpen(b.parentElement);
-  else if (pk && !e.target.closest?.(".pick,.pickl,.pickm")) pickClose(true);
+  else if (pk && !e.target.closest?.(".pick,.pickl,.pickm") && !pkDown?.closest?.(".pick,.pickl,.pickm")) pickClose(true);
 }, true);
 addEventListener("keydown", e => {
   if (!pk || !e.target.closest?.(".pick")) return;
