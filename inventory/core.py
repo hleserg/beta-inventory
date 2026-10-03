@@ -2,6 +2,7 @@
 import io
 import json
 import os
+import random
 import re
 import secrets
 import sqlite3
@@ -879,6 +880,25 @@ def lookalikes(name):
 def box_contents(c, box_id):
     return [dict(r, fields=item_fields(r), single=single_of(r)) for r in c.execute(
         "SELECT s.qty, i.* FROM stock s JOIN items i ON i.id=s.item_id WHERE s.box_id=? ORDER BY i.name", (box_id,))]
+
+
+def box_peek(c, box_id, n=2):
+    """The AR label over a box (CAMERA.md): (up to n things it gives out most, how many there are in all).
+
+    Things with stock left, ranked by take operations from this very box (not pieces, not the HANDS row)
+    in the last 1 month, else 3, else 6; ties by the later take, name, id. No takes in 6 months: n at random.
+    """
+    rows = [r for r in box_contents(c, box_id) if r["qty"] is None or r["qty"] > 0]
+    have = {r["id"] for r in rows}
+    for months in (1, 3, 6):
+        hits = {h["item_id"]: (h["n"], h["last"]) for h in c.execute(
+            "SELECT item_id, count(*) AS n, max(at) AS last FROM movements WHERE box_id=? AND kind='take' AND delta<0 "
+            "AND at >= datetime('now', 'localtime', ?) GROUP BY item_id", (box_id, f"-{months} months")) if h["item_id"] in have}
+        if hits:
+            rows.sort(key=lambda r: (r["name"].lower(), r["id"]))
+            rows.sort(key=lambda r: hits.get(r["id"], (0, "")), reverse=True)
+            return rows[:n], len(rows)
+    return random.sample(rows, min(n, len(rows))), len(rows)
 
 
 def search(q):

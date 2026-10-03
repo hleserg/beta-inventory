@@ -268,17 +268,21 @@ def box(req: Request, box_id: str):
     return box_page(req, b)
 
 
-@app.get("/api/boxes")
-def boxes_peek(ids: str = ""):
-    """The scanner's «Обзор»: for each box in sight its name, the first two things in it, how many more."""
-    out = {}
+@app.get("/api/peek")
+def peek(boxes: str = "", items: str = ""):
+    """The camera: which codes in sight are ours (in the catalog), and over each box the AR label — never its name."""
+    out = dict(boxes={}, items={})
     with db() as c:
-        for bid in dict.fromkeys(x.strip() for x in ids.upper().split(",")[:20]):
-            b = c.execute("SELECT name FROM boxes WHERE id=?", (bid,)).fetchone()
-            if b:
-                names = [r["name"] for r in core.box_contents(c, bid)]
-                names += [r["name"] or r["id"] for r in c.execute("SELECT id, name FROM boxes WHERE parent_id=? ORDER BY id", (bid,))]
-                out[bid] = dict(name=b["name"] or "", items=names[:2], more=max(len(names) - 2, 0))
+        for bid in dict.fromkeys(x.strip() for x in boxes.upper().split(",")[:20]):
+            if c.execute("SELECT 1 FROM boxes WHERE id=?", (bid,)).fetchone():
+                top, total = core.box_peek(c, bid)
+                out["boxes"][bid] = dict(items=[dict(id=r["id"], name=r["name"], qty=qty_text(r["qty"], unit=core.unit_of(r["type"], r["fields"])))
+                                                for r in top], more=total - len(top),
+                                         boxes=c.execute("SELECT count(*) FROM boxes WHERE parent_id=?", (bid,)).fetchone()[0])
+        for iid in dict.fromkeys(x.strip() for x in items.split(",")[:20] if x.strip().isdigit()):
+            r = c.execute("SELECT name FROM items WHERE id=?", (int(iid),)).fetchone()
+            if r:
+                out["items"][iid] = r["name"]
     return out
 
 

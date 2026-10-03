@@ -783,14 +783,41 @@ def test_alerts():
     assert 'href="/items?reorder=1"' in c.get("/alerts").text
 
 
-def test_boxes_peek():
-    a, b, inner = core.new_boxes(3)  # the scanner's «Обзор»: a label over each box in sight
+def test_peek():
+    """The camera (CAMERA.md): only catalog codes count; over a box, up to two things it gives out most, never its name."""
+    a, b, inner = core.new_boxes(3)
     c.post(f"/b/{a}", data={"name": "Шкаф-обзор"})
+    ids = {}
     for n in ("Бета", "Альфа", "Гамма"):
-        c.post("/items/new?type=resistor", data={"dup_ok": "1", "name": n, "value": "x", "box": a, "qty": 1})
+        c.post("/items/new?type=resistor", data={"dup_ok": "1", "name": n, "value": "x", "box": a, "qty": 4})
+        ids[n] = newest()
     with core.db() as db:
         db.execute("UPDATE boxes SET parent_id=? WHERE id=?", (a, inner))
-    r = c.get(f"/api/boxes?ids={a.lower()},{b},NOPE1")
+    r = c.get(f"/api/peek?boxes={a.lower()},{b},NOPE1&items={ids['Бета']},999999")
     assert r.status_code == 200
-    assert r.json() == {a: {"name": "Шкаф-обзор", "items": ["Альфа", "Бета"], "more": 2},  # 3 items + a box inside
-                        b: {"name": "", "items": [], "more": 0}}  # unknown ids: left out
+    j = r.json()
+    assert set(j["boxes"]) == {a, b} and list(j["items"]) == [str(ids["Бета"])]  # unknown codes are not ours
+    assert "Шкаф-обзор" not in r.text and j["boxes"][b] == {"items": [], "more": 0, "boxes": 0}  # an empty box
+    first = j["boxes"][a]  # no takes in half a year: two at random, one more
+    assert len(first["items"]) == 2 and first["more"] == 1 and first["boxes"] == 1 and first["items"][0]["qty"] == "4 шт"
+
+    def top():
+        return [x["name"] for x in c.get(f"/api/peek?boxes={a}").json()["boxes"][a]["items"]]
+
+    def took(name, days, times=1):
+        with core.db() as db:
+            for _ in range(times):
+                db.execute("INSERT INTO movements(item_id, box_id, delta, kind, author, at) VALUES (?, ?, -1, 'take', 't', "
+                           "datetime('now', 'localtime', ?))", (ids[name], a, f"-{days} days"))
+                db.execute("INSERT INTO movements(item_id, box_id, delta, kind, author, at) VALUES (?, ?, 1, 'take', 't', "
+                           "datetime('now', 'localtime', ?))", (ids[name], core.HANDS, f"-{days} days"))  # the hand's row: not counted
+
+    took("Гамма", 160, 3)
+    assert top() == ["Гамма", "Альфа"]  # 6 months: Гамма, the rest by name
+    took("Бета", 70)
+    assert top() == ["Бета", "Альфа"]  # 3 months wins over 6: Гамма's takes are out of the window
+    took("Альфа", 10)
+    took("Бета", 5)
+    assert top() == ["Бета", "Альфа"]  # a tie in the month: the later take first
+    took("Альфа", 3)
+    assert top() == ["Альфа", "Бета"]  # operations, not pieces
