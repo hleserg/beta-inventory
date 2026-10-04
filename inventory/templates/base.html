@@ -2,7 +2,7 @@
 <html lang="ru">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, interactive-widget=resizes-content">
 <meta name="theme-color" content="#126985">
 <link rel="icon" href="/static/icon.svg" type="image/svg+xml">
 <link rel="manifest" href="/manifest.webmanifest">
@@ -86,13 +86,14 @@ h2{font-size:17px;font-weight:850}
 .hit .top+.mut{margin-top:10px;border-top:1px solid var(--line)}.hit>.mut{font-size:13px}.hit>.mut a{display:inline-flex;align-items:center;min-height:44px}.hit .qty{font-weight:850;text-align:right}.hit form{margin:10px 0 0}
 .line .dots[aria-expanded=true]{background:var(--acc);color:var(--on-acc);border-color:var(--acc)}
 .fbar{position:fixed;z-index:9;left:0;right:0;bottom:calc(var(--bar) + env(safe-area-inset-bottom));background:var(--card);border-top:1px solid var(--line);padding:8px 12px}
-.fbar>div{max-width:720px;margin:0 auto;display:flex;gap:6px;overflow-x:auto;scrollbar-width:none}
-.fbar select,.fbar label,.fbar a{flex:none;width:auto;margin:0;min-height:44px;border-radius:99px;font-weight:400;border:1px solid var(--line);background:var(--bg);color:inherit;padding:0 14px;display:inline-flex;align-items:center;gap:6px;white-space:nowrap;text-decoration:none;font-size:.9em}
+.fbar>div{max-width:720px;margin:0 auto;display:flex;gap:6px;overflow-x:auto;scrollbar-width:none}.fbar>.sfrow{gap:8px;margin-bottom:8px;overflow:visible}  /* one home: the search field rides above the filters, at the thumb */
+.search-field .x{display:grid;place-items:center;width:44px;height:44px;margin-right:-10px;color:var(--mut);text-decoration:none;font-size:18px}
+.fl>:is(select,label,a){flex:none;width:auto;margin:0;min-height:44px;border-radius:99px;font-weight:400;border:1px solid var(--line);background:var(--bg);color:inherit;padding:0 14px;display:inline-flex;align-items:center;gap:6px;white-space:nowrap;text-decoration:none;font-size:.9em}
 .fbar select{max-width:11em;text-overflow:ellipsis}
 .fbar .on{background:var(--acc);color:var(--on-acc);border-color:var(--acc)}
 .fbar label input{position:absolute;opacity:0;width:1px;height:1px}
 .fbar label:has(:focus-visible){outline:2px solid var(--acc);outline-offset:2px}
-body:has(.fbar) main{padding-bottom:calc(var(--bar) + 84px + env(safe-area-inset-bottom))}
+body:has(.fbar) main{padding-bottom:calc(var(--bar) + 144px + env(safe-area-inset-bottom))}
 .put{position:fixed;z-index:9;left:0;right:0;bottom:calc(var(--bar) + env(safe-area-inset-bottom));background:var(--card);border-top:2px solid var(--acc);padding:8px 12px;max-height:calc(100dvh - var(--bar) - 60px);overflow-y:auto}
 .put form{flex-wrap:wrap;margin:6px 0 0}.put .row .pick{flex:1 1 100%}
 body:has(.put) main{padding-bottom:calc(var(--bar) + 150px + env(safe-area-inset-bottom))}
@@ -147,8 +148,8 @@ dialog{border:1px solid var(--line);border-radius:12px;background:var(--card);co
 .pill.on{border:2px solid var(--acc);color:var(--fg)}.pill:focus-within{border:2px solid var(--acc)}
 .fab{flex:none;width:52px;height:52px;min-height:0;border-radius:16px;padding:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;font-size:11px;font-weight:800}
 .fab.on{box-shadow:0 0 0 4px var(--bg),0 0 0 7px var(--acc)}  /* NFC listens: a tag opens its box */
-body:has(main :is(input:not([type=checkbox],[type=radio],[type=file]),textarea):focus){--bar:0px}  /* the keyboard is up: the page's own field wins the space */
-body:has(main :is(input:not([type=checkbox],[type=radio],[type=file]),textarea):focus) .bar{display:none}
+body:has(main :is(input:not([type=checkbox],[type=radio],[type=file],#find),textarea):focus){--bar:0px}  /* the keyboard is up: the page's own field wins the space */
+body:has(main :is(input:not([type=checkbox],[type=radio],[type=file],#find),textarea):focus) .bar{display:none}  /* the search field keeps the bar: it rides on it */
 @media print{.bar,.fbar,.put{display:none}}
 .pick{position:relative;display:flex;width:100%}.row .pick{flex:1;width:auto;min-width:0}.stock .pick{grid-column:1/-1}
 .pick input{flex:1;min-width:0;padding-right:2.4em}
@@ -267,7 +268,7 @@ body:has(.fbar) main{padding-top:calc(var(--top) + 77px);padding-bottom:32px}
 .put{left:auto;top:var(--top);width:var(--detail);max-height:none;padding:24px;border-top:0;border-left:1px solid var(--line)}
 body:has(.put) main{max-width:none;margin-right:var(--detail);padding-bottom:32px}
 .more{min-height:0}.more>h1{flex:none}
-main>.sfrow:not(:has([name=put])){display:none}  /* the top bar already searches; it does not carry ?put= */
+.fbar>.sfrow{display:none}  /* the top bar already searches */
 html{scroll-padding-top:calc(var(--top) + 16px)}html:has(.fbar){scroll-padding-top:calc(var(--top) + 77px)}
 /* the main list as a table: name · type · where · qty, fixed qty width so the columns line up */
 .thd{display:flex;color:var(--mut);font-size:13px;padding:4px 0}.thd .qty{font-weight:400}
@@ -919,6 +920,8 @@ addEventListener("pointerdown", e => {
   };
   for (const [n, f] of [["pointermove", move], ["pointerup", up], ["pointercancel", up]]) addEventListener(n, f);
 });
+addEventListener("submit", e => e.target.matches(".fbar") && document.activeElement?.blur());  // Enter / «Найти» on the phone: drop the keyboard
+for (const ev of ["DOMContentLoaded", "hashchange"]) addEventListener(ev, () => location.hash == "#find" && document.getElementById("find")?.focus());  // the «Найти» tab: straight into the field
 // №58 keyboard: «/» goes to search, ↑↓ walk the list rows (↓ from search too), Enter opens the row — a link does that itself
 addEventListener("keydown", e => {
   const q = document.querySelector("form[role=search] input");

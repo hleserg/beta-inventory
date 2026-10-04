@@ -154,21 +154,6 @@ def get_item(c, item_id):
 @app.get("/")
 def index(req: Request, q: str = "", put: str = "", type: str = "", cat: str = "", place: str = "",
           reorder: str = "", transit: str = "", hands: str = ""):
-    if q:
-        items, boxes = core.search(q)
-        for i in items:  # the chips narrow by the home page's own filters: a category, in hand
-            here = [s for s in i["stock"] if s["box_id"] != core.TRANSIT]
-            i["total"], i["uncounted"] = sum(s["qty"] or 0 for s in here), any(s["qty"] is None for s in here)
-            i["cat"] = core.TYPES[i["type"]]["category"]["key"] if i["type"] in core.TYPES else ""
-            i["hands"] = any(s["box_id"] == core.HANDS for s in here)
-        cats = [c for c in PROFILE["categories"] if any(i["cat"] == c["key"] for i in items)]
-        shown = [i for i in items if (not cat or i["cat"] == cat) and (not hands or i["hands"])]
-        boxes = [] if cat or hands else boxes
-        results = [dict(kind="item", data=i, score=i["score"]) for i in shown if not i["similar"]]
-        results += [dict(kind="box", data=b, score=b["score"]) for b in boxes]
-        results.sort(key=lambda r: (-r["score"], core.norm(r["data"]["name"] or r["data"].get("id", ""))))
-        return page(req, "index.html", q=q, put=put.upper(), items=shown, boxes=boxes, results=results,
-                    cats=cats, any_hands=any(i["hands"] for i in items), f=dict(cat=cat, hands=hands))
     # №51/№57: no query — what is where. The type list's group heading picks a whole category
     if any(c["key"] == type for c in PROFILE["categories"]):
         cat, type = type, ""
@@ -216,7 +201,19 @@ def index(req: Request, q: str = "", put: str = "", type: str = "", cat: str = "
     if place.isdigit():  # anything of it in a box standing there
         shown = [r for r in shown if any(b["top"] == int(place) for b in r["boxes"])]
     filtered = bool(hands or reorder or transit or cat or place)
-    return page(req, "index.html", q=q, put=put.upper(), rows=shown, n_items=len(rows), n_boxes=n_boxes, places=places,
+    items, boxes, results = [], [], []
+    if q:  # one home page: a query swaps the А–Я list for hits by relevance, the filters still narrow them
+        items, boxes = core.search(q)
+        for i in items:
+            here = [s for s in i["stock"] if s["box_id"] != core.TRANSIT]
+            i["total"], i["uncounted"] = sum(s["qty"] or 0 for s in here), any(s["qty"] is None for s in here)
+        if filtered:
+            ids = {r["id"] for r in shown}
+            items, boxes = [i for i in items if i["id"] in ids], []
+        results = [dict(kind="item", data=i, score=i["score"]) for i in items if not i["similar"]]
+        results += [dict(kind="box", data=b, score=b["score"]) for b in boxes]
+        results.sort(key=lambda r: (-r["score"], core.norm(r["data"]["name"] or r["data"].get("id", ""))))
+    return page(req, "index.html", q=q, put=put.upper(), items=items, boxes=boxes, results=results, rows=shown, n_items=len(rows), n_boxes=n_boxes, places=places,
                 taken=taken if not filtered or hands and not (reorder or transit or cat or place) else [],
                 recent=[] if filtered else recent, counts=counts, filtered=filtered,
                 f=dict(type=type, cat=cat, place=place, reorder=reorder, transit=transit, hands=hands))
