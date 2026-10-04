@@ -8,8 +8,7 @@
 <div class="head"><a class="back" href="/places" aria-label="Назад">{{ ico('<path d="M19 12H5m6-6-6 6 6 6"/>', 22, "2") }}</a>
   <div class="grow"><small>{{ kind }}{% if bare %} · {{ b.id }}{% elif request.url.path.startswith("/B/") %} · открыта по метке{% endif %}</small>{% if bare %}<h1 id="bname">{{ b.name or b.id }}</h1>{% endif %}</div>
   {% if not picking %}<button type="button" class="back sq" aria-label="Настройки: наклейка, NFC, место" onclick="const m=document.getElementById('more');m.open=!m.open;if(m.open)m.scrollIntoView({block:'start'})"><svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="19" cy="12" r="1.8"/></svg></button>{% endif %}</div>
-<div class="crumbs" id="where">{% if where %}{{ crumbs(where) }}{% else %}место не указано{% endif %}</div>
-<div class="duo bx"><div class="what">{% if pics %}{{ carousel(pics, "/b/" ~ b.id ~ "/rotate") }}{% else %}<div class="hero">{{ ico(I_BOX, 56, "1.6") }}</div>{% endif %}
+<div class="duo bx"><div class="what"><div class="crumbs" id="where">{% if where %}{{ crumbs(where) }}{% else %}место не указано{% endif %}</div>{% if pics %}{{ carousel(pics, "/b/" ~ b.id ~ "/rotate") }}{% else %}<div class="hero">{{ ico(I_BOX, 56, "1.6") }}</div>{% endif %}
 {% if not bare %}{% set n = items|length %}
 <div class="bhead"><div class="grow"><h1 id="bname">{{ b.name or b.id }}</h1>{% if b.name %}<span class="idchip">{{ b.id }}</span>{% endif %}</div>
   <div class="cnt"><b>{{ n }}</b><small>{{ 'предмет' if n % 10 == 1 and n % 100 != 11 else 'предмета' if n % 10 in [2, 3, 4] and n % 100 not in [12, 13, 14] else 'предметов' }}</small></div></div>
