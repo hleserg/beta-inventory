@@ -277,6 +277,11 @@ html{scroll-padding-top:calc(var(--top) + 16px)}html:has(.fbar){scroll-padding-t
 .where>h2:first-child{margin-top:0}.car img{height:min(60vh,480px)}
 body:has(.bell) .head>.grow~.back,body:has(.bell) .head .sq{margin-right:0}
 dialog.sheet{inset:0;margin:auto;border-radius:26px;padding-bottom:18px;max-height:85dvh}dialog.sheet::before{display:none}
+/* box: the cover, name and id pinned on the left; «В коробке» one row per item on the right */
+.duo.bx{grid-template-columns:minmax(260px,340px) minmax(0,1fr)}.duo.bx>.what{position:sticky;top:calc(var(--top) + 16px)}.duo.bx>.where{position:static}
+.bx .hero{height:220px;margin-top:0}.bx .car img{height:auto;max-height:340px}.where>.sec:first-child h2{margin-top:0}
+.line .side{flex-direction:row;align-items:center;gap:12px}
+.bx .line>a>.grow:has(>.nm){grid-template-columns:minmax(0,1fr) auto}
 }
 </style>
 </head>

@@ -9,11 +9,13 @@
   <div class="grow"><small>{{ kind }}{% if bare %} · {{ b.id }}{% elif request.url.path.startswith("/B/") %} · открыта по метке{% endif %}</small>{% if bare %}<h1 id="bname">{{ b.name or b.id }}</h1>{% endif %}</div>
   {% if not picking %}<button type="button" class="back sq" aria-label="Настройки: наклейка, NFC, место" onclick="const m=document.getElementById('more');m.open=!m.open;if(m.open)m.scrollIntoView({block:'start'})"><svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="19" cy="12" r="1.8"/></svg></button>{% endif %}</div>
 <div class="crumbs" id="where">{% if where %}{{ crumbs(where) }}{% else %}место не указано{% endif %}</div>
-{% if pics %}{{ carousel(pics, "/b/" ~ b.id ~ "/rotate") }}{% else %}<div class="hero">{{ ico(I_BOX, 56, "1.6") }}</div>{% endif %}
+<div class="duo bx"><div class="what">{% if pics %}{{ carousel(pics, "/b/" ~ b.id ~ "/rotate") }}{% else %}<div class="hero">{{ ico(I_BOX, 56, "1.6") }}</div>{% endif %}
 {% if not bare %}{% set n = items|length %}
 <div class="bhead"><div class="grow"><h1 id="bname">{{ b.name or b.id }}</h1>{% if b.name %}<span class="idchip">{{ b.id }}</span>{% endif %}</div>
   <div class="cnt"><b>{{ n }}</b><small>{{ 'предмет' if n % 10 == 1 and n % 100 != 11 else 'предмета' if n % 10 in [2, 3, 4] and n % 100 not in [12, 13, 14] else 'предметов' }}</small></div></div>
 {% endif %}
+</div>
+<div class="where">{# desktop: the cover stays left, the contents run as a table on the right #}
 {% if b.kind == "box" and not draft and b.parent_id == core.HANDS %}{% set bb = all_boxes()|selectattr("id", "equalto", b.back)|first %}{# №56: in hand, going back #}
 <form method="post" action="/b/{{ b.id }}/back" class="row"><button>Положить на место</button>
   <span class="mut">→ {{ (bb.name or bb.id) if bb else (places|selectattr("id", "equalto", b.place_id)|first or {}).name or "стоит сама" }}</span></form>
@@ -39,6 +41,7 @@
 {% if empty %}<details><summary>Пустые · {{ empty|length }}</summary>{% for k in empty %}{{ kid(k) }}{% endfor %}</details>{% endif %}
 {% if not picking %}<p class="mut">Наклейка, NFC и настройки коробки — в меню ⋯</p>{% endif %}
 {% endif %}
+</div></div>
 <details id="more"{% if draft or picking %} open{% endif %}><summary>Настроить, наклейка{% if contents %}, освободить{% endif %}</summary>
   <p><img src="/b/{{ b.id }}/label.png" alt="наклейка" style="width:240px;max-width:100%;background:#fff;border:1px solid var(--line)"><br>
   <a data-act href="/b/{{ b.id }}/label.png" download="{{ b.id }}.png">Скачать наклейку</a> {{ print_btn("/b/" ~ b.id ~ "/label.png") }}</p>
