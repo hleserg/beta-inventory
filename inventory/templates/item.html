@@ -11,12 +11,14 @@
 <div class="head"><a class="back" href="/" aria-label="Назад"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5m6-6-6 6 6 6"/></svg></a>
   <small class="grow">Карточка предмета</small><a class="back" href="/i/{{ it.id }}/edit" aria-label="Изменить карточку"><svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="19" cy="12" r="1.8"/></svg></a></div>
 {% if home|length == 1 %}<div class="crumbs">{{ crumbs(home[0].crumbs + [(home[0].name or home[0].box_id, "/b/" ~ home[0].box_id)]) }}</div>{% endif %}
+<div class="duo"><div class="what">
 {% if pk and f[pk] %}{{ carousel(f[pk], "/i/" ~ it.id ~ "/rotate") }}{% endif %}
 <div class="kind">{{ type_label(it.type) or "тип не выбран" }}</div>
 <h1>{{ it.name }}</h1>
 {% set counted = stock|map(attribute="qty")|reject("none")|list %}
 {% if counted or home|length > 1 %}<div class="mut">{% if counted %}Всего {{ counted|sum|qty(unit=u) }}{% endif %}{% if home|length > 1 %}{{ " · " if counted }}в {{ home|length }} местах{% endif %}</div>{% endif %}
-{# №54 screen 5: one card per place; each acts through its own sheet below #}
+</div>
+<div class="where">{# №54 screen 5: one card per place; each acts through its own sheet below #}
 <h2>Где лежит</h2>
 {% for s in stock %}
 <div class="card spot">
@@ -30,9 +32,9 @@
 {% endif %}</div>
 {% else %}<div class="card spot"><p class="mut">Нигде нет.</p><button type="button" data-sheet="put">Положить в коробку</button></div>{% endfor %}
 {% if single and not h and stock|length == 1 and stock[0].box_id != TRANSIT %}{# №43 #}
-<form method="post" action="/stock" data-take data-name="{{ it.name }}" hidden><input type="hidden" name="box" value="{{ stock[0].box_id }}"><input type="hidden" name="item" value="{{ it.id }}"><input type="hidden" name="action" value="take"><input type="hidden" name="qty" value="1"><input type="hidden" name="back" value="/i/{{ it.id }}"></form>{% endif %}
+<form method="post" action="/stock" data-take data-name="{{ it.name }}" hidden><input type="hidden" name="box" value="{{ stock[0].box_id }}"><input type="hidden" name="item" value="{{ it.id }}"><input type="hidden" name="action" value="take"><input type="hidden" name="qty" value="1"><input type="hidden" name="back" value="/i/{{ it.id }}"></form>{% endif %}</div>
 
-<div class="card list lrows secs">
+<div class="info card list lrows secs">
 {% set shown = fields|rejectattr("type", "equalto", "photo")|list %}
 {% set filled %}{% for fd in shown if f[fd.key] %}{{ fd.label }}{% if not loop.last %}, {% endif %}{% endfor %}{% endset %}
 {% if filled %}<details><summary class="lrow"><span>Описание и характеристики<br><span class="mut sm">{{ filled }}</span></span><span class="chev">{{ ico(I_DOWN) }}</span></summary><div>
@@ -65,7 +67,7 @@
 <form method="post" action="/i/{{ it.id }}/delete" onsubmit='return confirm({{ ("«" ~ it.name ~ "» уйдёт в корзину"
     ~ ((" и пропадёт из мест, где лежит: " ~ stock|length) if stock else "") ~ ". Вернуть можно " ~ core.TRASH_DAYS
     ~ " дней из «Корзины».")|tojson }})'><p><button class="bad">Удалить</button></p></form></div></details>
-</div>
+</div></div>
 
 {# Sheets: take from a box, put back / put away, write off. Cancel = backdrop, «Отмена» or «назад»; nothing moves. #}
 {% macro n_input(max=none, value=1, req=true) %}{% if single %}<input type="hidden" name="qty" value="1">{% else %}<input type="number" name="qty" min="1"{% if max %} max="{{ max }}"{% endif %} value="{{ value }}" inputmode="numeric"{% if req %} required{% else %} placeholder="не считал"{% endif %} aria-label="Сколько">{% endif %}{% endmacro %}

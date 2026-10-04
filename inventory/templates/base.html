@@ -233,6 +233,7 @@ body:has(dialog.sheet[open]){overflow:hidden}
 .types .ico{color:var(--acc);display:grid;flex:none}.types .grow>.mut{font-size:12px}
 /* box page: hero, name with id chip and count, «В коробке», empty state */
 .head .back.sq{border-radius:14px;margin-left:auto}body:has(.bell) .head .sq{margin-right:52px}
+.head>.grow{flex:1;min-width:0}body:has(.bell) .head>.grow~.back{margin-right:52px}
 .hero{display:grid;place-items:center;height:140px;border-radius:20px;background:var(--accent-soft);color:var(--acc);margin:8px 0 14px}
 .bhead{display:flex;gap:12px;align-items:flex-start}.bhead .grow{flex:1;min-width:0}.bhead h1{margin:0 0 6px}
 .idchip{display:inline-block;font-size:12px;font-weight:800;padding:2px 8px;border:1px solid var(--line);border-radius:8px;color:var(--mut)}
@@ -270,6 +271,12 @@ html{scroll-padding-top:calc(var(--top) + 16px)}html:has(.fbar){scroll-padding-t
 .line .grow:has(>.nm)>br{display:none}.line .grow:has(>.nm)>.src{grid-column:1;justify-self:start}
 .line .grow:has(>.nm)>span:not(.src){overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .line:has(.nm) .qty{width:7rem;max-width:none;flex:none}.card.list>.line{min-height:0}.line .nm{display:inline}.line:has(.nm) .thumb{width:40px;height:40px}.line.thd .thumb{height:0;visibility:hidden}
+/* item card: what it is on the left; where it lies and its actions on the right, pinned while scrolling */
+.duo{display:grid;grid-template-columns:minmax(0,1fr) minmax(320px,400px);column-gap:32px;align-items:start}
+.duo>.what,.duo>.info{grid-column:1}.duo>.where{grid-column:2;grid-row:1/span 2;position:sticky;top:calc(var(--top) + 16px)}
+.where>h2:first-child{margin-top:0}.car img{height:min(60vh,480px)}
+body:has(.bell) .head>.grow~.back,body:has(.bell) .head .sq{margin-right:0}
+dialog.sheet{inset:0;margin:auto;border-radius:26px;padding-bottom:18px;max-height:85dvh}dialog.sheet::before{display:none}
 }
 </style>
 </head>
