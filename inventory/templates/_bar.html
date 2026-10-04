@@ -1,17 +1,18 @@
-{# №54: one bar at the thumb on every screen, the reach grows left to right — Домой · Места · Найти · Ещё · scan (№67) #}
+{# №54: one bar at the thumb on every screen, the reach grows left to right — Домой · Места · Найти · Ещё · QR (№67, design/codex) #}
 {% set path = (request.url.path if request is defined else "/")|lower %}{% set seg = path.split("/")[1] %}
 {% set on = "home" if path == "/" and not (q is defined and q) else "find" if (q is defined and q) or seg in ("items", "i")
   else "more" if seg in ("more", "history", "projects", "p", "readers", "trash", "settings") or path.startswith("/boxes/sheet")
   else "places" if seg in ("places", "boxes", "b") else "" %}
 {% macro ico(d, size=24, w="1.8") %}<svg width="{{ size }}" height="{{ size }}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="{{ w }}" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">{{ d|safe }}</svg>{% endmacro %}
 <nav class="bar" aria-label="Главное меню"><div>
-<a class="tab{% if on == 'home' %} on{% endif %}" href="/"{% if on == "home" %} aria-current="page"{% endif %}><svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/></svg><span>Домой</span></a>
-<a class="tab{% if on == 'places' %} on{% endif %}" href="/places"{% if on == "places" %} aria-current="page"{% endif %}>{{ ico('<path d="M4 3v18M20 3v18M4 9h16M4 15h16"/>') }}<span>{{ t.places }}</span></a>
+<a class="tab{% if on == 'home' %} on{% endif %}" href="/"{% if on == "home" %} aria-current="page"{% endif %}>{{ ico('<path d="m3 10 9-7 9 7v10a1 1 0 0 1-1 1h-6v-7h-4v7H4a1 1 0 0 1-1-1z"/>', w="1.9") }}<span>Домой</span></a>
+<a class="tab{% if on == 'places' %} on{% endif %}" href="/places"{% if on == "places" %} aria-current="page"{% endif %}>{{ ico('<path d="M20 10.1c0 5.3-8 11-8 11s-8-5.7-8-11a8 8 0 1 1 16 0Z"/><circle cx="12" cy="10" r="2.5"/>') }}<span>{{ t.places }}</span></a>
 <form action="/" role="search"><label class="pill{% if on == 'find' %} on{% endif %}">{{ ico('<circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/>', 20) }}
   <input type="search" name="q" value="{{ q if seg == '' and q is defined else '' }}" placeholder="Найти" aria-label="Найти вещь" enterkeyhint="search"></label>
   {% if seg == "" and put %}<input type="hidden" name="put" value="{{ put }}">{% endif %}</form>
-<a class="tab{% if on == 'more' %} on{% endif %}" href="/more"{% if on == "more" %} aria-current="page"{% endif %}>{{ ico('<path d="M4 7h16M4 12h16M4 17h16"/>') }}<span>Ещё</span></a>
-{% if core.SCAN_NFC or core.SCAN_QR %}<button class="fab" id="scan" type="button" aria-label="Сканировать метку" title="Сканировать метку">{{ ico('<path d="M4 8V4h4M16 4h4v4M20 16v4h-4M8 20H4v-4M4 12h16"/>', 28, "2") }}<span class="dt">Сканировать</span></button>{% endif %}
+<a class="tab find{% if on == 'find' %} on{% endif %}" href="/#find"{% if on == "find" %} aria-current="page"{% endif %}>{{ ico('<circle cx="10.8" cy="10.8" r="6.8"/><path d="m16 16 4.5 4.5"/>') }}<span>Найти</span></a>
+<a class="tab{% if on == 'more' %} on{% endif %}" href="/more"{% if on == "more" %} aria-current="page"{% endif %}>{{ ico('<circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/>', w="2.4") }}<span>Ещё</span></a>
+{% if core.SCAN_NFC or core.SCAN_QR %}<button class="fab" id="scan" type="button" aria-label="Сканировать метку" title="Сканировать метку">{{ ico('<path d="M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5"/><path d="M7 7h3v3H7zM14 7h3v3h-3zM7 14h3v3H7zM14 14h1v1h-1zM17 14v3m-3 0h3"/>', 24, "1.8") }}<span class="nd">QR</span><span class="dt">Сканировать</span></button>{% endif %}
 </div></nav>
 {# the bell: what waits for the owner — a card without a photo, an agent's question, a late backup (/alerts) #}
 {% set alerts_n = core.alerts()|length %}{% if alerts_n %}<a class="bell" href="/alerts" aria-label="Требует внимания: {{ alerts_n }}">{{ ico('<path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/>', 22) }}<b>{{ alerts_n if alerts_n < 100 else "99+" }}</b></a>{% endif %}

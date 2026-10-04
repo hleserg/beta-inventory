@@ -35,7 +35,9 @@ def test_read_tools():
     assert call("get_box", box_id=box.lower()).structured_content["contents"][0]["qty"] == 7  # label id, any case
     err = call("get_box", box_id="ZZZZZ")
     assert err.is_error and "search" in err.content[0].text  # the error says what to do next
-    assert any(f["key"] == "value" for f in call("card_template", type="resistor").structured_content["fields"])
+    template = call("card_template", type="resistor").structured_content
+    assert any(f["key"] == "value" for f in template["fields"])
+    assert "48" in template["name_hint"]
     types = call("card_template").structured_content["categories"]
     assert "resistor" in [t["key"] for cat in types for t in cat["types"]]
     assert any("ESP32" in t["hint"] for cat in types for t in cat["types"])  # which type is which thing

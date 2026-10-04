@@ -1,8 +1,17 @@
-{% extends "base.html" %}
+{% extends "base.html" %}{% from "_bar.html" import ico %}
+{% set ICONS = {"plug": '<path d="M7 3v5a5 5 0 0 0 10 0V3M12 13v8M4 8h3M17 8h3"/>', "tool": '<path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18l3 3 6.3-6.3a4 4 0 0 0 5.4-5.4l-2.6 2.6-2.4-.4-.4-2.4z"/>',
+  "roll": '<circle cx="9" cy="12" r="6"/><circle cx="9" cy="12" r="2"/><path d="M9 6h10v12H9"/>', "home": '<path d="M3 11l9-7 9 7"/><path d="M5 10v10h14V10M10 20v-6h4v6"/>',
+  "box": '<path d="M3 7.5L12 3l9 4.5v9L12 21l-9-4.5z"/><path d="M3 7.5l9 4.5 9-4.5M12 12v9"/>'} %}
 {% block main %}
-<h1>Что это?</h1>
-{% for c in categories %}
-<h2>{{ c.label }}</h2>
-{% for ty in c.types %}<a class="line" href="/items/new?type={{ ty.key }}{% if keep %}&{{ keep }}{% endif %}"><span><b>{{ ty.label }}</b>{% if ty.hint %}<br><span class="mut">{{ ty.hint }}</span>{% endif %}</span></a>{% endfor %}
-{% endfor %}
+{% set box = request.query_params.get("box", "") %}
+<div class="head"><a class="back" href="{{ '/b/' ~ box if box else '/' }}" aria-label="Назад">{{ ico('<path d="M19 12H5m6-6-6 6 6 6"/>', 22, "2") }}</a>
+  <div><small>Новый предмет · шаг 1 из 2</small><h1>Что это?</h1></div></div>
+<div class="steps" aria-hidden="true"><i class="on"></i><i></i></div>
+<label class="search-field">{{ ico('<circle cx="10.8" cy="10.8" r="6.8"/><path d="m16 16 4.5 4.5"/>', 22, "2") }}<input type="search" data-filter placeholder="Найти тип" aria-label="Найти тип" autocomplete="off"></label>
+{% for c in categories %}<section>
+<div class="kind">{{ c.label }}</div>
+<div class="card list types">{% for ty in c.types %}<a class="line" href="/items/new?type={{ ty.key }}{% if keep %}&{{ keep }}{% endif %}" data-q="{{ (ty.label ~ ' ' ~ (ty.hint or ''))|lower }}">
+  <span class="ico">{{ ico(ICONS.get(c.icon) or ICONS.box) }}</span><span class="grow"><b>{{ ty.label }}</b>{% if ty.hint %}<br><span class="mut">{{ ty.hint }}</span>{% endif %}</span><span class="mut" aria-hidden="true">›</span></a>{% endfor %}</div>
+</section>{% endfor %}
+<p class="mut" data-none hidden>Такого типа нет.</p>
 {% endblock %}

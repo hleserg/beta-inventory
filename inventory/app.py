@@ -156,7 +156,19 @@ def index(req: Request, q: str = "", put: str = "", type: str = "", cat: str = "
           reorder: str = "", transit: str = "", hands: str = ""):
     if q:
         items, boxes = core.search(q)
-        return page(req, "index.html", q=q, put=put.upper(), items=items, boxes=boxes)
+        for i in items:  # the chips narrow by the home page's own filters: a category, in hand
+            here = [s for s in i["stock"] if s["box_id"] != core.TRANSIT]
+            i["total"], i["uncounted"] = sum(s["qty"] or 0 for s in here), any(s["qty"] is None for s in here)
+            i["cat"] = core.TYPES[i["type"]]["category"]["key"] if i["type"] in core.TYPES else ""
+            i["hands"] = any(s["box_id"] == core.HANDS for s in here)
+        cats = [c for c in PROFILE["categories"] if any(i["cat"] == c["key"] for i in items)]
+        shown = [i for i in items if (not cat or i["cat"] == cat) and (not hands or i["hands"])]
+        boxes = [] if cat or hands else boxes
+        results = [dict(kind="item", data=i, score=i["score"]) for i in shown if not i["similar"]]
+        results += [dict(kind="box", data=b, score=b["score"]) for b in boxes]
+        results.sort(key=lambda r: (-r["score"], core.norm(r["data"]["name"] or r["data"].get("id", ""))))
+        return page(req, "index.html", q=q, put=put.upper(), items=shown, boxes=boxes, results=results,
+                    cats=cats, any_hands=any(i["hands"] for i in items), f=dict(cat=cat, hands=hands))
     # №51/№57: no query — what is where. The type list's group heading picks a whole category
     if any(c["key"] == type for c in PROFILE["categories"]):
         cat, type = type, ""
@@ -260,17 +272,21 @@ def box(req: Request, box_id: str):
     return box_page(req, b)
 
 
-@app.get("/api/boxes")
-def boxes_peek(ids: str = ""):
-    """The scanner's «Обзор»: for each box in sight its name, the first two things in it, how many more."""
-    out = {}
+@app.get("/api/peek")
+def peek(boxes: str = "", items: str = ""):
+    """The camera: which codes in sight are ours (in the catalog), and over each box the AR label — never its name."""
+    out = dict(boxes={}, items={})
     with db() as c:
-        for bid in dict.fromkeys(x.strip() for x in ids.upper().split(",")[:20]):
-            b = c.execute("SELECT name FROM boxes WHERE id=?", (bid,)).fetchone()
-            if b:
-                names = [r["name"] for r in core.box_contents(c, bid)]
-                names += [r["name"] or r["id"] for r in c.execute("SELECT id, name FROM boxes WHERE parent_id=? ORDER BY id", (bid,))]
-                out[bid] = dict(name=b["name"] or "", items=names[:2], more=max(len(names) - 2, 0))
+        for bid in dict.fromkeys(x.strip() for x in boxes.upper().split(",")[:20]):
+            if c.execute("SELECT 1 FROM boxes WHERE id=?", (bid,)).fetchone():
+                top, total = core.box_peek(c, bid)
+                out["boxes"][bid] = dict(items=[dict(id=r["id"], name=r["name"], qty=qty_text(r["qty"], unit=core.unit_of(r["type"], r["fields"])))
+                                                for r in top], more=total - len(top),
+                                         boxes=c.execute("SELECT count(*) FROM boxes WHERE parent_id=?", (bid,)).fetchone()[0])
+        for iid in dict.fromkeys(x.strip() for x in items.split(",")[:20] if x.strip().isdigit()):
+            r = c.execute("SELECT name FROM items WHERE id=?", (int(iid),)).fetchone()
+            if r:
+                out["items"][iid] = r["name"]
     return out
 
 
@@ -756,9 +772,9 @@ def reader_delete(id: str = Form()):
 @app.get("/manifest.webmanifest")
 def manifest():
     return JSONResponse({"name": PROFILE["name"], "short_name": PROFILE["name"], "start_url": "/", "id": "/", "scope": "/", "display": "standalone",
-                         "background_color": "#f7f6f2", "theme_color": "#1f6feb",
-                         "icons": [{"src": f"/static/icon-{n}.png", "sizes": f"{n}x{n}", "type": "image/png",
-                                    "purpose": "any maskable"} for n in (192, 512)]},
+                         "background_color": "#EFF6F8", "theme_color": "#126985",
+                         "icons": [{"src": f"/static/icon{m}-{n}.png", "sizes": f"{n}x{n}", "type": "image/png", "purpose": p}
+                                   for m, p in (("", "any"), ("-maskable", "maskable")) for n in (192, 512)]},
                         media_type="application/manifest+json")
 
 

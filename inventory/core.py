@@ -2,6 +2,7 @@
 import io
 import json
 import os
+import random
 import re
 import secrets
 import sqlite3
@@ -881,6 +882,26 @@ def box_contents(c, box_id):
         "SELECT s.qty, i.* FROM stock s JOIN items i ON i.id=s.item_id WHERE s.box_id=? ORDER BY i.name", (box_id,))]
 
 
+def box_peek(c, box_id, n=2):
+    """The AR label over a box (CAMERA.md): (up to n things it gives out most, how many there are in all).
+
+    Things with stock left, ranked by take operations from this very box (not pieces, not the HANDS row)
+    in the last 1 month, else 3, else 6; ties by the later take, name, id. No takes in 6 months: n at random.
+    """
+    rows = [r for r in box_contents(c, box_id) if r["qty"] is None or r["qty"] > 0]
+    have = {r["id"] for r in rows}
+    for months in (1, 3, 6):
+        hits = {h["item_id"]: (h["n"], h["last"]) for h in c.execute(
+            "SELECT item_id, count(*) AS n, max(at) AS last FROM movements WHERE box_id=? AND kind='take' AND delta<0 "
+            "AND at >= datetime('now', 'localtime', ?) GROUP BY item_id", (box_id, f"-{months} months")) if h["item_id"] in have}
+        if hits:
+            rows.sort(key=lambda r: (norm(r["name"]), r["id"]))
+            rows.sort(key=lambda r: hits.get(r["id"], (0, ""))[1], reverse=True)
+            rows.sort(key=lambda r: hits.get(r["id"], (0, ""))[0], reverse=True)
+            return rows[:n], len(rows)
+    return random.sample(rows, min(n, len(rows))), len(rows)
+
+
 def search(q):
     """Items by keyword (name, type, profile fields marked `search`) and by meaning; boxes by id/name/place.
 
@@ -911,7 +932,9 @@ def search(q):
                     break
                 score += hit
             else:
-                score += norm(row["name"]).startswith(words[0])
+                name = norm(row["name"])
+                query = " ".join(words)
+                score += 2 if name == query else 1 if name.startswith(query) else 0
             sim = sims.get(row["id"], 0.0)
             if score or sim >= cut:
                 items.append(dict(id=row["id"], name=row["name"], type=row["type"], fields=f,
@@ -920,10 +943,16 @@ def search(q):
         items = [i for i in items if not i["similar"]] + [i for i in items if i["similar"]][:SEM_TOP]
         for i in items:
             i["stock"] = stock_of_item(c, i["id"])
+        query = " ".join(words)
         for b in c.execute("SELECT b.*, p.name AS place FROM boxes b LEFT JOIN places p ON p.id=b.place_id WHERE b.kind!='hands'"):
-            text = norm(f"{b['id']} {b['name']} {b['place'] or ''}")
-            if all(w in text for w in words):
-                boxes.append(dict(id=b["id"], name=b["name"], where=box_where(c, b["id"])))
+            fields = [(5, norm(b["id"])), (3, norm(b["name"])), (1, norm(b["place"] or ""))]
+            score = sum(max((weight for weight, value in fields if word in value), default=0) for word in words)
+            if score and all(any(word in value for _, value in fields) for word in words):
+                name = norm(b["name"])
+                score += 2 if name == query else 1 if name.startswith(query) else 0
+                score += 3 if norm(b["id"]) == query else 0
+                boxes.append(dict(id=b["id"], name=b["name"], where=box_where(c, b["id"]), score=score,
+                                  n=c.execute("SELECT COUNT(*) FROM stock WHERE box_id=?", (b["id"],)).fetchone()[0]))
     return items, boxes
 
 

@@ -3,16 +3,18 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="theme-color" content="#1f6feb">
+<meta name="theme-color" content="#126985">
+<link rel="icon" href="/static/icon.svg" type="image/svg+xml">
 <link rel="manifest" href="/manifest.webmanifest">
 <link rel="apple-touch-icon" href="/static/icon-192.png">
 <script>if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js")</script>
 <title>{% block title %}{{ t.items }}{% endblock %}</title>
 <style>
-:root{--bar:77px;--bg:#f7f6f2;--fg:#1d1d1b;--mut:#6b6b66;--line:#e2e1dc;--card:#fff;--acc:#1a64d6;--on-acc:#fff;--bad:#c62828;color-scheme:light dark}
-@media (prefers-color-scheme:dark){:root{--bg:#161615;--fg:#ecebe6;--mut:#9a9993;--line:#34342f;--card:#1f1f1d;--acc:#58a6ff;--on-acc:#0d1117;--bad:#ef5350}}
+/* design/codex tokens: --bg paper, --fg ink, --card surface, --acc accent, --bad danger */
+:root{--bar:78px;--bg:#EFF6F8;--fg:#15313D;--mut:#49636F;--line:#B6CAD0;--card:#FFFFFF;--surface-2:#E3EEF1;--acc:#126985;--accent-deep:#0D526B;--accent-soft:#D9EDF3;--on-acc:#FFFFFF;--bad:#A32E24;--shadow:0 10px 30px #1c292814;color-scheme:light dark}
+@media (prefers-color-scheme:dark){:root{--bg:#0E202A;--fg:#F1F8FA;--mut:#C0D2D8;--line:#536C77;--card:#19313C;--surface-2:#23404D;--acc:#7DD0E8;--accent-deep:#68C3DC;--accent-soft:#214454;--on-acc:#0E202A;--bad:#E77D70;--shadow:0 10px 30px #0006}}
 *{box-sizing:border-box}
-body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.45 system-ui,-apple-system,sans-serif}
+body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.42 system-ui,-apple-system,"Segoe UI",sans-serif}
 main{max-width:720px;margin:0 auto;padding:8px 16px calc(var(--bar) + 24px + env(safe-area-inset-bottom))}
 a{color:var(--acc)}
 h1{font-size:1.45rem;margin:.6em 0 .2em;text-wrap:balance}
@@ -20,19 +22,19 @@ h2{font-size:1.1rem;margin:1.3em 0 .4em;text-wrap:balance}
 p{text-wrap:pretty}
 :focus-visible{outline:2px solid var(--acc);outline-offset:2px}
 .mut{color:var(--mut);font-size:.9em}
-.crumbs{color:var(--mut);font-size:.9em}.crumbs a{display:inline-block;padding:10px 0}
-.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px;margin:8px 0}
+.crumbs{color:var(--mut);font-size:.9em}.crumbs a{display:inline-flex;align-items:center;min-height:44px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:14px;margin:8px 0}
 .lrows{padding:0}.lrow{display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:56px;padding:10px 14px;color:var(--fg);text-decoration:none}.lrow+.lrow{border-top:1px solid var(--line)}.lrow svg{flex:none;color:var(--mut)}
 .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
 .right{margin-left:auto}
-input,select,textarea,button{font:inherit;color:inherit;background:var(--card);border:1px solid var(--line);border-radius:8px;padding:8px 10px;max-width:100%}
+input,select,textarea,button{font:inherit;color:inherit;background:var(--card);border:1.5px solid var(--line);border-radius:14px;padding:8px 12px;max-width:100%}
 input,select,textarea{width:100%}
 input,select{min-height:44px}
 .row input,.row select{width:auto;flex:1;min-width:0}.row>input,.row>select{min-width:6em}  /* a field squeezed by its buttons wraps them instead */
 textarea{min-height:8em}
-button,.btn{cursor:pointer;background:var(--acc);color:var(--on-acc);border:0;text-decoration:none;display:inline-block;min-height:44px;padding:10px 16px;border-radius:8px}
+button,.btn{cursor:pointer;background:var(--acc);color:var(--on-acc);border:0;text-decoration:none;display:inline-block;min-height:48px;padding:10px 16px;border-radius:14px;font-weight:750}
 .btn{display:inline-flex;align-items:center;justify-content:center}
-.ghost{background:transparent;color:var(--acc);border:1px solid var(--line)}
+.ghost{background:var(--accent-soft);color:var(--accent-deep);border:1.5px solid var(--acc)}
 .bad{background:var(--bad)}
 label{display:block;margin:14px 0 4px;font-weight:600}
 .err{color:var(--bad)}
@@ -53,11 +55,33 @@ html:has(.car.full){overflow:hidden}
 .pic{position:relative;display:inline-flex;touch-action:none;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}.pic img{pointer-events:none}
 .pic.drag{opacity:.5}.pic:first-child:not(:only-child) img{outline:2px solid var(--acc);outline-offset:1px}  /* №64: the first is the face */
 .pic button{position:absolute;top:-6px;right:-6px;min-height:0;padding:0 6px;border-radius:50%}
-.thumb{width:52px;height:52px;object-fit:cover;border-radius:8px;flex:none;background:var(--line)}
+.thumb{width:52px;height:52px;object-fit:cover;border-radius:13px;flex:none;background:var(--surface-2)}
 a.line,.line{display:flex;gap:10px;align-items:center;text-decoration:none;color:inherit;padding:8px 0;border-bottom:1px solid var(--line)}
 .line>a:not(.btn){display:flex;gap:10px;align-items:center;flex:1;min-width:0;color:inherit;text-decoration:none}
 .line .grow{flex:1;min-width:0}.line form{margin:0}
 .line .qty{white-space:normal;text-align:right;max-width:6em}  /* «есть, не считал» wraps instead of running over the name */
+/* design: home — search field, «под рукой сейчас», rows in a white card */
+.search-field{display:flex;align-items:center;gap:12px;min-height:50px;border:1.5px solid var(--line);border-radius:14px;background:var(--card);padding:0 14px;margin:14px 0;color:var(--mut)}
+.search-field:focus-within{outline:2px solid var(--acc);outline-offset:1px}
+.search-field input{flex:1;min-width:0;border:0;outline:0;background:none;margin:0;padding:0;min-height:46px;font-size:16px;color:var(--fg)}
+.now{display:flex;align-items:center;gap:12px;background:var(--accent-soft);border:1px solid var(--line);border-radius:18px;padding:16px 18px;margin:14px 0;color:var(--accent-deep)}
+.now small{display:block;font-size:12px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--mut)}
+.now b{display:block;font-size:22px;font-weight:850;color:var(--fg);margin:6px 0 2px}.now p{margin:0;font-size:13px;color:var(--mut)}
+.sec{display:flex;align-items:baseline;justify-content:space-between;gap:8px}.sec a{font-weight:800;font-size:14px;text-decoration:none;min-height:44px;display:inline-flex;align-items:center}
+h2{font-size:17px;font-weight:850}
+.card.list>.line{padding:10px 12px;min-height:110px}.card.list>.line:last-child{border-bottom:0}
+.line .nm{font-size:14px;font-weight:800;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;line-height:1.3}
+.card.list:not(.types)>.line .nm{min-height:3.9em}
+.line .grow>.mut{font-size:12px}.line .grow:has(>.nm)>br{display:none}
+.line .qty{font-size:15px;font-weight:850}
+/* design: search — back header, chips, dividers, result cards */
+.head{display:flex;align-items:center;gap:12px;margin:8px 0 2px}.head>div{min-width:0}.head h1{margin:0;font-size:28px;font-weight:900;overflow-wrap:break-word;hyphens:auto}
+.head small{display:block;font-size:12px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--mut)}
+.back{display:grid;place-items:center;width:44px;height:44px;flex:none;border-radius:50%;border:1px solid var(--line);background:var(--card);color:var(--fg)}
+.div{display:flex;align-items:center;gap:10px;margin:18px 0 10px;font-size:12px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--mut)}.div::after{content:"";flex:1;border-top:1px solid var(--line)}
+.card.hit{border-radius:18px;padding:12px 14px;margin:0 0 10px}.hit .top{display:flex;gap:12px;align-items:center;color:inherit;text-decoration:none}
+.hit .grow{flex:1;min-width:0}.hit .nm{display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;font-weight:800;line-height:1.3;min-height:3.9em}.hit .grow>.mut{display:block;font-size:13px}
+.hit .top+.mut{margin-top:10px;border-top:1px solid var(--line)}.hit>.mut{font-size:13px}.hit>.mut a{display:inline-flex;align-items:center;min-height:44px}.hit .qty{font-weight:850;text-align:right}.hit form{margin:10px 0 0}
 .line .dots[aria-expanded=true]{background:var(--acc);color:var(--on-acc);border-color:var(--acc)}
 .fbar{position:fixed;z-index:9;left:0;right:0;bottom:calc(var(--bar) + env(safe-area-inset-bottom));background:var(--card);border-top:1px solid var(--line);padding:8px 12px}
 .fbar>div{max-width:720px;margin:0 auto;display:flex;gap:6px;overflow-x:auto;scrollbar-width:none}
@@ -77,9 +101,9 @@ details{margin:8px 0}
 summary{cursor:pointer;color:var(--acc)}
 .qty{font-weight:700;white-space:nowrap;font-variant-numeric:tabular-nums}
 .chips{display:flex;gap:6px;flex-wrap:wrap}
-.chips a{display:inline-flex;align-items:center;min-height:44px;padding:0 14px;border:1px solid var(--line);border-radius:99px;text-decoration:none;font-size:.9em}
+.chips a{display:inline-flex;align-items:center;min-height:44px;padding:0 14px;border:1px solid var(--line);border-radius:999px;text-decoration:none;font-size:.9em;font-weight:750;background:var(--card);color:var(--fg)}
 .seg a{font-size:1em}
-.chips a.on{background:var(--acc);color:var(--on-acc);border-color:var(--acc)}
+.chips a.on{background:var(--accent-soft);color:var(--accent-deep);border-color:var(--acc)}
 .md img{max-width:100%}.md pre{overflow-x:auto}.md table td,.md table th{border:1px solid var(--line);padding:4px 6px}
 [hidden]{display:none!important}[data-qr]{display:none}.qr [data-qr]{display:inline-block}
 label.chk{display:flex;gap:10px;align-items:center;min-height:44px;font-weight:400}.chk input{flex:none;width:auto}
@@ -90,20 +114,36 @@ input[type=checkbox],input[type=radio]{width:20px;height:20px;min-height:0;paddi
 .row .num{flex:0 0 auto}.row .num input{flex:0 0 4em}
 .stock .num{flex-direction:column-reverse}.stock .num input{font-size:1.2em;padding:6px 2px}.stock .num button{padding:4px 0}
 .stock select{grid-column:1/-1}
-.mini{padding:6px 9px;font-size:.85em}.mini.on,dialog .ghost.on{background:var(--acc);color:var(--on-acc)}
+.mini{padding:6px 9px;font-size:.85em}.mini.on{background:var(--acc);color:var(--on-acc)}
 dialog{border:1px solid var(--line);border-radius:12px;background:var(--card);color:var(--fg)}dialog::backdrop{background:#0008}
-dialog video{width:min(80vw,480px);display:block}.cam{position:relative;margin-bottom:8px}.cam canvas{position:absolute;inset:0;pointer-events:none}
-.cam .peek{position:absolute;transform:translate(-50%,calc(-100% - 6px));min-height:0;padding:6px 10px;white-space:pre-line;text-align:left;font-size:14px;max-width:60%;box-shadow:0 2px 8px #0006}
+/* the camera: full screen, dark in both themes; our codes green, others red, an AR label under each box */
+.scan{position:fixed;inset:0;width:100%;max-width:none;height:100dvh;max-height:none;margin:0;padding:0;border:0;border-radius:0;background:#10262F;color:#fff;--ok:#9EE6C8;--nok:#F08A7E}
+.scan[open]{display:flex;flex-direction:column}.scan button{min-height:0}
+.scanh{display:flex;align-items:center;gap:12px;padding:calc(12px + env(safe-area-inset-top)) 16px 12px}.scanh h2{margin:0;font-size:20px;color:#fff}
+.scan .close{display:grid;place-items:center;width:46px;height:46px;padding:0;background:none;border:1.5px solid #fff6;border-radius:12px;color:#fff}
+.cam{flex:1;position:relative;overflow:hidden;background:#0B1C22}.cam video,.cam canvas{position:absolute;inset:0;width:100%;height:100%}.cam video{object-fit:cover}.cam canvas{pointer-events:none}
+.aim{position:absolute;left:50%;top:46%;transform:translate(-50%,-50%);width:min(62vw,240px);aspect-ratio:1;color:#7FD0E6;pointer-events:none}.aim svg{width:100%;height:100%}
+.aim span{position:absolute;top:calc(100% + 14px);left:50%;transform:translateX(-50%);white-space:nowrap;font-size:14px;color:#DDEFF4;background:#10262Fb3;padding:4px 10px;border-radius:99px}
+.ours{position:absolute;top:12px;left:50%;transform:translateX(-50%);background:#10262Fd9;border:1.5px solid var(--ok);color:#fff;border-radius:99px;padding:5px 12px;font-size:14px;font-weight:700;white-space:nowrap}
+.tag{position:absolute;transform:translate(-50%,calc(-100% - 10px));background:#10262F;border:1.5px solid var(--ok);color:#fff;border-radius:99px;padding:4px 10px;font-size:13px;font-weight:700;white-space:nowrap}
+.scan button.tag{min-height:44px}
+.tag.no{border-color:var(--nok);transform:translate(-50%,10px)}
+.arc{position:absolute;width:max-content;min-height:44px;max-width:min(68vw,270px);background:#F6FBFC;border:1.5px solid #A9DCEB;color:#15313D;border-radius:14px;padding:8px 12px;font-size:14px;font-weight:700;text-decoration:none;box-shadow:0 4px 14px #0006}
+.arc div{display:flex;justify-content:space-between;gap:10px;padding:3px 0}.arc div span:first-child{overflow-wrap:anywhere}.arc div span+span{flex:none;color:#3F5F6B;font-weight:600}
+.arc em{display:block;font-style:normal;color:#126985;border-top:1px solid #D4E8EE;margin-top:4px;padding-top:6px}
+.scanp{padding:16px 16px calc(16px + env(safe-area-inset-bottom));color:#C0D2D8}.scanp h3{display:flex;align-items:center;gap:8px;margin:0 0 4px;color:#fff;font-size:18px}.scanp p{margin:0 0 12px}.scanp a{color:#9ED8EA}
+.camseg{display:grid;grid-template-columns:1fr 1fr;background:#1C3A45;border-radius:12px;padding:3px;margin-bottom:14px}.scan .camseg button{background:none;color:#C0D2D8;min-height:44px;border-radius:10px;padding:6px}.scan .camseg button.on{background:#DDEFF4;color:#15313D}
+.scango{width:100%;min-height:48px;background:#126985;color:#fff}
 /* №54 the bar: at the thumb, the reach grows left to right; the screen's own action rides above it (.save, .act) */
-.bar{position:fixed;z-index:10;left:0;right:0;bottom:0;padding:8px 12px calc(8px + env(safe-area-inset-bottom));background:var(--card);border-top:1px solid var(--line)}
-.bar>div{max-width:720px;margin:0 auto;display:flex;align-items:center;gap:8px}.bar form{flex:1;min-width:0}
-.tab{flex:none;width:48px;height:56px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;border-radius:10px;color:var(--mut);font-size:12px;text-decoration:none}
-.tab.on{color:var(--acc);font-weight:600}
+.bar{position:fixed;z-index:10;left:0;right:0;bottom:0;padding:8px 10px calc(8px + env(safe-area-inset-bottom));background:var(--card);border-top:1px solid var(--line)}
+.bar>div{max-width:720px;margin:0 auto;display:flex;align-items:center;justify-content:space-between;gap:4px}.bar form{display:none}  /* design: the field lives on the home screen, «Найти» leads there */
+.tab{flex:none;width:66px;min-height:54px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;border-radius:14px;color:var(--mut);font-size:12px;font-weight:800;text-decoration:none}
+.tab.on{background:var(--accent-soft);color:var(--acc)}
 .pill{display:flex;align-items:center;gap:6px;height:48px;margin:0;padding:0 12px;border-radius:99px;background:var(--bg);border:1px solid var(--line);color:var(--mut);font-weight:400;cursor:text}
 .pill input{flex:1;min-width:0;min-height:0;height:100%;border:0;padding:0;background:none;outline:none;font-size:16px;color:var(--fg)}
 .pill input::placeholder{color:var(--mut)}
 .pill.on{border:2px solid var(--acc);color:var(--fg)}.pill:focus-within{border:2px solid var(--acc)}
-.fab{flex:none;width:60px;height:60px;min-height:0;border-radius:50%;padding:0;display:grid;place-items:center}
+.fab{flex:none;width:52px;height:52px;min-height:0;border-radius:16px;padding:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;font-size:11px;font-weight:800}
 .fab.on{box-shadow:0 0 0 4px var(--bg),0 0 0 7px var(--acc)}  /* NFC listens: a tag opens its box */
 body:has(main :is(input:not([type=checkbox],[type=radio],[type=file]),textarea):focus){--bar:0px}  /* the keyboard is up: the page's own field wins the space */
 body:has(main :is(input:not([type=checkbox],[type=radio],[type=file]),textarea):focus) .bar{display:none}
@@ -146,8 +186,12 @@ summary.lrow{list-style:none;cursor:pointer} summary.lrow::-webkit-details-marke
 /* №54 screen 6: the new-item form */
 body:not(:has(.bar)){--bar:0px}
 .chips.scroll{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none}.chips.scroll a{flex:none}
-.tiles{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px}
-label.tile{position:relative;margin:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;min-height:88px;border:1px dashed var(--line);border-radius:12px;font-weight:400;color:var(--mut)}
+.tiles{display:grid;grid-template-columns:1fr 1fr;margin-top:8px;border:1.5px dashed var(--line);border-radius:14px}
+label.tile{position:relative;margin:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;min-height:88px;font-weight:600;color:var(--mut)}
+label.tile+label.tile{border-left:1px solid var(--line)}
+.cols{display:grid;grid-template-columns:1fr 1fr;gap:0 12px}.cols>div{min-width:0}.cols>.w,.cols>div:last-child:nth-child(odd){grid-column:1/-1}
+.plain{margin-top:18px;border-top:1px solid var(--line)}.plain>.lrow,.plain summary.lrow{padding:12px 0;border-bottom:1px solid var(--line)}.plain details>div{padding:0 0 12px}.plain .more-f{border:0;min-height:44px}
+.save.wide button{flex:1;min-height:52px;font-size:17px}
 .tile input{position:absolute;inset:0;opacity:0;width:100%}
 .ell{min-width:0}.ell .sm{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .card.acc{border-color:var(--acc)}.card.acc .row{margin-top:8px}
@@ -159,7 +203,7 @@ label.lrow{margin:0;font-weight:400;cursor:pointer}.lrows>details+.lrow{border-t
 .more .hd h2{margin:0;font-size:13px;font-weight:600;color:var(--mut);text-transform:uppercase;letter-spacing:.05em}.more .hd a{text-decoration:none;display:flex;align-items:center;font-weight:600;min-height:44px}
 .tn .ti{flex:none;width:28px;display:grid;place-items:center;color:var(--mut)}
 .tn .grow{flex:1;min-width:0} .tn a.grow,.tn .hb{color:inherit;text-decoration:none;display:flex;gap:10px;align-items:center}
-.tn .nm{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tn .nm{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:3;overflow:hidden;white-space:normal;overflow-wrap:anywhere;line-height:1.3;min-height:3.9em}
 .tn.hd .nm{font-weight:700}
 .tn .path{display:block;font-size:13px;color:var(--mut);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .ib{flex:none;width:44px;height:44px;min-height:44px;padding:0;background:transparent;color:var(--mut);display:grid;place-items:center}
@@ -170,6 +214,34 @@ details:not([open])>summary .chev{transform:rotate(-90deg)}
 .bell{position:fixed;z-index:11;top:calc(8px + env(safe-area-inset-top));right:12px;width:44px;height:44px;border-radius:50%;background:var(--card);border:1px solid var(--line);color:var(--fg);display:grid;place-items:center}
 .bell b{position:absolute;top:-4px;right:-4px;min-width:20px;height:20px;padding:0 5px;border-radius:10px;background:var(--bad);color:#fff;font-size:12px;line-height:20px;text-align:center;font-variant-numeric:tabular-nums}
 body:has(.bell) main>h1{padding-right:52px}
+/* №54 item card: a card per place; its action opens a bottom sheet (dialog.sheet) */
+.kind{margin-top:12px;font-size:12px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--mut)}
+.spot{padding:12px 14px}.spot .top{display:flex;gap:12px;align-items:center;color:inherit;text-decoration:none}.spot .top .thumb{width:44px;height:44px}
+.spot .grow{flex:1;min-width:0}.spot .qty{font-weight:850}.spot>button{width:100%;margin-top:10px;display:flex;align-items:center;justify-content:center;gap:8px}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}.two button{display:flex;align-items:center;justify-content:center;gap:8px}
+.ghost.bad{background:transparent;color:var(--bad);border-color:var(--bad)}
+dialog.sheet{position:fixed;inset:auto 0 0;width:100%;max-width:560px;margin:0 auto;border:0;border-radius:26px 26px 0 0;padding:22px 18px calc(18px + env(safe-area-inset-bottom));max-height:90dvh;overflow:auto}
+dialog.sheet::before{content:"";position:absolute;top:8px;left:50%;width:36px;height:4px;margin-left:-18px;border-radius:2px;background:var(--line)}
+.sheet small{display:block;font-size:12px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--mut)}.sheet h2{margin:4px 0;font-size:24px;font-weight:900}
+.sheet .nm{margin:0 0 6px;font-weight:700;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+.sheet form>button,.sheet .sure button{width:100%;margin-top:10px}.sheet .num{gap:8px}.sheet .num button{width:52px;height:52px;flex:none;font-size:22px}
+.sheet .num input{min-width:0;flex:1;font-size:29px;font-weight:900;text-align:center;font-variant-numeric:tabular-nums}.sheet .num button:disabled{opacity:.45}
+.sheet .sure{margin-top:12px;padding:12px;border:1.5px solid var(--bad);border-radius:14px}
+body:has(dialog.sheet[open]){overflow:hidden}
+/* type picker: steps bar, a card of types per category, a filter over them */
+.steps{display:flex;gap:6px;margin:12px 0 4px}.steps i{flex:1;height:4px;border-radius:2px;background:var(--line)}.steps i.on{background:var(--acc)}
+.card.list.types>.line{min-height:64px;padding:10px 14px;border:0}  /* inset dividers that skip filtered-out lines */
+.types>.line:not([hidden])~.line:not([hidden]){background:linear-gradient(var(--line),var(--line)) 14px 0/calc(100% - 28px) 1px no-repeat}
+.types .ico{color:var(--acc);display:grid;flex:none}.types .grow>.mut{font-size:12px}
+/* box page: hero, name with id chip and count, «В коробке», empty state */
+.head .back.sq{border-radius:14px;margin-left:auto}body:has(.bell) .head .sq{margin-right:52px}
+.head>.grow{flex:1;min-width:0}body:has(.bell) .head>.grow~.back{margin-right:52px}
+.hero{display:grid;place-items:center;height:140px;border-radius:20px;background:var(--accent-soft);color:var(--acc);margin:8px 0 14px}
+.bhead{display:flex;gap:12px;align-items:flex-start}.bhead .grow{flex:1;min-width:0}.bhead h1{margin:0 0 6px}
+.idchip{display:inline-block;font-size:12px;font-weight:800;padding:2px 8px;border:1px solid var(--line);border-radius:8px;color:var(--mut)}
+.cnt{text-align:center;color:var(--acc)}.cnt b{display:block;font-size:32px;font-weight:900;line-height:1}.cnt small{font-size:12px;font-weight:800;color:var(--mut)}
+.line .side{display:flex;flex-direction:column;align-items:flex-end;gap:6px}
+.btn.wide{display:flex;justify-content:center;width:100%;gap:8px;margin-top:10px}
 /* №58 desktop: the bottom bar becomes a left column, search runs across the top, bottom panels start after the column */
 @media (min-width:1024px){
 :root{--bar:0px;--nav:220px;--top:73px;--detail:clamp(300px,28vw,360px)}
@@ -178,27 +250,40 @@ main{max-width:1100px;margin:0 0 0 var(--nav);padding:calc(var(--top) + 16px) 32
 .bar{top:0;right:auto;width:var(--nav);padding:16px 12px;border-top:0;border-right:1px solid var(--line)}
 body:has(main :is(input:not([type=checkbox],[type=radio],[type=file]),textarea):focus) .bar{display:block}
 .bar>div{max-width:none;margin:0;flex-direction:column;align-items:stretch;gap:2px}
-.bar form{position:fixed;top:0;left:var(--nav);right:0;height:var(--top);padding:12px 32px;background:var(--card);border-bottom:1px solid var(--line)}
+.tab.find,.nd{display:none}.bar form{display:block;position:fixed;top:0;left:var(--nav);right:0;height:var(--top);padding:12px 32px;background:var(--card);border-bottom:1px solid var(--line)}
 .pill{max-width:1036px}
-.tab{width:auto;height:44px;flex-direction:row;justify-content:flex-start;gap:12px;padding:0 12px;color:var(--fg);font-size:15px}
+.tab{width:auto;min-height:44px;flex-direction:row;justify-content:flex-start;gap:12px;padding:0 12px;color:var(--fg);font-size:15px;font-weight:600}
 .tab:hover{background:var(--bg)}.tab.on{background:var(--bg);color:var(--acc)}
-.fab{width:auto;height:44px;border-radius:10px;display:flex;justify-content:flex-start;gap:12px;padding:0 12px;margin-top:12px;font-size:15px}
+.fab{width:auto;height:44px;border-radius:10px;flex-direction:row;justify-content:flex-start;gap:12px;padding:0 12px;margin-top:12px;font-size:15px}
 .fab svg{width:24px;height:24px}
 .fbar,.save{left:var(--nav)}
 .bell{top:14px;right:32px}body:has(.bell) .bar form{padding-right:96px}body:has(.bell) main>h1{padding-right:0}
-body:not(:has(.bar)){--nav:0px;--top:0px}body:not(:has(.bar)) main{max-width:720px;margin:0 auto}
+body:not(:has(.bar)){--nav:0px;--top:0px}body:not(:has(.bar)) main,main:has(>.steps){max-width:720px;margin:0 auto}
+body:not(:has(.bar)) .save{padding-inline:max(12px,calc(50% - 328px))}  /* the button lines up with the 720px column */
 .fbar{top:var(--top);bottom:auto;border-top:0;border-bottom:1px solid var(--line);padding:8px 32px}.fbar>div{max-width:none;margin:0}
 body:has(.fbar) main{padding-top:calc(var(--top) + 77px);padding-bottom:32px}
 .put{left:auto;top:var(--top);width:var(--detail);max-height:none;padding:24px;border-top:0;border-left:1px solid var(--line)}
 body:has(.put) main{max-width:none;margin-right:var(--detail);padding-bottom:32px}
 .more{min-height:0}.more>h1{flex:none}
+main>.search-field[role=search]:not(:has([name=put])){display:none}  /* the top bar already searches; it does not carry ?put= */
 html{scroll-padding-top:calc(var(--top) + 16px)}html:has(.fbar){scroll-padding-top:calc(var(--top) + 77px)}
 /* the main list as a table: name · type · where · qty, fixed qty width so the columns line up */
 .thd{display:flex;color:var(--mut);font-size:13px;padding:4px 0}.thd .qty{font-weight:400}
 .line>a>.grow:has(>.nm),.thd>.grow{display:grid;grid-template-columns:minmax(0,2fr) minmax(0,1fr) minmax(0,1.2fr);column-gap:16px;align-items:center}
 .line .grow:has(>.nm)>br{display:none}.line .grow:has(>.nm)>.src{grid-column:1;justify-self:start}
-.line .grow:has(>.nm)>span:not(.src){overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.line:has(.nm) .qty{width:7rem;max-width:none;flex:none}.line:has(.nm) .thumb{width:40px;height:40px}.line.thd .thumb{height:0;visibility:hidden}
+.line .grow:has(>.nm)>span:not(.src):not(.nm){overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.line:has(.nm) .qty{width:7rem;max-width:none;flex:none}.card.list>.line{min-height:0}.line .nm{display:-webkit-box}.line:has(.nm) .thumb{width:40px;height:40px}.line.thd .thumb{height:0;visibility:hidden}
+/* item card: what it is on the left; where it lies and its actions on the right, pinned while scrolling */
+.duo{display:grid;grid-template-columns:minmax(0,1fr) minmax(320px,400px);column-gap:32px;align-items:start}
+.duo>.what,.duo>.info{grid-column:1}.duo>.where{grid-column:2;grid-row:1/span 2;position:sticky;top:calc(var(--top) + 16px)}
+.where>h2:first-child{margin-top:0}.car img{height:min(60vh,480px)}
+body:has(.bell) .head>.grow~.back,body:has(.bell) .head .sq{margin-right:0}
+dialog.sheet{inset:0;margin:auto;border-radius:26px;padding-bottom:18px;max-height:85dvh}dialog.sheet::before{display:none}
+/* box: the cover, name and id pinned on the left; «В коробке» one row per item on the right */
+.duo.bx{grid-template-columns:minmax(260px,340px) minmax(0,1fr)}.duo.bx>.what{position:sticky;top:calc(var(--top) + 16px)}.duo.bx>.where{position:static}
+.bx .hero{height:220px;margin-top:0}.bx .car img{height:auto;max-height:340px}.where>.sec:first-child h2{margin-top:0}
+.line .side{flex-direction:row;align-items:center;gap:12px}
+.bx .line>a>.grow:has(>.nm){grid-template-columns:minmax(0,1fr) auto}
 }
 </style>
 </head>
@@ -226,7 +311,7 @@ document.documentElement.classList.toggle("qr", SCAN.qr && "BarcodeDetector" in 
 const PRN = {w: {{ core.LABEL[0] }}, h: {{ core.LABEL[1] }}, rot: {{ core.PRINT_ROTATE }}, dx: {{ core.PRINT_DX_MM }}, dy: {{ core.PRINT_DY_MM }}, density: {{ core.PRINT_DENSITY }}};
 let niim = null, niimPick = false;  // the printer client; niimPick: the remembered printer failed, show the list
 let armed = null, scanning = null;  // armed: the field whose QR button was pressed
-const BOX = /\/b\/([A-Za-z0-9]+)\/?$/i, ITEM = /\/i\/(\d+)\/?$/i;  // a label's or a tag's URL, any host
+const BOX = /\/b\/([A-Za-z0-9]+)\/?$/i, ITEM = /\/i\/(\d+)\/?$/i;  // NFC's existing URL handling
 const boxField = () => armed || [...document.querySelectorAll("[data-box]")]
   .find(e => e.checkVisibility ? e.checkVisibility() : e.offsetParent) || document.querySelector("form[data-put] [data-box]");
 async function gotBox(id) {
@@ -279,81 +364,174 @@ function fab() {  // the corner button: NFC where the phone reads tags (unless t
   if (document.getElementById("scan").classList.contains("on")) return SCAN.qr && qrScan();  // NFC listens already, the ring says so; a second tap is the camera
   nfcScan().catch(e => alert("NFC не включился: " + e.message));
 }
-const peekCache = {};  // «Обзор»: box id → {name, items, more} from /api/boxes, fetched once per page
-function peekFetch(ids) {
-  ids = ids.filter(id => !(id in peekCache));
-  if (!ids.length) return;
-  ids.forEach(id => peekCache[id] = null);
-  fetch("/api/boxes?ids=" + ids.join(",")).then(r => r.json()).then(o => Object.assign(peekCache, o)).catch(() => ids.forEach(id => delete peekCache[id]));
-}
+const plural = (n, one, few, many) => n % 10 == 1 && n % 100 != 11 ? one : [2, 3, 4].includes(n % 10) && ![12, 13, 14].includes(n % 100) ? few : many;
 function blip() {  // the snap: a short buzz and a click
   navigator.vibrate?.(30);
   try { const a = new AudioContext(), o = a.createOscillator(), g = a.createGain();
     o.frequency.value = 1800; g.gain.setValueAtTime(.15, a.currentTime); g.gain.exponentialRampToValueAtTime(.001, a.currentTime + .05);
     o.connect(g).connect(a.destination); o.start(); o.stop(a.currentTime + .05); o.onended = () => a.close(); } catch {}
 }
-async function qrScan(f) {  // f: the box field whose QR button was pressed; none: the corner button, it opens what it reads
+const svg = (d, w = 22) => `<svg viewBox="0 0 24 24" width="${w}" height="${w}" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${d}</svg>`;
+const ICO_QR = '<path d="M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h2v2h-2zM18 18h2v2h-2z"/>',
+  ICO_BOX = '<path d="M3 7.5L12 3l9 4.5v9L12 21l-9-4.5z"/><path d="M3 7.5l9 4.5 9-4.5M12 12v9"/>';
+// The camera (design CAMERA.md). A code is ours when /api/peek finds it in the catalog: green; not there: red.
+// One of ours in sight opens by itself; two or more turn on «Содержимое коробок» (AR): under each box its top two things
+// by takes from it, never its name. f: the box field whose QR button was pressed — boxes only, the field is filled.
+// The scanner is a history entry: the phone's «назад» and ✕ close it, the page under it (a sheet, a form) stays.
+async function qrScan(f) {
   if (!("BarcodeDetector" in window && navigator.mediaDevices)) {
     if (await ask(`Этот браузер не читает QR с сайта. Наведите на наклейку камеру телефона — страница откроется сама. `
       + `Сканер на сайте работает в Chrome на Android, когда адрес ${location.origin} добавлен в исключения Chrome.`, "Как настроить")) location.href = "/settings#phone";
     return;
   }
-  const d = document.createElement("dialog"), p = document.createElement("p"), cam = document.createElement("div"),
-    v = document.createElement("video"), cv = document.createElement("canvas"), x = document.createElement("button"), o = document.createElement("button");
-  let s, peek = false;  // peek: «Обзор», a label over each of our codes, nothing opens until one is tapped
-  const hint = () => p.textContent = peek ? "Нажмите на подпись коробки" : f ? "Наведите на QR коробки" : "Наведите на QR наклейки";
-  const go = u => {  // open what a code names, as the scanner always did
-    d.close();
-    const b = u.match(BOX)?.[1].toUpperCase(), i = u.match(ITEM)?.[1];
-    if (f) { armed = f; return gotBox(b); }  // a label read: straight into the field, no questions
-    if (i) return location.href = "/I/" + i;  // a thing: its card as scanned, «Взять?» (№37, №43)
-    if (location.pathname.toLowerCase() !== "/b/" + b.toLowerCase()) location.href = "/b/" + b;
+  const d = document.createElement("dialog");
+  d.className = "scan";
+  d.innerHTML = `<div class="scanh"><button type="button" class="close" aria-label="Закрыть">${svg('<path d="M6 6l12 12M18 6 6 18"/>')}</button><h2>Сканировать QR</h2></div>
+    <div class="cam"><video playsinline muted></video><canvas></canvas>
+      <div class="aim"><svg viewBox="0 0 100 100" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true"><path d="M4 26V10a6 6 0 0 1 6-6h16M74 4h16a6 6 0 0 1 6 6v16M96 74v16a6 6 0 0 1-6 6H74M26 96H10a6 6 0 0 1-6-6V74"/></svg><span>Рамка найдёт наклейку сама</span></div>
+      <div class="ours" hidden></div></div>
+    <div class="scanp">${f ? "" : `<nav class="camseg"><button type="button" data-m="qr" class="on">QR-сканер</button><button type="button" data-m="ar">Содержимое коробок</button></nav>`}
+      <h3></h3><p></p><button type="button" class="scango" hidden></button></div>`;
+  const $ = q => d.querySelector(q), v = $("video"), cv = $("canvas"), cam = $(".cam"), h2 = $("h2"), h3 = $("h3"), p = $(".scanp p"), btn = $(".scango"),
+    css = getComputedStyle(d);
+  let mode = "qr", auto = false, gone = false, after = null, timer = 0, snapped = null, s = null, said = "";
+  const known = {}, marks = new Map(), els = new Map();  // known: "b"+id / "i"+id → undefined unasked, null asking, false not ours, else /api/peek's
+  const ownOrigins = new Set([location.origin]);
+  try { const published = {{ core.setting("PUBLIC_BASE_URL")|tojson }}; if (published) ownOrigins.add(new URL(published).origin); } catch {}
+  const key = u => {
+    let url;
+    try { url = new URL(u); } catch { return null; }
+    if (!ownOrigins.has(url.origin) || url.search || url.hash) return null;
+    const b = url.pathname.match(/^\/b\/([A-Za-z0-9]+)\/?$/i)?.[1].toUpperCase();
+    const i = url.pathname.match(/^\/i\/(\d+)\/?$/i)?.[1];
+    return b ? "b" + b : i ? "i" + i : null;
   };
-  hint(); cam.className = "cam"; v.playsInline = v.muted = true; cam.append(v, cv);
-  cam.onclick = e => { const l = e.target.closest(".peek"); if (l) go(l.dataset.u); };
-  x.type = o.type = "button"; x.className = o.className = "ghost"; x.textContent = "Закрыть"; x.onclick = () => d.close();
-  o.textContent = "Обзор"; o.hidden = !!f; o.onclick = () => { peek = !peek; o.classList.toggle("on", peek); hint(); };
-  d.onclose = () => { s?.getTracks().forEach(t => t.stop()); d.remove(); };
-  const row = document.createElement("p"); row.className = "row"; row.append(o, x);
-  d.append(p, cam, row); document.body.append(d); d.showModal();
-  try {
-    s = await navigator.mediaDevices.getUserMedia({video: {facingMode: "environment"}});
-    if (!d.open) return s.getTracks().forEach(t => t.stop());
-    v.srcObject = s; await v.play();
-    const det = new BarcodeDetector({formats: ["qr_code"]}), g = cv.getContext("2d"), css = getComputedStyle(d);
-    while (d.open) {
-      const codes = await det.detect(v).catch(() => []);
-      const ours = c => BOX.test(c.rawValue) || !f && ITEM.test(c.rawValue);  // a field takes boxes only: a thing's label would leave the form
-      const k = v.clientWidth / (v.videoWidth || 1);
-      cv.width = v.clientWidth; cv.height = v.clientHeight; g.lineWidth = 4;
-      for (const c of codes) {  // corner brackets on each code: ours in the accent colour, others red
-        const {x: bx, y: by, width: bw, height: bh} = c.boundingBox;  // Android may give fewer than 4 corners: the box's own then
-        const q = (c.cornerPoints?.length === 4 ? c.cornerPoints : [{x: bx, y: by}, {x: bx + bw, y: by}, {x: bx + bw, y: by + bh}, {x: bx, y: by + bh}])
-          .map(({x, y}) => [x * k, y * k]), a = Math.min(18, Math.hypot(q[1][0] - q[0][0], q[1][1] - q[0][1]) / 3);
-        g.strokeStyle = css.getPropertyValue(ours(c) ? "--acc" : "--bad").trim();
-        q.forEach((pt, n) => { const [pa, nx] = [q[(n + 3) % 4], q[(n + 1) % 4]], to = (b, l = Math.hypot(b[0] - pt[0], b[1] - pt[1]) || 1) => [pt[0] + (b[0] - pt[0]) * a / l, pt[1] + (b[1] - pt[1]) * a / l];
-          g.beginPath(); g.moveTo(...to(pa)); g.lineTo(...pt); g.lineTo(...to(nx)); g.stroke(); });
+  const state = u => { const k = key(u); return !k ? false : f && k[0] == "i" ? false : known[k]; };  // a field takes boxes only
+  const check = keys => {
+    keys = keys.filter(k => known[k] === undefined);
+    if (!keys.length) return;
+    keys.forEach(k => known[k] = null);
+    const ids = t => keys.filter(k => k[0] == t).map(k => k.slice(1)).join(",");
+    fetch(`/api/peek?boxes=${ids("b")}&items=${ids("i")}`).then(r => r.json())
+      .then(o => keys.forEach(k => known[k] = (k[0] == "b" ? o.boxes[k.slice(1)] : k.slice(1) in o.items && {name: o.items[k.slice(1)]}) || false))
+      .catch(() => keys.forEach(k => delete known[k]));
+  };
+  const say = (title, text, icon, b) => {
+    btn.onclick = b?.[1];
+    const sig = [title, text, icon, b?.[0]].join("|");
+    if (sig == said) return;
+    said = sig; h3.innerHTML = icon ? svg(icon) : ""; h3.append(Object.assign(document.createElement("span"), {textContent: title}));
+    p.textContent = text; btn.hidden = !b; if (b) btn.textContent = b[0];
+  };
+  const leave = u => { gone = true; d.close(); location.replace(u); };  // replace: «назад» from there skips the scanner
+  const go = u => {  // open what a code names
+    if (gone) return;
+    gone = true; clearTimeout(timer);
+    const b = u.match(BOX)?.[1].toUpperCase(), i = u.match(ITEM)?.[1];
+    if (f) { after = () => { armed = f; gotBox(b); }; return history.back(); }  // a label read: straight into the field
+    if (i) return leave("/I/" + i);  // a thing: its card as scanned, «Взять?» (№37, №43)
+    if (location.pathname.toLowerCase() === "/b/" + b.toLowerCase()) return history.back();
+    leave("/b/" + b);
+  };
+  const onPop = () => d.close();
+  d.onclose = () => { gone = true; clearTimeout(timer); s?.getTracks().forEach(t => t.stop()); removeEventListener("popstate", onPop); d.remove(); after?.(); };
+  d.oncancel = e => { e.preventDefault(); gone || (gone = true, history.back()); };  // Esc
+  $(".close").onclick = () => gone || (gone = true, history.back());
+  d.onclick = e => {
+    const m = e.target.closest("[data-m]"), t = e.target.closest("[data-u]");
+    if (m) { mode = m.dataset.m; auto = false; snapped = null; clearTimeout(timer); }
+    if (t) { e.preventDefault(); go(t.dataset.u); }
+  };
+  const el = (k, tag, cls) => {
+    let e = els.get(k);
+    if (!e) { e = document.createElement(tag); e.className = cls; els.set(k, e); cam.append(e); }
+    e.dataset.t = 1; return e;
+  };
+  const frame = async det => {
+    const codes = await det.detect(v).catch(() => []), now = Date.now();
+    for (const c of codes) marks.set(c.rawValue, {c, t: now});
+    for (const [u, m] of marks) if (now - m.t > 500) marks.delete(u);  // out of sight half a second: gone; a blink keeps it
+    const seen = [...marks.values()].map(m => m.c);
+    check(seen.map(c => key(c.rawValue)).filter(k => k && !(f && k[0] == "i")));
+    const mine = seen.filter(c => state(c.rawValue)), wait = seen.some(c => !state(c.rawValue) && state(c.rawValue) !== false);
+    if (!f && mode == "qr" && mine.length > 1) { mode = "ar"; auto = true; }
+    if (auto && mine.length < 2 && !wait) { mode = "qr"; auto = false; }
+    // the picture: cover-scaled, so each code's corners map through the same scale and crop
+    const cw = cam.clientWidth, ch = cam.clientHeight, vw = v.videoWidth || 1, vh = v.videoHeight || 1,
+      k = Math.max(cw / vw, ch / vh), ox = (cw - vw * k) / 2, oy = (ch - vh * k) / 2, g = cv.getContext("2d");
+    cv.width = cw; cv.height = ch; g.lineWidth = 4; g.lineJoin = "round";
+    els.forEach(e => e.dataset.t = "");
+    for (const c of seen) {
+      const {x: bx, y: by, width: bw, height: bh} = c.boundingBox;  // Android may give fewer than 4 corners: the box's own then
+      const q = (c.cornerPoints?.length === 4 ? c.cornerPoints : [{x: bx, y: by}, {x: bx + bw, y: by}, {x: bx + bw, y: by + bh}, {x: bx, y: by + bh}])
+        .map(({x, y}) => [x * k + ox, y * k + oy]);
+      const mx = q.reduce((a, b) => a + b[0], 0) / 4, my = q.reduce((a, b) => a + b[1], 0) / 4, st = state(c.rawValue), u = c.rawValue, id = key(u)?.slice(1);
+      g.strokeStyle = st ? css.getPropertyValue("--ok") : st === false ? css.getPropertyValue("--nok") : "#fff";
+      g.beginPath();
+      q.forEach(([x, y], n) => { const l = Math.hypot(x - mx, y - my) || 1; g[n ? "lineTo" : "moveTo"](x + (x - mx) / l * 6, y + (y - my) / l * 6); });
+      g.closePath(); g.stroke();
+      const top = Math.min(...q.map(c => c[1])) - 6, bot = Math.max(...q.map(c => c[1])) + 6;
+      if (mode == "qr" || auto) {
+        if (st) { const t = el("t" + u, "button", "tag"); t.type = "button"; t.dataset.u = u;
+          t.textContent = u.match(BOX) ? "Наш · " + id : "Наш · предмет"; t.style.left = mx + "px"; t.style.top = top + "px"; }
+        else if (st === false) { const t = el("n" + u, "span", "tag no"); t.textContent = key(u)?.[0] == "i" && f ? "Не коробка" : "Чужой QR"; t.style.left = mx + "px"; t.style.top = bot + "px"; }
       }
-      const mine = codes.filter(ours);
-      if (!f && !peek && mine.length > 1) { peek = true; o.classList.add("on"); hint(); }  // a shelf of boxes in sight: look first
-      if (peek) {
-        peekFetch(mine.map(c => c.rawValue.match(BOX)?.[1].toUpperCase()).filter(Boolean));
-        cam.querySelectorAll(".peek").forEach(l => Date.now() - l.dataset.t > 500 && l.remove());  // out of sight half a second: gone
-        for (const c of mine) {
-          let l = [...cam.querySelectorAll(".peek")].find(l => l.dataset.u === c.rawValue);
-          if (!l) { l = document.createElement("button"); l.type = "button"; l.className = "peek"; l.dataset.u = c.rawValue; cam.append(l); }
-          const id = c.rawValue.match(BOX)?.[1].toUpperCase(), b = id && peekCache[id];
-          const text = !id ? "Вещь — открыть" : b ? [b.name || id, ...b.items, b.more ? `…ещё ${b.more}` : "", b.items.length ? "" : "пусто"].filter(Boolean).join("\n") : id;
-          if (l.textContent !== text) l.textContent = text;
-          l.dataset.t = Date.now(); l.style.left = (c.boundingBox.x + c.boundingBox.width / 2) * k + "px"; l.style.top = c.boundingBox.y * k + "px";
+      if (mode == "ar" && st && u.match(BOX)) {
+        const a = el("a" + u, "a", "arc"); a.href = "/b/" + id; a.dataset.u = u;
+        const h = !st.items.length ? "Коробка пуста" : null;
+        const sig = JSON.stringify(st);
+        if (a.dataset.sig != sig) {
+          a.dataset.sig = sig; a.replaceChildren();
+          if (h) a.append(h);
+          for (const r of st.items) { const row = document.createElement("div"); row.append(...[r.name, r.qty || "есть, не считал"].map(x => Object.assign(document.createElement("span"), {textContent: x}))); a.append(row); }
+          if (st.more) a.append(Object.assign(document.createElement("em"), {textContent: `… ещё ${st.more} ${plural(st.more, "предмет", "предмета", "предметов")} →`}));
         }
-      } else if (mine.length) {  // snapped: buzz, a beat to see the brackets, then open
-        blip(); await new Promise(r => setTimeout(r, 300));
-        if (d.open) return go(mine[0].rawValue);
-      } else if (codes.length) p.textContent = "Это не наша наклейка"; else hint();
-      await new Promise(r => setTimeout(r, peek ? 100 : 200));
+        a.style.left = Math.max(8, Math.min(cw - a.offsetWidth - 8, mx - a.offsetWidth / 2)) + "px";
+        a.style.top = Math.max(8, Math.min(ch - a.offsetHeight - 8, bot + 4)) + "px";
+      }
     }
-  } catch (e) { d.close(); alert("Камера недоступна: " + e.message); }
+    for (const [n, e] of els) if (!e.dataset.t) { e.remove(); els.delete(n); }
+    $(".aim").hidden = !!seen.length;
+    const ours = $(".ours"), n = mine.length;
+    ours.hidden = mode != "ar" || !n; ours.textContent = `${n} ${plural(n, "наша наклейка", "наши наклейки", "наших наклеек")}`;
+    d.querySelectorAll("[data-m]").forEach(b => b.classList.toggle("on", b.dataset.m == mode));
+    const head = f || mode == "qr" && seen.length < 2 ? "Сканировать QR" : mode == "qr" ? "QR в кадре" : "AR · содержимое";
+    if (h2.textContent != head) h2.textContent = head;
+    const one = mode == "qr" && mine.length == 1 && !wait ? mine[0].rawValue : null;
+    if (one !== snapped) { clearTimeout(timer); snapped = one; if (one) { blip(); timer = setTimeout(() => go(one), 800); } }
+    if (mode == "ar") say(auto ? "Несколько наших наклеек" : "Что в коробках?", auto ? "Нажмите нужное содержимое или наведите камеру так, чтобы осталась одна наклейка."
+      : "Наведите камеру на наклейки. Нажмите на подпись, чтобы открыть коробку.");
+    else if (one) {
+      const isBox = !!one.match(BOX), what = isBox ? `Коробка ${key(one).slice(1)}.` : `Предмет «${state(one).name}».`, open = [isBox ? "Открыть коробку сейчас" : "Открыть сейчас", () => go(one)];
+      seen.length > 1 ? say("Один наш код найден", `Нашу наклейку выделили зелёным, чужую — красным. Открываем ${isBox ? "нашу коробку" : "предмет"}.`, null, open)
+        : say("Код найден", what + " Открываем автоматически…", ICO_BOX, open);
+    }
+    else if (n > 1) say("Несколько наших наклеек", "Нажмите на нужную или наведите так, чтобы в кадре осталась одна.");
+    else if (seen.length && !wait) say("Наведите на код", "Этого кода нет в каталоге. Наведите на нашу наклейку.", ICO_QR);
+    else say("Наведите на код", "Держите наклейку в кадре. Снимок и кнопка спуска не нужны.", ICO_QR);
+  };
+  const start = async () => {
+    $(".aim").hidden = false;
+    say("Наведите на код", "Держите наклейку в кадре. Снимок и кнопка спуска не нужны.", ICO_QR);
+    try {
+      s = await navigator.mediaDevices.getUserMedia({video: {facingMode: "environment"}});
+      if (!d.open) return s.getTracks().forEach(t => t.stop());
+      v.muted = true; v.srcObject = s; await v.play();
+      const det = new BarcodeDetector({formats: ["qr_code"]});
+      while (d.open) { await frame(det); await new Promise(r => setTimeout(r, 120)); }
+    } catch (e) {
+      if (!d.open) return;
+      s?.getTracks().forEach(t => t.stop()); $(".aim").hidden = true;
+      say("Нет доступа к камере", "", null, ["Повторить", start]); said = "";
+      const a = Object.assign(document.createElement("a"), {href: "/settings#phone", textContent: "Как открыть камерой телефона"});
+      a.onclick = e => { e.preventDefault(); leave(a.href); };
+      p.replaceChildren("Разрешите камеру для этого сайта в настройках браузера и нажмите «Повторить». Или наведите на наклейку обычную камеру телефона — страница откроется сама. ", a);
+    }
+  };
+  document.body.append(d); d.showModal();
+  history.pushState({...history.state, scan: 1}, ""); addEventListener("popstate", onPop);
+  start();
+  return new Promise(r => d.addEventListener("close", r));
 }
 addEventListener("click", e => {
   if (e.target.closest("#scan")) return fab();
@@ -521,7 +699,7 @@ function pickMade(f, make, made = () => null) {
     id ? back(id) : guard || push();
   };
   f.addEventListener("input", () => guard || vals() == blank || push());
-  addEventListener("popstate", () => { if (guard) { guard = false; ask(); } });
+  addEventListener("popstate", () => { if (guard && !document.querySelector("dialog.scan[open]")) { guard = false; ask(); } });  // the scanner closing is not leaving
   for (const b of f.querySelectorAll("[data-back]")) b.onclick = ask;
   f.addEventListener("submit", async e => {
     e.preventDefault(); e.stopImmediatePropagation();
@@ -654,10 +832,49 @@ document.addEventListener("pointerdown", e => {
   addEventListener("pointermove", move); addEventListener("pointerup", up); addEventListener("pointercancel", up);
 });
 addEventListener("pageshow", e => { if (e.persisted) location.reload(); });  // back button: the page from memory has old counts
+// №54 bottom sheets: [data-sheet] opens dialog#id; backdrop, «Отмена» or the phone's «назад» close it, nothing moves.
+// The count sets [data-n] (the button's words) and [data-left] (what stays in the box). «Списать» asks once more inside.
+function syncSheetQty(d) {
+  const input = d.querySelector('.num input[name="qty"]');
+  if (!input) return;
+  const n = Number(input.value), max = input.max ? Number(input.max) : Infinity;
+  d.querySelector('[data-step="-1"]').disabled = !input.value || n <= 1;
+  d.querySelector('[data-step="1"]').disabled = n >= max;
+}
+addEventListener("click", e => {
+  const o = e.target.closest?.("[data-sheet]"), d = e.target.closest?.("dialog.sheet");
+  if (o) { const sheet = document.getElementById(o.dataset.sheet); sheet.showModal(); syncSheetQty(sheet); history.pushState({sheet: 1}, ""); }
+  else if (d && e.target.closest("[data-step]")) {
+    const input = d.querySelector('.num input[name="qty"]'), step = Number(e.target.closest("[data-step]").dataset.step);
+    input.value = Math.max(1, Math.min(input.max ? Number(input.max) : Infinity, (Number(input.value) || 0) + step));
+    input.dispatchEvent(new Event("input", {bubbles: true}));
+  }
+  else if (d && (e.target == d || e.target.closest("[value=cancel]"))) history.back();
+  else if (d && e.target.closest("[data-ask]")) { e.target.closest("[data-ask]").hidden = true; d.querySelector(".sure").hidden = false; }
+});
+addEventListener("popstate", e => e.state?.sheet || document.querySelector("dialog.sheet[open]")?.close());  // back from the scanner over it: stays
+addEventListener("cancel", e => { if (e.target.matches?.("dialog.sheet")) { e.preventDefault(); history.back(); } }, true);  // Esc
+addEventListener("input", e => {
+  const d = e.target.closest?.("dialog.sheet");
+  if (!d || e.target.name != "qty") return;
+  const n = +e.target.value || 0;
+  for (const s of d.querySelectorAll("[data-n]")) s.textContent = n;
+  for (const s of d.querySelectorAll("[data-left]")) s.textContent = Math.max(0, s.dataset.left - n);
+  syncSheetQty(d);
+});
+// type picker: [data-filter] hides the lines whose [data-q] lacks the words, then the emptied sections.
+addEventListener("input", e => {
+  if (!e.target.matches?.("[data-filter]")) return;
+  const w = e.target.value.toLowerCase().split(/\s+/).filter(Boolean);
+  for (const l of document.querySelectorAll("[data-q]")) l.hidden = !w.every(x => l.dataset.q.includes(x));
+  for (const s of document.querySelectorAll("main section")) s.hidden = !s.querySelector("[data-q]:not([hidden])");
+  document.querySelector("[data-none]").hidden = !!document.querySelector("[data-q]:not([hidden])");
+});
 // №40: every number field gets − and + by its step (none: one). Card numbers are text ("1,5"), so no stepUp; never below min (else 0).
 // An empty field: + starts it, − leaves it empty («не считал»). Events as if typed: drafts and autosave see it.
 addEventListener("DOMContentLoaded", () => {
   for (const f of document.querySelectorAll("input[type=number], input[inputmode=decimal]")) {
+    if (f.closest(".num")) continue;  // sheets already have their own large controls
     const s = document.createElement("span"), btn = (t, d) => {
       const b = document.createElement("button");
       b.type = "button"; b.className = "ghost"; b.textContent = t;

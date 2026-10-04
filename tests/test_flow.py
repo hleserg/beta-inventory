@@ -86,7 +86,7 @@ def test_main_path():
     assert c.post("/stock", data={"box": box, "item": iid, "action": "take", "qty": 99}).status_code == 400
 
     c.post(f"/b/{box}/clear")
-    assert "Что кладём" in c.get(f"/b/{box}").text
+    assert "Здесь пока пусто." in c.get(f"/b/{box}").text
     assert "Метеостанция" in c.get("/history").text
     assert "Освободил · " in c.get("/more").text  # №54: the last moves under the menu
 
@@ -108,6 +108,21 @@ def test_meaning():
         assert page.index("MP1584") < page.index("Похоже по смыслу")  # keyword hit (alias) ranks first
     finally:
         core._sem["model"] = None
+
+
+def test_search_ranks_items_and_boxes_together():
+    box, other = core.new_boxes(2)
+    c.post(f"/b/{box}", data={"name": "Звёздная гайка"})
+    c.post(f"/b/{other}", data={"name": "Звёздный модуль LM2596 запас"})
+    c.post("/items/new?type=resistor", data={"dup_ok": "1", "name": "Звёздная гайка М3", "value": "М3"})
+    first = newest()
+    c.post("/items/new?type=resistor", data={"dup_ok": "1", "name": "Звёздный модуль LM2596", "value": "LM2596"})
+    second = newest()
+
+    box_query = c.get("/", params={"q": "Звёздная гайка"}).text
+    assert box_query.index(f'href="/b/{box}"') < box_query.index(f'href="/i/{first}"')
+    item_query = c.get("/", params={"q": "Звёздный модуль LM2596"}).text
+    assert item_query.index(f'href="/i/{second}"') < item_query.index(f'href="/b/{other}"')
 
 
 def test_phone_app():
@@ -158,7 +173,7 @@ def test_uncounted():
     c.post("/stock", data={"box": box, "item": rid, "action": "add", "kind": "return", "qty": 2})
     assert "2 шт" in c.get(f"/b/{box}").text  # «вернул 2» to an uncounted pair: now there are 2 (№34)
     c.post(f"/b/{box}/clear")
-    assert "Что кладём" in c.get(f"/b/{box}").text
+    assert "Здесь пока пусто." in c.get(f"/b/{box}").text
 
 
 def test_lookalike_asks():
@@ -239,7 +254,7 @@ def test_box_by_name():
     places = c.get("/places").text  # №54: the tree names the box, its ID leads the grey line
     assert '<span class="nm">Клеммники WAGO</span>' in places and f'<span class="path">{b} ·' in places
     page = c.get(f"/b/{b}").text
-    assert f'<h1>Клеммники WAGO <span class="mut">{b}</span></h1>' in page
+    assert f'<h1 id="bname">Клеммники WAGO</h1><span class="idchip">{b}</span>' in page  # the name, the ID in a chip
     assert '<span class="nm">Ящик</span>' in page and f'<span class="path">{d}' in page  # №54 screen 4: a box inside reads as on «Места»
 
 
@@ -464,10 +479,10 @@ def test_hands():
     assert stock(iid) == {core.HANDS: 1, box: 2}
     c.post("/stock", data={"box": box, "item": iid, "action": "take", "qty": 1})
     card = c.get(f"/i/{iid}").text
-    assert stock(iid) == {core.HANDS: 2, box: 1} and f"взят из {box}" in card and "Положить на место" in card
+    assert stock(iid) == {core.HANDS: 2, box: 1} and f"взят из {box}" in card and 'id="put"' in card and "<h2>Вернуть</h2>" in card
     c.post("/stock", data={"box": core.HANDS, "item": iid, "action": "take", "qty": 2})
     card = c.get(f"/i/{iid}").text  # №72: lying in its box, the pinned panel takes it rather than asks where to put it
-    assert stock(iid) == {box: 1} and "списал" in card and f"Взять из {box}" in card and "data-put hidden" in card
+    assert stock(iid) == {box: 1} and "списал" in card and "<h2>Взять</h2>" in card and "data-put hidden" in card
     assert "модуль с ПВЗ" not in c.get("/items?hands=1").text
     places = c.get("/places").text  # a box with no place is under «Без места», a placed one under its place
     loose = places[places.index('id="loose"'):]
@@ -521,7 +536,7 @@ def test_box_lists_what_is_inside():
     iid = newest()
     page = c.get(f"/b/{outer}").text
     assert "светодиод 5мм" in page and "коробка мелочь" in page and f'name="box" value="{inner}"' in page
-    assert "Пустые · 1" in page and "+ Положить сюда" in page
+    assert "Пустые · 1" in page and f'href="/?put={outer}">Добавить +' in page
     c.post("/stock", data={"box": inner, "item": iid, "action": "take", "qty": 2, "back": f"/b/{outer}"})
     assert core.db().execute("SELECT qty FROM stock WHERE box_id=? AND item_id=?", (inner, iid)).fetchone()[0] == 5
 
@@ -541,8 +556,12 @@ def test_transit():
     assert "защита АКБ" in tr and "3 шт" in tr and "13 шт" not in tr and "10k" not in tr
     card = c.get(f"/i/{iid}").text
     assert "В пути" in card and "заказано" in card and "Пришло" in card
+    assert "В пути" in c.get("/?q=защита").text  # a search hit keeps its «в пути» row
+    c.post("/stock", data={"box": box, "item": iid, "action": "take", "kind": "return", "qty": 1})
+    card = c.get(f"/i/{iid}").text  # in hand and in transit: the transit row must not open the «Вернуть» sheet
+    assert "Вернуть" in card and "Куда положить</button>" not in card
     c.post("/stock", data={"box": box, "item": iid, "action": "add", "kind": "move", "src": core.TRANSIT, "qty": 12})
-    assert stock(iid) == {box: 15}  # 12 came of the 10 ordered
+    assert stock(iid) == {box: 14, core.HANDS: 1}  # 12 came of the 10 ordered
     assert core.TRANSIT not in c.get("/places").text
     c.post(f"/b/{core.TRANSIT}/delete")
     assert c.get(f"/b/{core.TRANSIT}").status_code == 200
@@ -785,14 +804,47 @@ def test_alerts():
     assert 'href="/items?reorder=1"' in c.get("/alerts").text
 
 
-def test_boxes_peek():
-    a, b, inner = core.new_boxes(3)  # the scanner's «Обзор»: a label over each box in sight
+def test_peek():
+    """The camera (CAMERA.md): only catalog codes count; over a box, up to two things it gives out most, never its name."""
+    a, b, inner = core.new_boxes(3)
     c.post(f"/b/{a}", data={"name": "Шкаф-обзор"})
+    ids = {}
     for n in ("Бета", "Альфа", "Гамма"):
-        c.post("/items/new?type=resistor", data={"dup_ok": "1", "name": n, "value": "x", "box": a, "qty": 1})
+        c.post("/items/new?type=resistor", data={"dup_ok": "1", "name": n, "value": "x", "box": a, "qty": 4})
+        ids[n] = newest()
     with core.db() as db:
         db.execute("UPDATE boxes SET parent_id=? WHERE id=?", (a, inner))
-    r = c.get(f"/api/boxes?ids={a.lower()},{b},NOPE1")
+    r = c.get(f"/api/peek?boxes={a.lower()},{b},NOPE1&items={ids['Бета']},999999")
     assert r.status_code == 200
-    assert r.json() == {a: {"name": "Шкаф-обзор", "items": ["Альфа", "Бета"], "more": 2},  # 3 items + a box inside
-                        b: {"name": "", "items": [], "more": 0}}  # unknown ids: left out
+    j = r.json()
+    assert set(j["boxes"]) == {a, b} and list(j["items"]) == [str(ids["Бета"])]  # unknown codes are not ours
+    assert "Шкаф-обзор" not in r.text and j["boxes"][b] == {"items": [], "more": 0, "boxes": 0}  # an empty box
+    first = j["boxes"][a]  # no takes in half a year: two at random, one more
+    assert len(first["items"]) == 2 and first["more"] == 1 and first["boxes"] == 1 and first["items"][0]["qty"] == "4 шт"
+
+    def top():
+        return [x["name"] for x in c.get(f"/api/peek?boxes={a}").json()["boxes"][a]["items"]]
+
+    def took(name, days, times=1):
+        with core.db() as db:
+            for _ in range(times):
+                db.execute("INSERT INTO movements(item_id, box_id, delta, kind, author, at) VALUES (?, ?, -1, 'take', 't', "
+                           "datetime('now', 'localtime', ?))", (ids[name], a, f"-{days} days"))
+                db.execute("INSERT INTO movements(item_id, box_id, delta, kind, author, at) VALUES (?, ?, 1, 'take', 't', "
+                           "datetime('now', 'localtime', ?))", (ids[name], core.HANDS, f"-{days} days"))  # the hand's row: not counted
+
+    took("Гамма", 160, 3)
+    assert top() == ["Гамма", "Альфа"]  # 6 months: Гамма, the rest by name
+    took("Бета", 70)
+    assert top() == ["Бета", "Альфа"]  # 3 months wins over 6: Гамма's takes are out of the window
+    took("Альфа", 10)
+    took("Бета", 5)
+    assert top() == ["Бета", "Альфа"]  # a tie in the month: the later take first
+    took("Альфа", 3)
+    assert top() == ["Альфа", "Бета"]  # operations, not pieces
+    with core.db() as db:
+        db.execute("DELETE FROM movements WHERE box_id=?", (a,))
+        for name in ("Альфа", "Бета"):
+            db.execute("INSERT INTO movements(item_id, box_id, delta, kind, author, at) "
+                       "VALUES (?, ?, -1, 'take', 't', datetime('now', 'localtime', '-2 days'))", (ids[name], a))
+    assert top() == ["Альфа", "Бета"]  # same popularity and date: names go A–Я

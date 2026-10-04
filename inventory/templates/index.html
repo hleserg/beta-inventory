@@ -1,47 +1,63 @@
 {% extends "base.html" %}{% from "_box.html" import box_link %}
 {% block main %}
 {% if put %}<div class="card">Кладём в {{ box_link(put, (all_boxes()|selectattr("id", "equalto", put)|first or {}).name) }}. Найдите, что кладёте, или <a href="/items/new?box={{ put }}">заведите новое</a>.</div>{% endif %}
+{% macro thumb(r) %}{% if pk and r.fields[pk] %}<img class="thumb" src="/u/{{ r.fields[pk][0] }}" alt="" loading="lazy">{% else %}<span class="thumb"></span>{% endif %}{% endmacro %}
+{% macro search_field() %}<form class="search-field" action="/" role="search"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="10.8" cy="10.8" r="6.8"/><path d="m16 16 4.5 4.5"/></svg>
+  {% if put %}<input type="hidden" name="put" value="{{ put }}">{% endif %}<input id="find" type="search" name="q" placeholder="Найти вещь или коробку" aria-label="Поиск" value="{{ q }}" autocomplete="off"></form>{% endmacro %}
 {% if q %}
-  {% if boxes %}<h2>{{ t.boxes }}</h2>{% for b in boxes %}<div>{{ box_link(b.id, b.name) }} <span class="mut">{{ b.where }}</span></div>{% endfor %}{% endif %}
-  <h2>{{ t.items }}{% if items %} <span class="mut">{{ items|length }}</span>{% endif %}</h2>
-  {% set ns = namespace(sim=false) %}
-  {% for i in items %}
-  {% if i.similar and not ns.sim %}{% set ns.sim = true %}<h2>Похоже по смыслу</h2>{% endif %}
-  <div class="card">
-    <a class="row" href="/i/{{ i.id }}" style="text-decoration:none;color:inherit">{% if pk and i.fields[pk] %}<img class="thumb" src="/u/{{ i.fields[pk][0] }}" alt="">{% endif %}<span><b>{{ i.name }}</b><br><span class="mut">{{ type_label(i.type) }}</span></span></a>
-    {% for s in i.stock %}<div>{{ box_link(s.box_id, s.name) }} <span class="mut">{{ s.where }}</span> — <span class="qty">{{ s.qty|qty(unit=unit_of(i.type, i.fields)) }}</span></div>
-    {% else %}<div class="mut">Нигде нет</div>{% endfor %}
-    {% if put %}<form method="post" action="/stock" class="row" style="margin-top:8px">
-      <input type="hidden" name="box" value="{{ put }}"><input type="hidden" name="item" value="{{ i.id }}"><input type="hidden" name="action" value="add"><input type="hidden" name="kind" value="put"><input type="hidden" name="back" value="/b/{{ put }}">
-      <input type="number" name="qty" min="1" placeholder="не считал"><button>Положить в {{ put }}</button></form>{% endif %}
-  </div>
-  {% else %}<p class="mut">Ничего не нашлось. <a href="/items/new{% if put %}?box={{ put }}{% endif %}">+ {{ t.item }}</a></p>{% endfor %}
+{% macro hit(i) %}<div class="card hit"><a class="top" href="/i/{{ i.id }}">{{ thumb(i) }}<span class="grow"><span class="nm">{{ i.name }}</span><span class="mut">{{ type_label(i.type).split(" › ")|last }}</span></span>
+  <span class="qty">{{ i.total|qty(i.uncounted, unit=unit_of(i.type, i.fields)) }}</span></a>
+  {% for s in i.stock %}<div class="mut">{{ box_link(s.box_id, s.name) }}{% if s.where %} · {{ s.where }}{% endif %}{% if loop.length > 1 %} — <span class="qty">{{ s.qty|qty(unit=unit_of(i.type, i.fields)) }}</span>{% endif %}</div>
+  {% else %}<div class="mut">Нигде нет</div>{% endfor %}
+  {% if put %}<form method="post" action="/stock" class="row">
+    <input type="hidden" name="box" value="{{ put }}"><input type="hidden" name="item" value="{{ i.id }}"><input type="hidden" name="action" value="add"><input type="hidden" name="kind" value="put"><input type="hidden" name="back" value="/b/{{ put }}">
+    <input type="number" name="qty" min="1" placeholder="не считал"><button>Положить в {{ put }}</button></form>{% endif %}
+</div>{% endmacro %}
+<div class="head"><a class="back" href="/{{ '?put=' ~ put if put }}" aria-label="Назад"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5m6-6-6 6 6 6"/></svg></a>
+  <div><small>Поиск по каталогу</small><h1>Результаты</h1></div></div>
+{{ search_field() }}
+{% set base = "/?q=" ~ q|urlencode ~ ("&put=" ~ put if put else "") %}
+{% if cats|length > 1 or any_hands %}<nav class="chips scroll" aria-label="Фильтры">
+  <a class="{{ 'on' if not (f.cat or f.hands) }}" href="{{ base }}">Все</a>
+  {%- for c in cats %}<a class="{{ 'on' if f.cat == c.key }}" href="{{ base }}&cat={{ c.key }}">{{ c.label }}</a>{% endfor %}
+  {%- if any_hands %}<a class="{{ 'on' if f.hands }}" href="{{ base }}&hands=1">{{ t.hands }}</a>{% endif %}</nav>{% endif %}
+{% set sim = items|selectattr("similar")|list %}
+{% if results %}<div class="div">По релевантности · {{ results|length }}</div>{% endif %}
+{% for result in results %}{% if result.kind == "item" %}{{ hit(result.data) }}{% else %}{% set b = result.data %}<div class="card hit"><div class="top"><span class="thumb bx"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" aria-hidden="true"><path d="m3 8 9-4.5L21 8v9l-9 4.5L3 17z"/><path d="m3 8 9 4.5L21 8M12 12.5v9"/></svg></span>
+  <span class="grow">{{ box_link(b.id, b.name) }}<br><span class="mut">{{ t.box }} · {{ b.n }} {{ 'предмет' if b.n % 10 == 1 and b.n % 100 != 11 else 'предмета' if b.n % 10 in [2, 3, 4] and b.n % 100 not in [12, 13, 14] else 'предметов' }}</span></span></div>
+  {% if b.where %}<div class="mut">{{ b.where }}</div>{% endif %}</div>{% endif %}{% endfor %}
+{% if sim %}<div class="div">Похоже по смыслу</div>{% for i in sim %}{{ hit(i) }}{% endfor %}{% endif %}
+{% if not items and not boxes %}<p class="mut">Ничего не нашлось. Попробуйте другое название или проверьте написание запроса.</p>{% endif %}
 {% else %}
 {# №51/№57: what is where — at the top what is in hand, then what I just put away, then everything; filters at the thumb #}
-{% macro thumb(r) %}{% if pk and r.fields[pk] %}<img class="thumb" src="/u/{{ r.fields[pk][0] }}" alt="" loading="lazy">{% else %}<span class="thumb"></span>{% endif %}{% endmacro %}
-{% macro row(r) %}<div class="line"><a href="/i/{{ r.id }}">{{ thumb(r) }}<span class="grow"><span class="nm">{{ r.name }}</span>{% set tl = type_label(r.type) %}<span class="dt mut" title="{{ tl }}">{{ tl.split(" › ")|last }}</span><br><span class="mut">
+{% macro row(r, hand=false) %}<div class="line"><a href="/i/{{ r.id }}">{{ thumb(r) }}<span class="grow"><span class="nm">{{ r.name }}</span>{% set tl = type_label(r.type) %}<span class="dt mut" title="{{ tl }}">{{ tl.split(" › ")|last }}</span><br><span class="mut">
   {%- if r.boxes|length == 1 %}{% set b = r.boxes[0] %}{{ b.name or b.box_id }}{% if b.where %} · {{ b.where }}{% endif %}
   {%- elif r.boxes %}в {{ r.boxes|length }} местах{% elif r.hands %}{{ t.hands|lower }}{% elif r.tr %}{{ t.transit|lower }}{% else %}нигде нет{% endif %}</span>
   {%- if r.low %} <span class="src warn">{{ t.reorder|lower }}</span>{% endif %}
   {%- if r.hands and r.boxes %} <span class="src">{{ t.hands|lower }}</span>{% endif %}
   {%- if r.tr and (r.boxes or r.hands) %} <span class="src">{{ t.transit|lower }}</span>{% endif %}</span>
-  <span class="qty">{{ r.total|qty(r.uncounted, unit=unit_of(r.type, r.fields)) }}</span></a>
+  <span class="qty">{{ (r.inhand if hand else r.total)|qty(not hand and r.uncounted, unit=unit_of(r.type, r.fields)) }}</span></a>
   {%- if put %}<form method="post" action="/stock"><input type="hidden" name="box" value="{{ put }}"><input type="hidden" name="item" value="{{ r.id }}"><input type="hidden" name="action" value="add"><input type="hidden" name="kind" value="put"><input type="hidden" name="qty" value="1"><input type="hidden" name="back" value="/b/{{ put }}"><button>Сюда</button></form>
   {%- elif caller is defined %}{{ caller() }}{% endif %}</div>{% endmacro %}
 {% macro taken_box(b) %}<div class="line"><a href="/b/{{ b.id }}"><span class="thumb"></span><span class="grow">{{ b.name or b.id }}<br><span class="mut">{{ t.box }}{% if b.name %} ({{ b.id }}){% endif %}</span></span></a>
   <form method="post" action="/b/{{ b.id }}/back"><input type="hidden" name="back" value="{{ request.url.path }}{{ '?' ~ request.url.query if request.url.query }}"><button class="ghost">На место</button></form></div>{% endmacro %}
-<div class="row" style="justify-content:space-between"><h1>Что где</h1><a class="btn ghost" href="/items/new">+ Новый предмет</a></div>
-<p class="mut">{{ t.items|lower }}: {{ n_items }} · {{ t.boxes|lower }}: {{ n_boxes }} · {{ t.places|lower }}: {{ places|length }}</p>
+<h1>Что где</h1>
+<p class="mut">{{ t.items }} {{ n_items }} · {{ t.boxes }} {{ n_boxes }} · {{ t.places }} {{ places|length }}</p>
+{{ search_field() }}
 {% set inhand = rows|selectattr("hands")|list if not filtered else [] %}
-{% if inhand or taken and not filtered %}<h2>{{ t.hands }} · {{ inhand|length + taken|length }}</h2>
+{% if inhand or taken and not filtered %}{% set n = inhand|length + taken|length %}
+<div class="now"><div class="grow"><small>Под рукой сейчас</small><b>{{ n }} {{ 'вещь' if n % 10 == 1 and n % 100 != 11 else 'вещи' if n % 10 in [2, 3, 4] and n % 100 not in [12, 13, 14] else 'вещей' }} {{ t.hands|lower }}</b><p>Вернуть можно прямо из карточки.</p></div>
+  <svg viewBox="0 0 24 24" width="40" height="40" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" aria-hidden="true"><path d="m3 8 9-4.5L21 8v9l-9 4.5L3 17z"/><path d="m3 8 9 4.5L21 8M12 12.5v9"/></svg></div>
+<div class="sec"><h2>{{ t.hands }}</h2><a href="/items?hands=1">Открыть →</a></div>
+<div class="card list">
   {% for b in taken %}{{ taken_box(b) }}{% endfor %}
-  {% for r in inhand %}{% call row(r) %}<a class="btn ghost" href="/i/{{ r.id }}">Положить</a>{% endcall %}{% endfor %}{% endif %}
-{% if recent %}<h2>Недавно положил</h2>
+  {% for r in inhand %}{{ row(r, true) }}{% endfor %}</div>{% endif %}
+{% if recent %}<h2>Недавно положил</h2><div class="card list">
   {% for r, b in recent %}<div class="line"><a href="/i/{{ r.id }}">{{ thumb(r) }}<span class="grow"><span class="nm">{{ r.name }}</span>{% set tl = type_label(r.type) %}<span class="dt mut" title="{{ tl }}">{{ tl.split(" › ")|last }}</span><br><span class="mut">→ {{ b.name or b.box_id }}{% if b.where %} · {{ b.where }}{% endif %}</span></span>
-    <span class="qty">{{ b.qty|qty(unit=unit_of(r.type, r.fields)) }}</span></a></div>{% endfor %}{% endif %}
-{% if filtered %}{% for b in taken %}{{ taken_box(b) }}{% endfor %}{% else %}<h2>Все · А–Я</h2>{% endif %}
-{% if rows %}<div class="line thd" aria-hidden="true"><span class="thumb"></span><span class="grow"><span class="nm">Название</span><span>Тип</span><span>Где</span></span><span class="qty">Кол-во</span></div>{% endif %}
-{% for r in rows %}{{ row(r) }}
+    <span class="qty">{{ b.qty|qty(unit=unit_of(r.type, r.fields)) }}</span></a></div>{% endfor %}</div>{% endif %}
+{% if filtered %}{% for b in taken %}{{ taken_box(b) }}{% endfor %}{% else %}<div class="sec"><h2>Все · А–Я</h2><a href="/items/new">+ {{ t.item }}</a></div>{% endif %}
+{% if rows %}<div class="card list"><div class="line thd" aria-hidden="true"><span class="thumb"></span><span class="grow"><span class="nm">Название</span><span>Тип</span><span>Где</span></span><span class="qty">Кол-во</span></div>{% endif %}
+{% for r in rows %}{{ row(r) }}{% if loop.last %}</div>{% endif %}
 {% else %}{% if not (filtered and taken) %}<p class="mut">{% if filtered %}Ничего не нашлось. <a href="/{{ '?put=' ~ put if put }}">Сбросить</a>{% else %}Пока пусто. <a href="/items/new">+ {{ t.item }}</a>{% endif %}</p>{% endif %}{% endfor %}
 <form class="fbar" action="/" aria-label="Фильтры"><div>
   {% if put %}<input type="hidden" name="put" value="{{ put }}">{% endif %}
