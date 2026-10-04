@@ -163,7 +163,11 @@ def index(req: Request, q: str = "", put: str = "", type: str = "", cat: str = "
             i["hands"] = any(s["box_id"] == core.HANDS for s in here)
         cats = [c for c in PROFILE["categories"] if any(i["cat"] == c["key"] for i in items)]
         shown = [i for i in items if (not cat or i["cat"] == cat) and (not hands or i["hands"])]
-        return page(req, "index.html", q=q, put=put.upper(), items=shown, boxes=[] if cat or hands else boxes,
+        boxes = [] if cat or hands else boxes
+        results = [dict(kind="item", data=i, score=i["score"]) for i in shown if not i["similar"]]
+        results += [dict(kind="box", data=b, score=b["score"]) for b in boxes]
+        results.sort(key=lambda r: (-r["score"], core.norm(r["data"]["name"] or r["data"].get("id", ""))))
+        return page(req, "index.html", q=q, put=put.upper(), items=shown, boxes=boxes, results=results,
                     cats=cats, any_hands=any(i["hands"] for i in items), f=dict(cat=cat, hands=hands))
     # №51/№57: no query — what is where. The type list's group heading picks a whole category
     if any(c["key"] == type for c in PROFILE["categories"]):

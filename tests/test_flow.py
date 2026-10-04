@@ -110,6 +110,21 @@ def test_meaning():
         core._sem["model"] = None
 
 
+def test_search_ranks_items_and_boxes_together():
+    box, other = core.new_boxes(2)
+    c.post(f"/b/{box}", data={"name": "Звёздная гайка"})
+    c.post(f"/b/{other}", data={"name": "Звёздный модуль LM2596 запас"})
+    c.post("/items/new?type=resistor", data={"dup_ok": "1", "name": "Звёздная гайка М3", "value": "М3"})
+    first = newest()
+    c.post("/items/new?type=resistor", data={"dup_ok": "1", "name": "Звёздный модуль LM2596", "value": "LM2596"})
+    second = newest()
+
+    box_query = c.get("/", params={"q": "Звёздная гайка"}).text
+    assert box_query.index(f'href="/b/{box}"') < box_query.index(f'href="/i/{first}"')
+    item_query = c.get("/", params={"q": "Звёздный модуль LM2596"}).text
+    assert item_query.index(f'href="/i/{second}"') < item_query.index(f'href="/b/{other}"')
+
+
 def test_phone_app():
     """Installable app + writing NFC tags from the phone, with setup steps per platform."""
     m = c.get("/manifest.webmanifest").json()
@@ -827,3 +842,9 @@ def test_peek():
     assert top() == ["Бета", "Альфа"]  # a tie in the month: the later take first
     took("Альфа", 3)
     assert top() == ["Альфа", "Бета"]  # operations, not pieces
+    with core.db() as db:
+        db.execute("DELETE FROM movements WHERE box_id=?", (a,))
+        for name in ("Альфа", "Бета"):
+            db.execute("INSERT INTO movements(item_id, box_id, delta, kind, author, at) "
+                       "VALUES (?, ?, -1, 'take', 't', datetime('now', 'localtime', '-2 days'))", (ids[name], a))
+    assert top() == ["Альфа", "Бета"]  # same popularity and date: names go A–Я

@@ -21,14 +21,13 @@
   <a class="{{ 'on' if not (f.cat or f.hands) }}" href="{{ base }}">Все</a>
   {%- for c in cats %}<a class="{{ 'on' if f.cat == c.key }}" href="{{ base }}&cat={{ c.key }}">{{ c.label }}</a>{% endfor %}
   {%- if any_hands %}<a class="{{ 'on' if f.hands }}" href="{{ base }}&hands=1">{{ t.hands }}</a>{% endif %}</nav>{% endif %}
-{% set rel = items|rejectattr("similar")|list %}{% set sim = items|selectattr("similar")|list %}
-{% if rel or boxes %}<div class="div">По релевантности · {{ rel|length + boxes|length }}</div>{% endif %}
-{% for i in rel %}{{ hit(i) }}{% endfor %}
-{% for b in boxes %}<div class="card hit"><div class="top"><span class="thumb bx"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" aria-hidden="true"><path d="m3 8 9-4.5L21 8v9l-9 4.5L3 17z"/><path d="m3 8 9 4.5L21 8M12 12.5v9"/></svg></span>
+{% set sim = items|selectattr("similar")|list %}
+{% if results %}<div class="div">По релевантности · {{ results|length }}</div>{% endif %}
+{% for result in results %}{% if result.kind == "item" %}{{ hit(result.data) }}{% else %}{% set b = result.data %}<div class="card hit"><div class="top"><span class="thumb bx"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" aria-hidden="true"><path d="m3 8 9-4.5L21 8v9l-9 4.5L3 17z"/><path d="m3 8 9 4.5L21 8M12 12.5v9"/></svg></span>
   <span class="grow">{{ box_link(b.id, b.name) }}<br><span class="mut">{{ t.box }} · {{ b.n }} {{ 'предмет' if b.n % 10 == 1 and b.n % 100 != 11 else 'предмета' if b.n % 10 in [2, 3, 4] and b.n % 100 not in [12, 13, 14] else 'предметов' }}</span></span></div>
-  {% if b.where %}<div class="mut">{{ b.where }}</div>{% endif %}</div>{% endfor %}
+  {% if b.where %}<div class="mut">{{ b.where }}</div>{% endif %}</div>{% endif %}{% endfor %}
 {% if sim %}<div class="div">Похоже по смыслу</div>{% for i in sim %}{{ hit(i) }}{% endfor %}{% endif %}
-{% if not items and not boxes %}<p class="mut">Ничего не нашлось. <a href="/items/new{% if put %}?box={{ put }}{% endif %}">+ {{ t.item }}</a></p>{% endif %}
+{% if not items and not boxes %}<p class="mut">Ничего не нашлось. Попробуйте другое название или проверьте написание запроса.</p>{% endif %}
 {% else %}
 {# №51/№57: what is where — at the top what is in hand, then what I just put away, then everything; filters at the thumb #}
 {% macro row(r, hand=false) %}<div class="line"><a href="/i/{{ r.id }}">{{ thumb(r) }}<span class="grow"><span class="nm">{{ r.name }}</span>{% set tl = type_label(r.type) %}<span class="dt mut" title="{{ tl }}">{{ tl.split(" › ")|last }}</span><br><span class="mut">

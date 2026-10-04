@@ -70,7 +70,7 @@
 </div></div>
 
 {# Sheets: take from a box, put back / put away, write off. Cancel = backdrop, «Отмена» or «назад»; nothing moves. #}
-{% macro n_input(max=none, value=1, req=true) %}{% if single %}<input type="hidden" name="qty" value="1">{% else %}<input type="number" name="qty" min="1"{% if max %} max="{{ max }}"{% endif %} value="{{ value }}" inputmode="numeric"{% if req %} required{% else %} placeholder="не считал"{% endif %} aria-label="Сколько">{% endif %}{% endmacro %}
+{% macro n_input(max=none, value=1, req=true) %}{% if single %}<input type="hidden" name="qty" value="1">{% else %}<div class="num"><button type="button" data-step="-1" aria-label="Уменьшить количество">−</button><input type="number" name="qty" min="1"{% if max %} max="{{ max }}"{% endif %} value="{{ value }}" inputmode="numeric"{% if req %} required{% else %} placeholder="не считал"{% endif %} aria-label="Сколько"><button type="button" data-step="1" aria-label="Увеличить количество">+</button></div>{% endif %}{% endmacro %}
 {% macro n_word(v=1) %}{% if not single %}<span data-n>{{ v }}</span> {{ uw }}{% endif %}{% endmacro %}
 {% for s in stock if s.box_id not in ("HANDS", TRANSIT) %}
 <dialog class="sheet" id="take{{ loop.index }}"><form method="post" action="/stock">

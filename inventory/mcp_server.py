@@ -116,12 +116,13 @@ def card_template(type: str = "") -> dict[str, Any]:
     Without type: the categories and their types to pick from.
     """
     if not type:
-        return {"categories": [dict(key=c["key"], label=c["label"],
+        return {"name_hint": PROFILE.get("name_hint", ""), "categories": [dict(key=c["key"], label=c["label"],
                                     types=[dict(key=t["key"], label=t["label"], hint=t.get("hint", "")) for t in c.get("types", [])])
                                for c in PROFILE["categories"]]}
     if type not in core.TYPES:
         raise ToolError(f"Unknown type {type!r}. Call card_template without type for the list.")
-    return {"type": type, "label": core.type_label(type), "fields": core.fields_for(type), "single": core.TYPES[type]["single"]}
+    return {"type": type, "label": core.type_label(type), "name_hint": PROFILE.get("name_hint", ""),
+            "fields": core.fields_for(type), "single": core.TYPES[type]["single"]}
 
 
 def author(agent):
