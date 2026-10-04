@@ -50,11 +50,11 @@
       <div class="row">{{ box_input(value=box, placeholder="коробка: название или ID") }}</div>
       <div class="row" data-many{% if single %} hidden{% endif %}><span class="grow">Сколько, <span id="unit">{{ unit_of(type, vals) }}</span></span><input type="number" name="qty" value="{{ qty }}" min="0" placeholder="не считал" aria-label="Сколько"></div>
     </div></details>
+    <label class="lrow"><span><b>{{ t.to_agent }}</b><br><span class="mut sm">заполнит остальное сам — нужно только название</span></span><input type="checkbox" class="tgl" name="for_agent" value="1"{% if agent %} checked{% endif %}></label>
+    {% if core.SCAN_NFC %}<label class="lrow"><span><b>Сразу записать метку</b><br><span class="mut sm">после сохранения — поднести к наклейке NFC</span></span><input type="checkbox" class="tgl" name="nfc" value="1"{% if nfc %} checked{% endif %}></label>{% endif %}
     {% set opt = fields|rejectattr("required")|rejectattr("type", "equalto", "photo")|list %}
-    <details{% if errors or agent or nfc %} open{% endif %}><summary class="lrow more-f"><span class="ell"><span class="mut sm">Ещё поля: {{ (opt|map(attribute="label")|map("lower")|list + ["агент"] + (["NFC"] if core.SCAN_NFC else []))|join(", ") }}</span></span><span class="chev">{{ ico('<path d="M6 9l6 6 6-6"/>', 18) }}</span></summary><div>
+    <details{% if errors %} open{% endif %}><summary class="lrow more-f"><span class="ell"><span class="mut sm">Ещё поля: {{ (opt|map(attribute="label")|map("lower")|list)|join(", ") }}</span></span><span class="chev">{{ ico('<path d="M6 9l6 6 6-6"/>', 18) }}</span></summary><div>
       {% for fd in opt %}{{ fld(fd) }}{% endfor %}
-      <label class="lrow"><span>{{ t.to_agent }}<br><span class="mut sm">заполнит остальное сам — нужно только название</span></span><input type="checkbox" class="tgl" name="for_agent" value="1"{% if agent %} checked{% endif %}></label>
-      {% if core.SCAN_NFC %}<label class="lrow"><span>Сразу записать метку<br><span class="mut sm">после сохранения — поднести к наклейке NFC</span></span><input type="checkbox" class="tgl" name="nfc" value="1"{% if nfc %} checked{% endif %}></label>{% endif %}
     </div></details>
   </div>
   <div class="save wide"><button>Сохранить карточку</button></div>

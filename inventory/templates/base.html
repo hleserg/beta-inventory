@@ -62,6 +62,8 @@ a.line,.line{display:flex;gap:10px;align-items:center;text-decoration:none;color
 .line .qty{white-space:normal;text-align:right;max-width:6em}  /* «есть, не считал» wraps instead of running over the name */
 /* design: home — search field, «под рукой сейчас», rows in a white card */
 .search-field{display:flex;align-items:center;gap:12px;min-height:50px;border:1.5px solid var(--line);border-radius:14px;background:var(--card);padding:0 14px;margin:14px 0;color:var(--mut)}
+.sfrow{display:flex;gap:8px;align-items:center;margin:14px 0}.sfrow .search-field{flex:1;margin:0}
+.sfrow .add{flex:none;display:grid;place-items:center;width:50px;height:50px;border:1.5px solid var(--line);border-radius:14px;background:var(--card);color:var(--acc);font-size:28px;line-height:1;text-decoration:none}
 .search-field:focus-within{outline:2px solid var(--acc);outline-offset:1px}
 .search-field input{flex:1;min-width:0;border:0;outline:0;background:none;margin:0;padding:0;min-height:46px;font-size:16px;color:var(--fg)}
 .now{display:flex;align-items:center;gap:12px;background:var(--accent-soft);border:1px solid var(--line);border-radius:18px;padding:16px 18px;margin:14px 0;color:var(--accent-deep)}
@@ -265,7 +267,7 @@ body:has(.fbar) main{padding-top:calc(var(--top) + 77px);padding-bottom:32px}
 .put{left:auto;top:var(--top);width:var(--detail);max-height:none;padding:24px;border-top:0;border-left:1px solid var(--line)}
 body:has(.put) main{max-width:none;margin-right:var(--detail);padding-bottom:32px}
 .more{min-height:0}.more>h1{flex:none}
-main>.search-field[role=search]:not(:has([name=put])){display:none}  /* the top bar already searches; it does not carry ?put= */
+main>.sfrow:not(:has([name=put])){display:none}  /* the top bar already searches; it does not carry ?put= */
 html{scroll-padding-top:calc(var(--top) + 16px)}html:has(.fbar){scroll-padding-top:calc(var(--top) + 77px)}
 /* the main list as a table: name · type · where · qty, fixed qty width so the columns line up */
 .thd{display:flex;color:var(--mut);font-size:13px;padding:4px 0}.thd .qty{font-weight:400}
@@ -310,7 +312,7 @@ document.documentElement.classList.toggle("qr", SCAN.qr && "BarcodeDetector" in 
 // «Печать»: the label as the printer reports its roll, else /settings; turn, shift, darkness — /settings «Наклейки».
 const PRN = {w: {{ core.LABEL[0] }}, h: {{ core.LABEL[1] }}, rot: {{ core.PRINT_ROTATE }}, dx: {{ core.PRINT_DX_MM }}, dy: {{ core.PRINT_DY_MM }}, density: {{ core.PRINT_DENSITY }}};
 let niim = null, niimPick = false;  // the printer client; niimPick: the remembered printer failed, show the list
-let armed = null, scanning = null;  // armed: the field whose QR button was pressed
+let armed = null, scanning = null, nfcWrite = null;  // armed: the field whose QR button was pressed
 const BOX = /\/b\/([A-Za-z0-9]+)\/?$/i, ITEM = /\/i\/(\d+)\/?$/i;  // NFC's existing URL handling
 const boxField = () => armed || [...document.querySelectorAll("[data-box]")]
   .find(e => e.checkVisibility ? e.checkVisibility() : e.offsetParent) || document.querySelector("form[data-put] [data-box]");
@@ -478,7 +480,7 @@ async function qrScan(f) {
       }
       if (mode == "ar" && st && u.match(BOX)) {
         const a = el("a" + u, "a", "arc"); a.href = "/b/" + id; a.dataset.u = u;
-        const h = !st.items.length ? "Коробка пуста" : null;
+        const h = !st.items.length ? (st.boxes ? `${st.boxes} ${plural(st.boxes, "коробка", "коробки", "коробок")} внутри` : "Коробка пуста") : null;
         const sig = JSON.stringify(st);
         if (a.dataset.sig != sig) {
           a.dataset.sig = sig; a.replaceChildren();
@@ -556,13 +558,18 @@ addEventListener("click", async e => {  // «Записать на метку» 
   }
   st.textContent = "Поднесите метку к задней крышке телефона…";
   window.nfcBusy = true;  // the scan would jump to whatever the tag held before
+  nfcWrite?.abort();  // Chrome holds one write at a time: a second tap cancels the first, whose error must not land on screen
+  const ctl = nfcWrite = new AbortController();
   try {
-    await new NDEFReader().write({records: [{recordType: "url", data: b.dataset.nfcw}]});
+    await new NDEFReader().write({records: [{recordType: "url", data: b.dataset.nfcw}]}, {signal: ctl.signal});
     st.textContent = "Записано ✓ Проверьте: коснитесь метки телефоном.";
     const i = b.dataset.nfcw.match(/\/I\/(\d+)$/), s = document.getElementById("single");  // №43: a thing with a tag is one of a kind
     if (i && (await fetch(`/i/${i[1]}/tag`, {method: "POST"})).ok && s && "auto" in s.dataset) s.checked = true;
-  } catch (e) { st.textContent = e.name == "NotAllowedError" ? "Нажмите «Записать на метку» — телефон ждёт нажатия." : "Не записалось: " + e.message; }
-  finally { window.nfcBusy = false; }
+  } catch (e) {
+    if (ctl !== nfcWrite) return;  // a newer tap took over: it owns the status and nfcBusy
+    st.textContent = e.name == "NotAllowedError" ? "Нажмите «Записать на метку» — телефон ждёт нажатия." : "Не записалось: " + e.message;
+  }
+  if (ctl === nfcWrite) { window.nfcBusy = false; nfcWrite = null; }
 });
 addEventListener("click", async e => {  // «Печать» (_box.html print_btn): a Niimbot over Web Bluetooth, Chrome; the site trusted as secure, as for NFC
   const b = e.target.closest("[data-print]");
@@ -643,6 +650,9 @@ if (SCAN.nfc && "NDEFReader" in window) navigator.permissions.query({name: "nfc"
     // not asked yet and no corner button here (the new-item form): the tap on the box field asks, then a tag fills it
     : p.state === "prompt" && !document.getElementById("scan") && document.querySelector("[data-box]")?.addEventListener("click", () => nfcScan().catch(() => {}), {once: true})).catch(() => {});
 if (!SCAN.qr && !("NDEFReader" in window)) document.getElementById("scan")?.remove();  // nothing left for the corner button here
+addEventListener("DOMContentLoaded", () => {  // desktop, iPhone: this browser cannot write a tag, so don't offer it
+  if (!("NDEFReader" in window)) document.querySelector("input[name=nfc]")?.closest("label").remove();
+});
 
 // Our own list over a choice (select[data-pick], a long select, a datalist field): the native datalist won't open on an
 // Android tap and filters by the value already in it. Open: the value hides, the field searches; recent choices first,

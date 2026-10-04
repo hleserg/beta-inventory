@@ -560,7 +560,7 @@ def item_new(req: Request, box: str = "", type: str = "", name: str = "", link: 
         return page(req, "type_pick.html", keep=urlencode(dict(req.query_params)))
     key = next((fd["key"] for fd in core.fields_for(check_type(type)) if fd.get("share")), None)
     return card_form(req, type=type, box=box.upper(), name=name, vals={key: link} if key and link else None,
-                     agent=bool(link), shared=urlencode({"name": name, "link": link}) if link else "")
+                     agent=True, nfc=True, shared=urlencode({"name": name, "link": link}) if link else "")
 
 
 @app.post("/items/new")

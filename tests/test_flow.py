@@ -125,6 +125,14 @@ def test_search_ranks_items_and_boxes_together():
     assert item_query.index(f'href="/i/{second}"') < item_query.index(f'href="/b/{other}"')
 
 
+def test_new_item_at_hand():
+    """A «+» beside the search field on the main page; a search that finds nothing offers that name as a new card."""
+    assert 'class="add" href="/items/new?' in c.get("/").text
+    empty = c.get("/", params={"q": "щщщ нет такого"}).text
+    assert 'href="/items/new?name=%D1%89%D1%89%D1%89+%D0%BD%D0%B5%D1%82+%D1%82%D0%B0%D0%BA%D0%BE%D0%B3%D0%BE' in empty
+    assert "Создать «щщщ нет такого»" in empty
+
+
 def test_phone_app():
     """Installable app + writing NFC tags from the phone, with setup steps per platform."""
     m = c.get("/manifest.webmanifest").json()
@@ -452,7 +460,10 @@ def test_single():
 def test_for_agent():
     """№41: «Передать агенту» — the card waits for an agent to fill it in (agent_queue); an agent's update clears it."""
     flag = lambda iid: core.db().__enter__().execute("SELECT for_agent FROM items WHERE id=?", (iid,)).fetchone()[0]
-    assert 'name="for_agent"' in c.get("/items/new?type=resistor").text
+    new = c.get("/items/new?type=resistor").text  # both on by default and in sight, not under «Ещё поля»
+    assert 'name="for_agent" value="1" checked' in new and 'name="nfc" value="1" checked' in new
+    head = new[:new.index('name="for_agent"')]
+    assert head.count("<details") == head.count("</details>")
     c.post("/items/new?type=resistor", data={"name": "плата без надписей", "value": "x", "for_agent": "1"})
     iid = newest()
     assert flag(iid) == 1 and 'name="on" value="1" checked' in c.get(f"/i/{iid}").text
