@@ -256,7 +256,7 @@ body:has(main :is(input:not([type=checkbox],[type=radio],[type=file]),textarea):
 .fab svg{width:24px;height:24px}
 .fbar,.save{left:var(--nav)}
 .bell{top:14px;right:32px}body:has(.bell) .bar form{padding-right:96px}body:has(.bell) main>h1{padding-right:0}
-body:not(:has(.bar)){--nav:0px;--top:0px}body:not(:has(.bar)) main{max-width:720px;margin:0 auto}
+body:not(:has(.bar)){--nav:0px;--top:0px}body:not(:has(.bar)) main,main:has(>.steps){max-width:720px;margin:0 auto}
 body:not(:has(.bar)) .save{padding-inline:max(12px,calc(50% - 328px))}  /* the button lines up with the 720px column */
 .fbar{top:var(--top);bottom:auto;border-top:0;border-bottom:1px solid var(--line);padding:8px 32px}.fbar>div{max-width:none;margin:0}
 body:has(.fbar) main{padding-top:calc(var(--top) + 77px);padding-bottom:32px}
