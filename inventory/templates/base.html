@@ -401,8 +401,11 @@ addEventListener("click", async e => {  // «Печать» (_box.html print_btn
       niim ??= new L.NiimbotBluetoothClient();
       const dev = !niimPick && (await navigator.bluetooth.getDevices?.() ?? [])[0];  // the first device this site was allowed: the printer while it is the only one
       st.textContent = dev ? "Подключаю принтер…" : "Выберите принтер в списке…";
-      try { if (dev) await heard(dev); await niim.connect(dev ? {authorizedDevice: dev} : undefined); }
-      catch (x) { if (dev) niimPick = true; throw x; }  // off, or another printer: the next press opens the list (it needs a fresh tap)
+      const go = () => niim.connect(dev ? {authorizedDevice: dev} : undefined);
+      niim.protocol.setPacketTimeout(3000);  // a dozing printer answers «connect» later than the library's 1 s: «waited for c2» (remark 2026-10-04)
+      try { if (dev) await heard(dev); await go().catch(x => { if (dev && /negotiate/.test(x)) return go(); throw x; }); }  // Bluetooth is up, the printer missed the packet: once more
+      catch (x) { if (dev && !/negotiate/.test(x)) niimPick = true; throw x; }  // off, or another printer: the next press opens the list (it needs a fresh tap)
+      finally { niim.protocol.setDefaultPacketTimeout(); }
     }
     await niim.fetchRfidInfo();  // the roll may have changed since connecting
     const r = niim.getRfidInfo(), p = r.paperInfo?.valid && r.paperInfo, m = niim.getModelMetadata();
@@ -428,7 +431,8 @@ addEventListener("click", async e => {  // «Печать» (_box.html print_btn
     st.textContent = `Напечатано ✓ ${pw}×${ph} мм — ` + (p ? "размер сообщил принтер" : "размер из настроек, принтер его не сообщил");
     if (!navigator.bluetooth.getDevices) st.insertAdjacentHTML("beforeend", `<br>Каждая страница заново спрашивает принтер? <a href="/settings#phone">Chrome можно научить его помнить</a>.`);
   } catch (x) {
-    st.textContent = (niimPick ? "Принтер не ответил. Он включён? Нажмите «Печать» ещё раз — откроется список принтеров. " : "Не напечаталось: ") + (x.message || x);
+    st.textContent = /negotiate/.test(x) ? "Принтер на связи, но молчит. Закройте приложение Niimbot или выключите и включите принтер, потом «Печать» ещё раз. (" + x.message + ")"
+      : (niimPick ? "Принтер не ответил. Он включён? Нажмите «Печать» ещё раз — откроется список принтеров. " : "Не напечаталось: ") + (x.message || x);
   } finally { b.disabled = false; }
 });
 // №69: Chrome connects to a remembered printer only once it has heard it since it started; not heard in 5 s — try anyway
