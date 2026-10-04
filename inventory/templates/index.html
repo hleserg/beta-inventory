@@ -7,7 +7,7 @@
 {% if q %}
 {% macro hit(i) %}<div class="card hit"><a class="top" href="/i/{{ i.id }}">{{ thumb(i) }}<span class="grow"><span class="nm">{{ i.name }}</span><span class="mut">{{ type_label(i.type).split(" › ")|last }}</span></span>
   <span class="qty">{{ i.total|qty(i.uncounted, unit=unit_of(i.type, i.fields)) }}</span></a>
-  {% for s in i.stock if s.box_id != TRANSIT %}<div class="mut">{{ box_link(s.box_id, s.name) }}{% if s.where %} · {{ s.where }}{% endif %}{% if loop.length > 1 %} — <span class="qty">{{ s.qty|qty(unit=unit_of(i.type, i.fields)) }}</span>{% endif %}</div>
+  {% for s in i.stock %}<div class="mut">{{ box_link(s.box_id, s.name) }}{% if s.where %} · {{ s.where }}{% endif %}{% if loop.length > 1 %} — <span class="qty">{{ s.qty|qty(unit=unit_of(i.type, i.fields)) }}</span>{% endif %}</div>
   {% else %}<div class="mut">Нигде нет</div>{% endfor %}
   {% if put %}<form method="post" action="/stock" class="row">
     <input type="hidden" name="box" value="{{ put }}"><input type="hidden" name="item" value="{{ i.id }}"><input type="hidden" name="action" value="add"><input type="hidden" name="kind" value="put"><input type="hidden" name="back" value="/b/{{ put }}">

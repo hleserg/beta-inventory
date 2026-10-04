@@ -28,7 +28,7 @@
   <span class="grow"><b>{{ s.name or s.box_id }}</b>{% if s.name and s.box_id != TRANSIT %} <span class="mut sm">{{ s.box_id }}</span>{% endif %}
   {% if s.crumbs or s.where %}<br><span class="mut sm">{{ s.crumbs|map("first")|join(" › ") if s.crumbs else s.where }}</span>{% endif %}</span>
   <span class="qty">{{ s.qty|qty(unit=u) }}</span></a>
-  {% if s.box_id == TRANSIT %}<button type="button" data-sheet="put">Куда положить</button>{% else %}<button type="button" data-sheet="take{{ loop.index }}">{{ ico(I_BOX) }} Взять из этой коробки</button>{% endif %}
+  {% if s.box_id == TRANSIT %}{% if not h %}<button type="button" data-sheet="put">Куда положить</button>{% endif %}{# with HANDS too, the put sheet returns the HANDS stock: Codex P1 #}{% else %}<button type="button" data-sheet="take{{ loop.index }}">{{ ico(I_BOX) }} Взять из этой коробки</button>{% endif %}
 {% endif %}</div>
 {% else %}<div class="card spot"><p class="mut">Нигде нет.</p><button type="button" data-sheet="put">Положить в коробку</button></div>{% endfor %}
 {% if single and not h and stock|length == 1 and stock[0].box_id != TRANSIT %}{# №43 #}

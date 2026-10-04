@@ -541,8 +541,12 @@ def test_transit():
     assert "защита АКБ" in tr and "3 шт" in tr and "13 шт" not in tr and "10k" not in tr
     card = c.get(f"/i/{iid}").text
     assert "В пути" in card and "заказано" in card and "Пришло" in card
+    assert "В пути" in c.get("/?q=защита").text  # a search hit keeps its «в пути» row
+    c.post("/stock", data={"box": box, "item": iid, "action": "take", "kind": "return", "qty": 1})
+    card = c.get(f"/i/{iid}").text  # in hand and in transit: the transit row must not open the «Вернуть» sheet
+    assert "Вернуть" in card and "Куда положить</button>" not in card
     c.post("/stock", data={"box": box, "item": iid, "action": "add", "kind": "move", "src": core.TRANSIT, "qty": 12})
-    assert stock(iid) == {box: 15}  # 12 came of the 10 ordered
+    assert stock(iid) == {box: 14, core.HANDS: 1}  # 12 came of the 10 ordered
     assert core.TRANSIT not in c.get("/places").text
     c.post(f"/b/{core.TRANSIT}/delete")
     assert c.get(f"/b/{core.TRANSIT}").status_code == 200
