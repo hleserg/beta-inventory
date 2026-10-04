@@ -321,7 +321,7 @@ async function gotBox(id) {
   if (location.pathname.toLowerCase() === "/b/" + id.toLowerCase()) return;  // this box's own label: already here
   const f = boxField();
   if (!f) return location.href = "/b/" + id;  // this origin: labels may name the host differently
-  const o = [...document.querySelectorAll("#boxlist option")].find(o => o.value === id || o.value.endsWith(` (${id})`)), label = o ? o.value : id;
+  const o = [...(f.list?.options || [])].find(o => o.value === id || o.value.endsWith(` (${id})`)), label = o ? o.value : id;
   const put = f.form?.hasAttribute("data-put"), from = put && f.form.dataset.from;  // the item card; from: the one box it lies in
   const asked = f === armed; armed = null; document.querySelectorAll(".mini.on").forEach(b => b.classList.remove("on"));
   if (from === id || f.value === label && !put) return;  // already there

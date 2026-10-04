@@ -33,8 +33,8 @@
 {% if i.qty != 0 %}<form method="post" action="/stock" class="tacts" hidden>
   <input type="hidden" name="box" value="{{ i.box }}"><input type="hidden" name="item" value="{{ i.id }}"><input type="hidden" name="back" value="/b/{{ b.id }}">
   {% if projects %}<select name="project"><option value="">Без проекта</option>{% for p in projects %}<option value="{{ p.id }}">{{ p.name }}</option>{% endfor %}</select>{% endif %}
-  {% if i.single %}<input type="hidden" name="qty" value="1">{% else %}<input type="number" name="qty" value="1" min="1"{% if i.qty is not none %} max="{{ i.qty }}"{% endif %} inputmode="numeric" required>{% if i.qty is not none %}<span class="mut">из {{ i.qty }}</span>{% endif %}{% endif %}
-  <button name="action" value="take">Взять</button></form>{% endif %}
+  {% if i.single %}<input type="hidden" name="qty" value="1">{% else %}{% if i.qty is none %}<input type="number" name="qty" min="1" inputmode="numeric" placeholder="не считал" aria-label="Сколько, необязательно">{% else %}<input type="number" name="qty" value="1" min="1" max="{{ i.qty }}" inputmode="numeric" required><span class="mut">из {{ i.qty }}</span>{% endif %}{% endif %}
+  <button name="action" value="take">Взять</button><button name="action" value="out" class="ghost bad" formnovalidate>Закончилось</button></form>{% endif %}
 {% endfor %}</div>{% else %}<div class="sec"><h2>{{ t.boxes }}</h2><a data-act href="/?put={{ b.id }}">Добавить +</a></div>{% endif %}
 {% for k in nested %}{{ kid(k) }}{% endfor %}
 {% if empty %}<details><summary>Пустые · {{ empty|length }}</summary>{% for k in empty %}{{ kid(k) }}{% endfor %}</details>{% endif %}

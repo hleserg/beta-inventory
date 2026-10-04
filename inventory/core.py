@@ -433,6 +433,8 @@ def change_stock(box_id, item_id, action, qty, author, project_id=None):
         qty = 1
         if action in ("put", "return") and box_id != HANDS and HANDS not in rows and rows:
             return (rows[box_id] or 1) if box_id in rows else transfer(item_id, next(iter(rows)), box_id, author)
+    if action == "take" and box_id in rows and rows[box_id] is None:  # a loose pile: taking some leaves it there, uncounted
+        return move(item_id, box_id, -qty if qty else None, "take", author, project_id)
     if qty is None and action in ("take", "count"):
         raise ValueError("Сколько? Нужно число")
     if action == "count":
@@ -473,7 +475,7 @@ def transfer(item_id, src, dst, author, qty=None):
     if not row:
         raise ValueError(f"в {src} этого нет")
     # ponytail: two transactions like clear_box; both boxes are checked first, so a half-move needs a crash between
-    took = row["qty"] if qty is None or row["qty"] is None else min(qty, row["qty"])
+    took = row["qty"] if qty is None else qty if row["qty"] is None else min(qty, row["qty"])  # some of a loose pile: it stays loose
     if took is None and single_of(it):  # №43: an uncounted unique thing is one
         took = 1
     move(item_id, src, -(took or 0), "move", author)

@@ -153,7 +153,7 @@ def get_item(c, item_id):
 
 @app.get("/")
 def index(req: Request, q: str = "", put: str = "", type: str = "", cat: str = "", place: str = "",
-          reorder: str = "", transit: str = "", hands: str = ""):
+          reorder: str = "", transit: str = "", hands: str = "", out: str = ""):
     # №51/№57: no query — what is where. The type list's group heading picks a whole category
     if any(c["key"] == type for c in PROFILE["categories"]):
         cat, type = type, ""
@@ -187,7 +187,8 @@ def index(req: Request, q: str = "", put: str = "", type: str = "", cat: str = "
     for r in rows:
         r["low"] = core.low(r["fields"], r["have"], r["uncounted"])
     counts = {"reorder": sum(r["low"] for r in rows), "transit": sum(bool(r["tr"]) for r in rows),
-              "hands": sum(bool(r["hands"]) for r in rows) + len(taken)}
+              "hands": sum(bool(r["hands"]) for r in rows) + len(taken),
+              "out": sum(not (r["boxes"] or r["hands"] or r["tr"]) for r in rows)}  # «нет в наличии»: nowhere, 0
     recent = [(by_id[m["item_id"]], next(b for b in by_id[m["item_id"]]["boxes"] if b["box_id"] == m["box_id"])) for m in recent]
     shown = rows
     if hands:  # №28: taken and not put back, or not put away yet; №56: whole boxes too
@@ -196,11 +197,13 @@ def index(req: Request, q: str = "", put: str = "", type: str = "", cat: str = "
         shown = [r for r in shown if r["low"]]
     if transit:
         shown = [r for r in shown if r["tr"]]
+    if out:
+        shown = [r for r in shown if not (r["boxes"] or r["hands"] or r["tr"])]
     if cat:
         shown = [r for r in shown if r["type"] in core.TYPES and core.TYPES[r["type"]]["category"]["key"] == cat and (not type or r["type"] == type)]
     if place.isdigit():  # anything of it in a box standing there
         shown = [r for r in shown if any(b["top"] == int(place) for b in r["boxes"])]
-    filtered = bool(hands or reorder or transit or cat or place)
+    filtered = bool(hands or reorder or transit or out or cat or place)
     items, boxes, results = [], [], []
     if q:  # one home page: a query swaps the А–Я list for hits by relevance, the filters still narrow them
         items, boxes = core.search(q)
@@ -214,9 +217,9 @@ def index(req: Request, q: str = "", put: str = "", type: str = "", cat: str = "
         results += [dict(kind="box", data=b, score=b["score"]) for b in boxes]
         results.sort(key=lambda r: (-r["score"], core.norm(r["data"]["name"] or r["data"].get("id", ""))))
     return page(req, "index.html", q=q, put=put.upper(), items=items, boxes=boxes, results=results, rows=shown, n_items=len(rows), n_boxes=n_boxes, places=places,
-                taken=taken if not filtered or hands and not (reorder or transit or cat or place) else [],
+                taken=taken if not filtered or hands and not (reorder or transit or out or cat or place) else [],
                 recent=[] if filtered else recent, counts=counts, filtered=filtered,
-                f=dict(type=type, cat=cat, place=place, reorder=reorder, transit=transit, hands=hands))
+                f=dict(type=type, cat=cat, place=place, reorder=reorder, transit=transit, hands=hands, out=out))
 
 
 # --- boxes ---
@@ -678,8 +681,12 @@ def item_rotate(item_id: int, photo: str = Form(), deg: int = Form()):
 
 @app.post("/stock")
 def stock(box: str = Form(), item: int = Form(), action: str = Form(), qty: int | None = Form(None),
-          kind: str = Form("put"), project: str = Form(""), back: str = Form("/"), src: str = Form("")):
-    if kind == "move" and src:  # the item card: a scanned box takes it from the one box it lay in, or «пришло»
+          kind: str = Form("put"), project: str = Form(""), back: str = Form("/"), src: str = Form(""), to: str = Form("")):
+    if action == "move":  # «Переложить» from a box's sheet: all of it or some to another box, no stop in hand
+        core.transfer(item, box, to, AUTHOR, qty)
+    elif action == "out":  # «Закончилось»: none left in this box — it goes, and with no box left it is «нет в наличии»
+        core.change_stock(box, item, "count", 0, AUTHOR)
+    elif kind == "move" and src:  # the item card: a scanned box takes it from the one box it lay in, or «пришло»
         core.transfer(item, src, box, AUTHOR, qty)
     else:
         if action != "take":

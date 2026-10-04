@@ -28,9 +28,10 @@
   <span class="grow"><b>{{ s.name or s.box_id }}</b>{% if s.name and s.box_id != TRANSIT %} <span class="mut sm">{{ s.box_id }}</span>{% endif %}
   {% if s.crumbs or s.where %}<br><span class="mut sm">{{ s.crumbs|map("first")|join(" › ") if s.crumbs else s.where }}</span>{% endif %}</span>
   <span class="qty">{{ s.qty|qty(unit=u) }}</span></a>
-  {% if s.box_id == TRANSIT %}{% if not h %}<button type="button" data-sheet="put">Куда положить</button>{% endif %}{# with HANDS too, the put sheet returns the HANDS stock: Codex P1 #}{% else %}<button type="button" data-sheet="take{{ loop.index }}">{{ ico(I_BOX) }} Взять из этой коробки</button>{% endif %}
+  {% if s.box_id == TRANSIT %}{% if not h %}<button type="button" data-sheet="put">Куда положить</button>{% endif %}{# with HANDS too, the put sheet returns the HANDS stock: Codex P1 #}{% else %}<div class="two"><button type="button" data-sheet="take-{{ s.box_id }}">{{ ico(I_BOX) }} Взять</button><button type="button" class="ghost" data-sheet="move-{{ s.box_id }}">Переложить</button></div>{% endif %}
 {% endif %}</div>
-{% else %}<div class="card spot"><p class="mut">Нигде нет.</p><button type="button" data-sheet="put">Положить в коробку</button></div>{% endfor %}
+{% else %}<div class="card spot"><div class="top"><span class="thumb bx"></span><span class="grow"><b>{{ t.out }}</b></span><span class="qty">{{ 0|qty(unit=u) }}</span></div>
+  <button type="button" data-sheet="put">Положить в коробку</button></div>{% endfor %}
 {% if single and not h and stock|length == 1 and stock[0].box_id != TRANSIT %}{# №43 #}
 <form method="post" action="/stock" data-take data-name="{{ it.name }}" hidden><input type="hidden" name="box" value="{{ stock[0].box_id }}"><input type="hidden" name="item" value="{{ it.id }}"><input type="hidden" name="action" value="take"><input type="hidden" name="qty" value="1"><input type="hidden" name="back" value="/i/{{ it.id }}"></form>{% endif %}</div>
 
@@ -73,14 +74,24 @@
 {% macro n_input(max=none, value=1, req=true) %}{% if single %}<input type="hidden" name="qty" value="1">{% else %}<div class="num"><button type="button" data-step="-1" aria-label="Уменьшить количество">−</button><input type="number" name="qty" min="1"{% if max %} max="{{ max }}"{% endif %} value="{{ value }}" inputmode="numeric"{% if req %} required{% else %} placeholder="не считал"{% endif %} aria-label="Сколько"><button type="button" data-step="1" aria-label="Увеличить количество">+</button>{% if max %}<button type="button" data-step="all" class="all">Все</button>{% endif %}</div>{% endif %}{% endmacro %}
 {% macro n_word(v=1) %}{% if not single %}<span data-n>{{ v }}</span> {{ uw }}{% endif %}{% endmacro %}
 {% for s in stock if s.box_id not in ("HANDS", TRANSIT) %}
-<dialog class="sheet" id="take{{ loop.index }}"><form method="post" action="/stock">
+<dialog class="sheet" id="take-{{ s.box_id }}"><form method="post" action="/stock">
   <small>Из коробки «{{ s.name or s.box_id }}»</small><h2>Взять</h2><p class="nm">{{ it.name }}</p>
   <input type="hidden" name="box" value="{{ s.box_id }}"><input type="hidden" name="item" value="{{ it.id }}"><input type="hidden" name="back" value="/i/{{ it.id }}"><input type="hidden" name="kind" value="return">
-  {% if not single %}<label>Сколько взять</label>{{ n_input(s.qty) }}
-  <p class="mut sm">{% if s.qty is none %}В коробке не считали{% else %}В коробке {{ s.qty }} · после взятия останется <span data-left="{{ s.qty }}">{{ s.qty - 1 }}</span>{% endif %}</p>{% else %}{{ n_input() }}{% endif %}
+  {% if single %}{{ n_input() }}{% elif s.qty is none %}<label>Сколько взять · необязательно</label>{{ n_input(none, "", false) }}
+  <p class="mut sm">Россыпью, не считали — останется в коробке</p>{% else %}<label>Сколько взять</label>{{ n_input(s.qty) }}
+  <p class="mut sm">В коробке {{ s.qty }} · после взятия останется <span data-left="{{ s.qty }}">{{ s.qty - 1 }}</span></p>{% endif %}
   {% if projects %}<label>Проект · необязательно</label><select name="project"><option value="">Без проекта</option>{% for p in projects %}<option value="{{ p.id }}">{{ p.name }}</option>{% endfor %}</select>{% endif %}
-  <button name="action" value="take">Взять {{ n_word() }}</button>
+  <button name="action" value="take">Взять {% if s.qty is not none %}{{ n_word() }}{% endif %}</button>
   {% if not single %}<button name="action" value="set" class="ghost" formnovalidate title="В коробке теперь столько, сколько в поле">Пересчитать: в коробке столько</button>{% endif %}
+  <button name="action" value="out" class="ghost bad" formnovalidate title="Убрать из этой коробки; нигде больше нет — «{{ t.out }}»">Закончилось</button>
+  <button type="button" class="ghost" value="cancel">Отмена</button>
+</form></dialog>
+<dialog class="sheet" id="move-{{ s.box_id }}"><form method="post" action="/stock">{# owner: all or some into another box in one go; a scanned label fills «Куда» #}
+  <small>Из коробки «{{ s.name or s.box_id }}»</small><h2>Переложить</h2><p class="nm">{{ it.name }}</p>
+  <input type="hidden" name="box" value="{{ s.box_id }}"><input type="hidden" name="item" value="{{ it.id }}"><input type="hidden" name="back" value="/i/{{ it.id }}"><input type="hidden" name="action" value="move">
+  {% if single %}{{ n_input() }}{% elif s.qty is none %}<label>Сколько · пусто — всё</label>{{ n_input(none, "", false) }}{% else %}<label>Сколько</label>{{ n_input(s.qty, s.qty) }}{% endif %}
+  <label>Куда</label><div class="row">{{ box_input(name="to", required=True, exclude=s.box_id, dl="boxlist-" ~ s.box_id) }}</div>
+  <button>Переложить</button>
   <button type="button" class="ghost" value="cancel">Отмена</button>
 </form></dialog>
 {% endfor %}

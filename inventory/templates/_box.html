@@ -2,11 +2,11 @@
 {% macro label(b) %}{{ b.name ~ " (" ~ b.id ~ ")" if b.name else b.id }}{% endmacro %}
 {% macro box_link(id, name) %}<a href="/b/{{ id }}">{% if id in ("HANDS", TRANSIT) %}<b>{{ name }}</b>{# №28, manifesto 3: a state, not a labelled box #}{% elif name %}<b>{{ name }}</b> <span class="mut">{{ id }}</span>{% else %}<b>{{ id }}</b>{% endif %}</a>{% endmacro %}
 {% macro crumbs(cs) %}{# №44: the way up, each step a link; box.html redraws it the same way #}{% for label, href in cs %}<a href="{{ href }}">{{ label }}</a>{% if not loop.last %} › {% endif %}{% endfor %}{% endmacro %}
-{% macro box_input(name="box", value="", placeholder="название, часть названия или скан", required=False, exclude=None) %}
+{% macro box_input(name="box", value="", placeholder="название, часть названия или скан", required=False, exclude=None, dl="boxlist") %}
 {%- set boxes = all_boxes()|rejectattr("id", "equalto", exclude)|list %}{% set hit = boxes|selectattr("id", "equalto", value)|first %}
-<input name="{{ name }}" value="{{ label(hit) if hit else value }}" list="boxlist" data-box data-new="/boxes/new" data-term="{{ t.box }}" placeholder="{{ placeholder }}" autocomplete="off"{% if required %} required{% endif %}>
+<input name="{{ name }}" value="{{ label(hit) if hit else value }}" list="{{ dl }}" data-box data-new="/boxes/new" data-term="{{ t.box }}" placeholder="{{ placeholder }}" autocomplete="off"{% if required %} required{% endif %}>
 <button type="button" class="ghost mini" data-qr title="Навести камеру на QR коробки">QR</button>
-<datalist id="boxlist">{% for b in boxes %}<option value="{{ label(b) }}" data-place="{{ b.top or '' }}" data-where="{{ b.where or '' }}">{% endfor %}</datalist>
+<datalist id="{{ dl }}">{% for b in boxes %}<option value="{{ label(b) }}" data-place="{{ b.top or '' }}" data-where="{{ b.where or '' }}">{% endfor %}</datalist>
 {%- endmacro %}
 
 {% macro print_btn(url) %}{% if core.PRINT_BT %}<span><button type="button" class="ghost" data-print="{{ url }}">Печать</button></span><span class="mut" data-prst></span>{% endif %}{% endmacro %}{# printing: base.html #}

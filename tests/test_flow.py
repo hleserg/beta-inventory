@@ -28,6 +28,10 @@ def newest():
     return core.db().execute("SELECT max(id) FROM items").fetchone()[0]
 
 
+def q(sql, *a):
+    return core.db().execute(sql, a).fetchone()[0]
+
+
 def test_main_path():
     assert core.PROFILE["terms"]["items"] in c.get("/items").text  # t.items once rendered dict.items
     assert c.post("/places", data={"name": "Шкаф"}).status_code == 200
@@ -172,10 +176,9 @@ def test_uncounted():
     assert "есть, не считал" in c.get(f"/b/{box}").text and "есть, не считал" in c.get("/items").text
     assert c.post("/stock", data={"box": box, "item": rid, "action": "take", "qty": 3}).status_code == 200
     assert "есть, не считал" in c.get(f"/i/{rid}").text  # taking some leaves the pile uncounted
+    assert q("SELECT count(*) FROM stock WHERE item_id=? AND box_id=?", rid, core.HANDS) == 0  # loose: nothing to return
     c.post("/stock", data={"box": box, "item": rid, "action": "set", "qty": 40})
     assert "40 шт" in c.get(f"/b/{box}").text  # counted: a number again
-    c.post("/stock", data={"box": box, "item": rid, "action": "add", "kind": "put", "qty": ""})
-    assert "43 шт" in c.get(f"/b/{box}").text  # no number, 3 in hand (№28): those 3 go back
     c.post("/stock", data={"box": box, "item": rid, "action": "add", "kind": "put", "qty": ""})
     assert "есть, не считал" in c.get(f"/b/{box}").text  # nothing in hand: a handful more, uncounted
     c.post("/stock", data={"box": box, "item": rid, "action": "add", "kind": "return", "qty": 2})
@@ -349,7 +352,6 @@ def test_old_single_photo():
 
 def test_trash():
     """№18/№27/№32: an item, a box, a place go to the trash at once and come back whole with «Вернуть»."""
-    q = lambda sql, *a: core.db().execute(sql, a).fetchone()[0]
     c.post("/places", data={"name": "Антресоль"})
     pid = q("SELECT id FROM places WHERE name='Антресоль'")
     shelf = c.post(f"/places/{pid}/shelves", data={"label": "1"}, follow_redirects=False).headers["location"].split("/")[-1]
@@ -368,7 +370,7 @@ def test_trash():
     assert back == f"/i/{item}" and "3 шт" in c.get(f"/b/{box}").text and "Флюс ЛТИ" in c.get("/history").text
 
     c.post(f"/b/{box}/delete")  # a box: its stock goes with it, boxes inside move up a level
-    assert c.get(f"/b/{box}").status_code == 404 and "Нигде нет" in c.get(f"/i/{item}").text
+    assert c.get(f"/b/{box}").status_code == 404 and "Нет в наличии" in c.get(f"/i/{item}").text
     assert q("SELECT parent_id FROM boxes WHERE id=?", inner) == shelf
     c.post("/places/%d/delete" % pid)  # a place: its shelves go too, boxes on it lose the place (№27)
     assert "Антресоль" not in c.get("/places").text and q("SELECT place_id FROM boxes WHERE id=?", loose) is None
@@ -691,7 +693,6 @@ def test_reader():
     """Manifesto «Умная коробка»: a reader sends what it read; a box becomes its current one, a thing goes in it."""
     tap = lambda code, r="AA:01": c.post("/api/tap", json={"reader": r, "code": code})
     stock = lambda iid: {r[0]: r[1] for r in core.db().execute("SELECT box_id, qty FROM stock WHERE item_id=?", (iid,))}
-    q = lambda sql, *a: core.db().execute(sql, a).fetchone()[0]
     a, b = core.new_boxes(2)
     r = tap(f"http://inv.lan/b/{a.lower()}")
     assert r.status_code == 403 and not r.json()["ok"]  # new: shows up on the page, does nothing till accepted
@@ -859,3 +860,30 @@ def test_peek():
             db.execute("INSERT INTO movements(item_id, box_id, delta, kind, author, at) "
                        "VALUES (?, ?, -1, 'take', 't', datetime('now', 'localtime', '-2 days'))", (ids[name], a))
     assert top() == ["Альфа", "Бета"]  # same popularity and date: names go A–Я
+
+
+def test_out_of_stock_and_move():
+    """Нет в наличии: «Закончилось» drops the pair, the item stays findable at 0. «Переложить»: all, part, part of a pile."""
+    a, b = core.new_boxes(2)
+    c.post("/items/new?type=resistor", data={"name": "кончился", "value": "x", "box": a, "qty": 5})
+    iid = newest()
+    page = c.get(f"/i/{iid}").text
+    assert f'id="take-{a}"' in page and f'id="move-{a}"' in page
+    c.post("/stock", data={"box": a, "item": iid, "action": "out"})
+    assert q("SELECT count(*) FROM stock WHERE item_id=?", iid) == 0
+    assert "Нет в наличии" in c.get(f"/i/{iid}").text and "кончился" in c.get("/?out=1").text
+
+    c.post("/stock", data={"box": a, "item": iid, "action": "set", "qty": 5})
+    c.post("/stock", data={"box": a, "item": iid, "action": "move", "to": b, "qty": 2})  # part
+    stock = lambda: dict(core.db().execute("SELECT box_id, qty FROM stock WHERE item_id=?", (iid,)).fetchall())
+    assert stock() == {a: 3, b: 2}
+    c.post("/stock", data={"box": a, "item": iid, "action": "move", "to": b, "qty": ""})  # all
+    assert stock() == {b: 5}
+
+    c.post("/items/new?type=resistor", data={"name": "кучка", "value": "x", "box": a, "qty": ""})
+    pid = newest()
+    c.post("/stock", data={"box": a, "item": pid, "action": "take", "qty": ""})  # a pile: take without a number
+    assert q("SELECT qty FROM stock WHERE item_id=? AND box_id=?", pid, a) is None
+    assert q("SELECT count(*) FROM stock WHERE item_id=? AND box_id=?", pid, core.HANDS) == 0
+    c.post("/stock", data={"box": a, "item": pid, "action": "move", "to": b, "qty": 4})  # part of a pile: it stays loose
+    assert dict(core.db().execute("SELECT box_id, qty FROM stock WHERE item_id=?", (pid,)).fetchall()) == {a: None, b: 4}

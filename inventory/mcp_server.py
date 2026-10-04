@@ -203,7 +203,9 @@ def change_stock(box_id: str, item_id: int, action: Literal["put", "return", "bu
     count: the box holds exactly qty now (stocktaking). qty counts in the item's unit (get_item).
     agent: your name as the user knows you.
     put / return / buy with qty null: some went in, not counted (loose resistors and the like); the box then
-    holds qty null, «есть, не считал», left out of totals. take and count need a number.
+    holds qty null, «есть, не считал», left out of totals. A take from such a loose pile logs what went, qty
+    optional, and the pile stays in the box uncounted; count needs a number. count 0 = ran out: the pair goes, and an
+    item left in no box at all is «нет в наличии», 0 — it is still found.
     single: true on get_item (a tool, anything with a tag): one of a kind — qty is ignored and may be null;
     take moves it to HANDS, put / return into a box moves it there from wherever it lies.
     box_id "" or HANDS is «на руках»: a take from a box lands there, a put or return into a box takes from there

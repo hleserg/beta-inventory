@@ -5,7 +5,7 @@
 {% macro hit(i) %}<div class="card hit"><a class="top" href="/i/{{ i.id }}">{{ thumb(i) }}<span class="grow"><span class="nm">{{ i.name }}</span><span class="mut">{{ type_label(i.type).split(" › ")|last }}</span></span>
   <span class="qty">{{ i.total|qty(i.uncounted, unit=unit_of(i.type, i.fields)) }}</span></a>
   {% for s in i.stock %}<div class="mut">{{ box_link(s.box_id, s.name) }}{% if s.where %} · {{ s.where }}{% endif %}{% if loop.length > 1 %} — <span class="qty">{{ s.qty|qty(unit=unit_of(i.type, i.fields)) }}</span>{% endif %}</div>
-  {% else %}<div class="mut">Нигде нет</div>{% endfor %}
+  {% else %}<div class="mut">{{ t.out }}</div>{% endfor %}
   {% if put %}<form method="post" action="/stock" class="row">
     <input type="hidden" name="box" value="{{ put }}"><input type="hidden" name="item" value="{{ i.id }}"><input type="hidden" name="action" value="add"><input type="hidden" name="kind" value="put"><input type="hidden" name="back" value="/b/{{ put }}">
     <input type="number" name="qty" min="1" placeholder="не считал"><button>Положить в {{ put }}</button></form>{% endif %}
@@ -13,7 +13,7 @@
 {# №51/№57: what is where — at the top what is in hand, then what I just put away, then everything; filters at the thumb #}
 {% macro row(r, hand=false) %}<div class="line"><a href="/i/{{ r.id }}">{{ thumb(r) }}<span class="grow"><span class="nm">{{ r.name }}</span>{% set tl = type_label(r.type) %}<span class="dt mut" title="{{ tl }}">{{ tl.split(" › ")|last }}</span><br><span class="mut">
   {%- if r.boxes|length == 1 %}{% set b = r.boxes[0] %}{{ b.name or b.box_id }}{% if b.where %} · {{ b.where }}{% endif %}
-  {%- elif r.boxes %}в {{ r.boxes|length }} местах{% elif r.hands %}{{ t.hands|lower }}{% elif r.tr %}{{ t.transit|lower }}{% else %}нигде нет{% endif %}</span>
+  {%- elif r.boxes %}в {{ r.boxes|length }} местах{% elif r.hands %}{{ t.hands|lower }}{% elif r.tr %}{{ t.transit|lower }}{% else %}{{ t.out|lower }}{% endif %}</span>
   {%- if r.low %} <span class="src warn">{{ t.reorder|lower }}</span>{% endif %}
   {%- if r.hands and r.boxes %} <span class="src">{{ t.hands|lower }}</span>{% endif %}
   {%- if r.tr and (r.boxes or r.hands) %} <span class="src">{{ t.transit|lower }}</span>{% endif %}</span>
@@ -60,7 +60,7 @@
       {% for ty in c.types %}<option value="{{ ty.key }}"{{ ' selected' if f.type == ty.key }}>{{ ty.label }}</option>{% endfor %}</optgroup>{% endfor %}</select>
   {% if places %}<select name="place" aria-label="{{ t.place }}" class="{{ 'on' if f.place }}" onchange="this.form.submit()"><option value="">все {{ t.places|lower }}</option>
     {% for p in places %}<option value="{{ p.id }}"{{ ' selected' if f.place == p.id|string }}>{{ p.name }}</option>{% endfor %}</select>{% endif %}
-  {% for key, label in [("hands", t.hands), ("reorder", t.reorder), ("transit", t.transit)] if counts[key] or f[key] %}
+  {% for key, label in [("hands", t.hands), ("reorder", t.reorder), ("transit", t.transit), ("out", t.out)] if counts[key] or f[key] %}
   <label class="{{ 'on' if f[key] }}"><input type="checkbox" name="{{ key }}" value="1"{{ ' checked' if f[key] }} onchange="this.form.submit()">{{ label|lower }} · {{ counts[key] }}</label>{% endfor %}
   {% if filtered %}<a href="/?{{ {'q': q, 'put': put}|urlencode }}">✕ сбросить</a>{% endif %}
 </div></form>

@@ -24,6 +24,7 @@ terms:
   hands: На руках
   transit: В пути
   reorder: Докупить
+  out: Нет в наличии
   single: Одна штука — брать и класть без счёта  # №43, a tag ticks it
   to_agent: Передать агенту  # the card waits for an agent to fill it in (MCP agent_queue)
   unit: шт
