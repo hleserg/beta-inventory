@@ -27,10 +27,11 @@ terms:
   to_agent: Передать агенту  # the card waits for an agent to fill it in (MCP agent_queue)
   unit: шт
 
-# A shop's «Поделиться» puts these phrases before the name; /share drops them (regexes, any case)
+# A shop's «Поделиться» puts these phrases around the name; /share drops them (regexes, any case)
 share_junk:
   - "(По)?смотри,? что (есть|я нашёл|я нашел|нашёл|нашел) на AliExpress!?"
   - "Look what I found on AliExpress!?"
+  - "\\s(за|for)\\s+(US\\s*)?[$€]?\\s?\\d[\\d\\s.,]*(₽|руб|\\$|€)[\\s\\S]*"  # the price and «уже со скидкой 23%» after it
 
 # The bell (/alerts): after how many hours a card handed to an agent, or the last backup (POST /backup/done), is
 # late. Leave a key out and that alert is off.

@@ -207,6 +207,8 @@ def test_share_cleans_up(monkeypatch):
         return dict(parse_qsl(urlsplit(loc).query))
     assert shared("https://ya.cc/t/X1") == {"name": "esp32 p4c6 iot hmi 43 ips panel sensornaya", "link": full["https://ya.cc/t/X1"]}
     assert shared("Смотри, что есть на AliExpress! ESP32-P4 плата https://aliexpress.ru/item/1.html")["name"] == "ESP32-P4 плата"
+    assert shared("XH-M313 TPA3118 60 Вт усилитель за 166 ₽ - уже со скидкой 23% https://aliexpress.ru/item/1.html")["name"] \
+        == "XH-M313 TPA3118 60 Вт усилитель"
 
 def test_box_by_name():
     """A box field takes what people know: part of the name in any case, «Name (ID)» from the list, or the ID."""
