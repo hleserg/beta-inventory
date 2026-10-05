@@ -956,6 +956,13 @@ def backup_done():
     return {"ok": True}
 
 
+@app.get("/health")
+def health():
+    """compose healthcheck: the process answers and the database opens."""
+    core.db().execute("SELECT 1")
+    return {"ok": True}
+
+
 @app.get("/trash")
 def trash_page(req: Request):
     return page(req, "trash.html", rows=core.trash_list())

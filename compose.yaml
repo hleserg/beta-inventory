@@ -14,3 +14,9 @@ services:
       - path: .env
         required: false
     restart: unless-stopped
+    healthcheck:  # `docker compose ps` says healthy; the image has no curl, python is there
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 60s

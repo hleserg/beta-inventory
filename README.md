@@ -29,7 +29,8 @@ changing its IP. Update: `git pull && ./install.sh`.
 `install.sh` pulls the ready image, built for amd64 and arm64 (Raspberry Pi)
 from every commit to `main`: `ghcr.io/hleserg/beta-inventory:latest` (or
 `:sha-<commit>`). With no image to pull, it builds one on the box. To run your
-own changes: `docker compose up -d --build`.
+own changes: `docker compose up -d --build`. `docker compose ps` says whether
+the site is healthy: it polls `GET /health`, which also opens the database.
 
 ### A Windows laptop, no Docker
 
@@ -103,8 +104,9 @@ label in the camera scanner.
   relevance; box IDs and places too. Below the word matches, a small local
   model adds items close in meaning, so "step-down" finds a buck converter.
 - **Backup** in one tap (bottom of «Корзина», or `GET /backup`): a zip of the
-  database and the uploads. To restore, stop the container, unzip into the
-  data folder, start.
+  database and the uploads. To restore, stop the container, delete
+  `inventory.db-wal` and `inventory.db-shm` from the data folder if they are
+  there, unzip into it, start.
 - **Projects** with a git link, to charge takes against, and what each needs:
   what is short is ordered line by line or all at once, and waits «in transit».
   With `GITHUB_OWNER` set, new repos of that account wait in an inbox until

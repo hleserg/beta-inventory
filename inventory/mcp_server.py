@@ -323,11 +323,12 @@ async def create_item(type: str, name: str, fields: dict[str, Any], agent: str, 
 
 @server.tool(annotations=ToolAnnotations(readOnlyHint=False, destructiveHint=True, openWorldHint=False))
 async def update_item(item_id: int, fields: dict[str, Any], name: str = "", type: str = "",
-                      single: bool | None = None) -> dict[str, Any]:
+                      single: bool | None = None, agent: str = "") -> dict[str, Any]:
     """Change card fields: only the keys given change, "" clears one. photo: the whole list, get_item's links keep a photo,
     new image URLs add one; files: new [{name, url}] are added, ones already on the card are kept.
     type: move the card to another type (card_template), its required fields must then be given.
-    single: tick or untick «одна штука» on the card (get_item's single); only when the owner asks. Returns the card.
+    single: tick or untick «одна штука» on the card (get_item's single); only when the owner asks.
+    agent: your name; your own open ask_owner questions about this card close with it. Returns the card.
     """
     with db() as c:
         it = c.execute("SELECT * FROM items WHERE id=?", (item_id,)).fetchone()
@@ -343,6 +344,8 @@ async def update_item(item_id: int, fields: dict[str, Any], name: str = "", type
     if single is not None:
         core.set_single(item_id, single)
     core.set_for_agent(item_id, False)  # an agent filled it in: off agent_queue
+    if agent.strip():
+        core.close_own_questions(item_id, author(agent))
     return card(item_id)
 
 
@@ -360,7 +363,8 @@ def stats() -> dict[str, Any]:
 def ask_owner(question: str, agent: str, item_id: int | None = None) -> dict[str, Any]:
     """Ask the owner what only they know: a name too vague to identify, a marking you can't read, which of two
     variants it is. The question waits in the site's bell; with item_id the card leaves agent_queue until the owner
-    answers and hands it back. Short, in the profile's language. agent: your name, shown as the author."""
+    answers and hands it back. Short, in the profile's language. agent: your name, shown as the author.
+    Asked again about the same card, it replaces your earlier open question."""
     if not question.strip():
         raise ToolError("question is empty: write the question itself.")
     if item_id and not db().execute("SELECT 1 FROM items WHERE id=?", (item_id,)).fetchone():

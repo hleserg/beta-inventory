@@ -233,6 +233,7 @@ def db():
     c = sqlite3.connect(DATA / "inventory.db")
     c.row_factory = sqlite3.Row
     c.execute("PRAGMA foreign_keys=ON")
+    c.execute("PRAGMA journal_mode=WAL")  # a read never waits for a write: the phone opens a page while an agent saves a card
     return c
 
 
@@ -641,10 +642,15 @@ def set_for_agent(item_id, on):
 
 
 def ask_owner(text, author, item_id=None):
-    """An agent's question in the bell; a card it is about leaves agent_queue until the owner hands it back."""
+    """An agent's question in the bell; a card it is about leaves agent_queue until the owner hands it back.
+    Asked again about the same card by the same author, it replaces the earlier open question instead of piling up."""
     with db() as c:
         if item_id:
             c.execute("UPDATE items SET for_agent=0 WHERE id=?", (item_id,))
+            old = c.execute("SELECT id FROM questions WHERE item_id=? AND author=? AND closed_at IS NULL", (item_id, author)).fetchone()
+            if old:
+                c.execute("UPDATE questions SET text=?, at=datetime('now','localtime') WHERE id=?", (text.strip(), old["id"]))
+                return old["id"]
         return c.execute("INSERT INTO questions(item_id, text, author) VALUES (?, ?, ?)",
                          (item_id, text.strip(), author)).lastrowid
 
@@ -657,6 +663,14 @@ def close_question(question_id, answer=None):
         if answer:
             c.execute("UPDATE items SET for_agent=1, for_agent_at=datetime('now','localtime') WHERE id=(SELECT item_id FROM questions WHERE id=?)"
                       " AND NOT EXISTS (SELECT 1 FROM questions WHERE item_id=items.id AND closed_at IS NULL)", (question_id,))
+
+
+def close_own_questions(item_id, author):
+    """An agent's update_item on a card it asked about: its own open questions are moot, no answer to wait for.
+    seen=1 too, so agent_queue never echoes them back as answers."""
+    with db() as c:
+        c.execute("UPDATE questions SET closed_at=datetime('now','localtime'), seen=1 WHERE item_id=? AND author=? AND closed_at IS NULL",
+                  (item_id, author))
 
 
 def take_answers():
@@ -676,7 +690,7 @@ def own_upload(v):
 
 def backup(path):
     """A household in one zip: a consistent copy of the database, and the uploads. models/ downloads again by itself.
-    Back: stop, unzip into DATA_DIR, start."""
+    Back: stop, delete inventory.db-wal and inventory.db-shm if they are there, unzip into DATA_DIR, start."""
     with zipfile.ZipFile(path, "w") as z, tempfile.TemporaryDirectory() as d:
         src, dst = sqlite3.connect(DATA / "inventory.db"), sqlite3.connect(Path(d) / "inventory.db")
         src.backup(dst)

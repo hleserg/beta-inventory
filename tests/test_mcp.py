@@ -248,3 +248,35 @@ def test_owner_answers():
     assert got[a]["answer"] == "4,7 кОм" and got[a]["item_id"] == iid and got[b]["answer"] is None
     assert iid in [i["id"] for i in q["items"]]  # the answer hands the card back to the agent
     assert not {a, b} & {x["id"] for x in call("agent_queue").structured_content["answers"]}
+
+
+def test_ask_owner_replaces_own_question():
+    """Asked again about the same card by the same agent, the bell keeps one question, not a pile; another agent's stays."""
+    c, box = TestClient(app), core.new_boxes(1)[0]
+    iid = call("create_item", type="resistor", name="R-upsert", agent="Codex", box_id=box, fields={"value": "?"}).structured_content["id"]
+    a = call("ask_owner", question="Какой номинал?", agent="Codex", item_id=iid).structured_content["id"]
+    b = call("ask_owner", question="Точно 0805?", agent="Codex", item_id=iid).structured_content["id"]
+    m = call("ask_owner", question="Где лежит коробка?", agent="Мара", item_id=iid).structured_content["id"]
+    assert a == b != m
+    text = c.get("/alerts").text
+    assert "Точно 0805" in text and "Какой номинал" not in text and "Где лежит коробка" in text
+
+
+def test_update_item_closes_own_questions():
+    """An agent's update_item on a card closes that agent's open questions about it; they never come back as answers."""
+    c, box = TestClient(app), core.new_boxes(1)[0]
+    iid = call("create_item", type="resistor", name="R-close", agent="Codex", box_id=box, fields={"value": "?"}).structured_content["id"]
+    a = call("ask_owner", question="Фото недоступно, какое сопротивление?", agent="Codex", item_id=iid).structured_content["id"]
+    call("ask_owner", question="А в какой коробке?", agent="Мара", item_id=iid)
+    call("agent_queue")  # drains earlier answers
+    assert not call("update_item", item_id=iid, fields={"value": "1 кОм"}, agent="Codex").is_error
+    text = c.get("/alerts").text
+    assert "какое сопротивление" not in text and "в какой коробке" in text
+    assert a not in [x["id"] for x in call("agent_queue").structured_content["answers"]]
+    assert not call("update_item", item_id=iid, fields={"value": "2 кОм"}).is_error  # agent stays optional
+
+
+def test_health_and_wal():
+    """compose healthcheck: the process answers and the database opens; WAL so a read never waits for a write."""
+    assert TestClient(app).get("/health").json() == {"ok": True}
+    assert core.db().execute("PRAGMA journal_mode").fetchone()[0] == "wal"
