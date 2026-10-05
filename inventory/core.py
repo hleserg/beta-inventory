@@ -203,6 +203,11 @@ def unit_of(type_key, fields):
     return fields.get(fd.get("key")) or fd.get("default") or PROFILE["terms"]["unit"]
 
 
+def brief_of(type_key, fields, n=3):
+    """The AR label over a thing (CAMERA.md): [label, value] of its filled fields marked `brief`, in profile order."""
+    return [[f.get("label", f["key"]), str(v)] for f in fields_for(type_key) if f.get("brief") and (v := fields.get(f["key"])) not in (None, "")][:n]
+
+
 def type_label(type_key):
     t = TYPES.get(type_key)
     return f"{t['category']['label']} › {t['label']}" if t else ""

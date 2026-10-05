@@ -828,7 +828,7 @@ def test_peek():
     c.post(f"/b/{a}", data={"name": "Шкаф-обзор"})
     ids = {}
     for n in ("Бета", "Альфа", "Гамма", "Дельта", "Эпсилон", "Эта", "Яша"):
-        c.post("/items/new?type=resistor", data={"dup_ok": "1", "name": n, "value": "x", "box": a, "qty": 4})
+        c.post("/items/new?type=resistor", data={"dup_ok": "1", "name": n, "value": "x", "power": "0.25 Вт" if n == "Бета" else "", "box": a, "qty": 4})
         ids[n] = newest()
     with core.db() as db:
         db.execute("UPDATE boxes SET parent_id=? WHERE id=?", (a, inner))
@@ -836,6 +836,8 @@ def test_peek():
     assert r.status_code == 200
     j = r.json()
     assert set(j["boxes"]) == {a, b} and list(j["items"]) == [str(ids["Бета"])]  # unknown codes are not ours
+    # over a thing: its name, how many in all, and the profile's `brief` fields that are filled, in profile order
+    assert j["items"][str(ids["Бета"])] == {"name": "Бета", "qty": "4 шт", "brief": [["Номинал", "x"], ["Мощность", "0.25 Вт"]]}
     assert j["boxes"][a]["name"] == "Шкаф-обзор" and j["boxes"][b] == {"name": "", "items": [], "more": 0, "boxes": 0}  # an empty box
     first = j["boxes"][a]  # no takes in half a year: five at random, two more
     assert len(first["items"]) == 5 and first["more"] == 2 and first["boxes"] == 1 and first["items"][0]["qty"] == "4 шт"

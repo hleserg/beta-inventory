@@ -131,8 +131,12 @@ dialog{border:1px solid var(--line);border-radius:12px;background:var(--card);co
 .tag{position:absolute;left:0;top:0;background:#10262F;border:2px solid var(--ok);color:#fff;border-radius:99px;padding:8px 16px;font-size:16px;font-weight:700;white-space:nowrap;max-width:min(70vw,300px);overflow:hidden;text-overflow:ellipsis;animation:fin .25s ease-out}
 .scan button.tag{min-height:52px}.tag.sel{background:var(--ok);color:#10262F}.arc.sel{outline:4px solid var(--ok)}@keyframes fin{from{opacity:0}}
 .tag.no{border-color:var(--nok)}
-.arc{position:absolute;left:0;top:0;animation:fin .25s ease-out;width:max-content;min-height:52px;max-width:min(68vw,270px);background:#F6FBFC;border:1.5px solid #A9DCEB;color:#15313D;border-radius:14px;padding:8px 12px;font-size:14px;font-weight:700;text-decoration:none;box-shadow:0 4px 14px #0006}
-.arc div{display:flex;justify-content:space-between;gap:10px;padding:3px 0}.arc div span:first-child{overflow-wrap:anywhere;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden}.arc div span+span{flex:none;color:#3F5F6B;font-weight:600}
+.arc{position:absolute;left:0;top:0;animation:fin .25s ease-out;width:max-content;min-width:150px;max-width:min(68vw,270px);background:#F6FBFC;color:#15313D;border-radius:16px;padding:10px 14px 8px;font-size:14px;font-weight:600;text-decoration:none;box-shadow:0 0 0 1.5px #A9DCEB,0 8px 24px #0009;font-variant-numeric:tabular-nums}
+.arc div{display:flex;justify-content:space-between;align-items:baseline;gap:12px;padding:3px 0}.arc div span:first-child{overflow-wrap:anywhere;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden}.arc div span+span{flex:none;color:#3F5F6B;font-weight:700}
+.arc .h{font-size:16px;font-weight:800;color:#0E2730;line-height:1.25;padding:0 0 2px}.arc .h span+span{color:#126985;font-weight:800}.arc:not(.it) .h span+span{color:#5A7682;font-weight:600;font-size:13px}
+.arc .h:not(:last-child){border-bottom:1px solid #D4E8EE;margin-bottom:4px;padding-bottom:8px}
+.arc .b{font-size:13px}.arc .b span:first-child{flex:none;color:#5A7682;font-weight:500}.arc .b span+span{flex:0 1 auto;min-width:0;overflow-wrap:anywhere;text-align:right;color:#15313D}
+.arc p{margin:4px 0 2px;color:#5A7682;font-weight:500}
 .arc em{display:block;font-style:normal;color:#126985;border-top:1px solid #D4E8EE;margin-top:4px;padding-top:6px}
 .scanp{padding:16px 16px calc(16px + env(safe-area-inset-bottom));color:#C0D2D8}.scanp h3{display:flex;align-items:center;gap:8px;margin:0 0 4px;color:#fff;font-size:18px}.scanp p{margin:0 0 12px}.scanp a{color:#9ED8EA}
 .camseg{display:grid;grid-template-columns:1fr 1fr;background:#1C3A45;border-radius:12px;padding:3px;margin-bottom:14px}.scan .camseg button{background:none;color:#C0D2D8;min-height:44px;border-radius:10px;padding:6px}.scan .camseg button.on{background:#DDEFF4;color:#15313D}
@@ -420,7 +424,7 @@ async function qrScan(f) {
     keys.forEach(k => known[k] = null);
     const ids = t => keys.filter(k => k[0] == t).map(k => k.slice(1)).join(",");
     fetch(`/api/peek?boxes=${ids("b")}&items=${ids("i")}`).then(r => r.json())
-      .then(o => keys.forEach(k => known[k] = (k[0] == "b" ? o.boxes[k.slice(1)] : k.slice(1) in o.items && {name: o.items[k.slice(1)]}) || false))
+      .then(o => keys.forEach(k => known[k] = (k[0] == "b" ? o.boxes : o.items)[k.slice(1)] || false))
       .catch(() => keys.forEach(k => delete known[k]));
   };
   const say = (title, text, icon, b) => {
@@ -459,15 +463,21 @@ async function qrScan(f) {
     return (c.cornerPoints?.length === 4 ? c.cornerPoints : [{x, y}, {x: x + w, y}, {x: x + w, y: y + h}, {x, y: y + h}]).map(p => [p.x, p.y]);
   };
   const mid = q => q.reduce((a, p) => [a[0] + p[0] / 4, a[1] + p[1] / 4], [0, 0]);
+  const src = document.createElement("canvas"), dbg = location.hash == "#dbg";  // #dbg: the code's own box and the sizes drawn over the picture
   const frame = async det => {
-    const codes = await det.detect(v).catch(() => []), now = Date.now(), vw = v.videoWidth || 1, vh = v.videoHeight || 1;
+    // read from a frame drawn here, not from the <video>: the code's corners are then in the picture's own pixels, as drawn below
+    // (rings sat off their codes on phones: above-right on its side, on the left half upright)
+    const vw = v.videoWidth || 1, vh = v.videoHeight || 1;
+    if (src.width != vw || src.height != vh) { src.width = vw; src.height = vh; }
+    src.getContext("2d").drawImage(v, 0, 0, vw, vh);
+    const codes = await det.detect(src).catch(() => []), now = Date.now();
     // A code read once is followed, not read again: a frame that misses it moves its ring as far as the codes read in it moved,
     // so with three labels in view none blinks out. Gone: unread 2 s, or followed out of the picture.
     let dx = 0, dy = 0, moved = 0;
     for (const c of codes) {
       const q = corners(c), m = marks.get(c.rawValue);
       if (m) { const [ax, ay] = mid(m.q), [bx, by] = mid(q); dx += bx - ax; dy += by - ay; moved++; }
-      marks.set(c.rawValue, {u: c.rawValue, q, t: now, s: m?.s || q});  // s: where it is drawn, gliding to q (draw)
+      marks.set(c.rawValue, {u: c.rawValue, q, t: now, s: m?.s || q, b: c.boundingBox});  // s: where it is drawn, gliding to q (draw)
     }
     for (const [u, m] of marks) {
       if (m.t < now && moved) m.q = m.q.map(([x, y]) => [x + dx / moved, y + dy / moved]);
@@ -488,8 +498,8 @@ async function qrScan(f) {
     const one = mode == "qr" && !crowd && mine.length == 1 && !wait ? mine[0].u : null;
     // never opens by itself: the camera may read one of three labels for a second before the rest («ловит одну и тут же открывает»)
     if (one !== snapped) { snapped = one; if (one) blip(); }
-    if (mode == "ar") say(auto ? "Несколько наших наклеек" : "Что в коробках?", auto ? "Нажмите на нужную коробку."
-      : "Наведите камеру на наклейки. Нажмите на коробку, чтобы открыть её.");
+    if (mode == "ar") say(auto ? "Несколько наших наклеек" : "Что в коробках?", auto ? "Нажмите на нужную наклейку."
+      : "Наведите камеру на наклейки. Нажмите на карточку, чтобы открыть.");
     else if (one) {
       const isBox = !!one.match(BOX), what = isBox ? `Коробка ${state(one).name || key(one).slice(1)}.` : `Предмет «${state(one).name}».`, open = [isBox ? "Открыть коробку" : "Открыть", () => go(one)];
       seen.length > 1 ? say("Один наш код найден", `Нашу наклейку выделили зелёным, чужую — красным. Нажмите, чтобы открыть ${isBox ? "коробку" : "предмет"}.`, null, open)
@@ -514,6 +524,7 @@ async function qrScan(f) {
     if (cv.width != Math.round(cw * r) || cv.height != Math.round(ch * r)) { cv.width = Math.round(cw * r); cv.height = Math.round(ch * r); }
     g.setTransform(r, 0, 0, r, 0, 0); g.clearRect(0, 0, cw, ch); g.lineJoin = "round";
     els.forEach(e => e.dataset.t = "");
+    const cards = [], taken = [];  // AR labels, placed after the rings: each where it covers no code, no other label, no button
     for (const c of marks.values()) {
       c.s = c.s.map(([x, y], n) => [x + (c.q[n][0] - x) * a, y + (c.q[n][1] - y) * a]);
       const q = c.s.map(([x, y]) => [x * k + ox, y * k + oy]);
@@ -526,28 +537,50 @@ async function qrScan(f) {
       g.beginPath(); ring.forEach(([x, y], n) => g[n ? "lineTo" : "moveTo"](x, y)); g.closePath();
       if (sel) { g.globalAlpha = .3; g.fill(); g.globalAlpha = 1; }
       g.lineWidth = sel ? 6 : 3; g.stroke();
+      if (dbg) { const {x, y, width: w, height: h} = c.b; g.lineWidth = 1; g.setLineDash([4, 4]); g.strokeStyle = "#fff"; g.strokeRect(x * k + ox, y * k + oy, w * k, h * k); g.setLineDash([]);
+        g.font = "12px monospace"; g.fillStyle = "#fff"; g.fillText(`video ${vw}×${vh} cam ${cw}×${ch} k ${k.toFixed(3)}`, 8, ch - 8); }
       const top = Math.min(...ring.map(p => p[1])), bot = Math.max(...ring.map(p => p[1]));
+      taken.push([mx - half - pad, top, 2 * (half + pad), bot - top, 2]);
       if (mode == "qr" || auto) {
-        if (st) { const t = el("t" + u, "button", "tag"); t.type = "button"; t.dataset.u = u; t.classList.toggle("sel", sel);
+        if (st && mode == "qr") { const t = el("t" + u, "button", "tag"); t.type = "button"; t.dataset.u = u; t.classList.toggle("sel", sel);
           const name = st.name || (u.match(BOX) ? "Коробка " + id : "Предмет");
           if (t.textContent != name) t.textContent = name;
           t.style.transform = `translate3d(${mx}px,${top}px,0) translate(-50%,calc(-100% - 8px))`; }
         else if (st === false) { const t = el("n" + u, "span", "tag no"); t.textContent = key(u)?.[0] == "i" && f ? "Не коробка" : "Чужой QR";
           t.style.transform = `translate3d(${mx}px,${bot}px,0) translate(-50%,8px)`; }
       }
-      if (mode == "ar" && st && u.match(BOX)) {
-        const ar = el("a" + u, "a", "arc"); ar.href = "/b/" + id; ar.dataset.u = u; ar.classList.toggle("sel", sel);
-        const h = !st.items.length ? (st.boxes ? `${st.boxes} ${plural(st.boxes, "коробка", "коробки", "коробок")} внутри` : "Коробка пуста") : null;
-        const sig = JSON.stringify(st);
+      if (mode == "ar" && st) {
+        const box = !!u.match(BOX), ar = el("a" + u, "a", box ? "arc" : "arc it"); ar.href = (box ? "/b/" : "/i/") + id; ar.dataset.u = u; ar.classList.toggle("sel", sel);
+        const n = ch < 500 ? 3 : 5, sig = JSON.stringify(st) + n;  // a landscape phone fits three rows a box, not five
         if (ar.dataset.sig != sig) {
+          const row = (a, b, cls) => { const r = Object.assign(document.createElement("div"), {className: cls || ""}); r.append(...[a, b].map(x => Object.assign(document.createElement("span"), {textContent: x}))); ar.append(r); };
           ar.dataset.sig = sig; ar.replaceChildren();
-          if (h) ar.append(h);
-          for (const it of st.items) { const row = document.createElement("div"); row.append(...[it.name, it.qty || "есть, не считал"].map(x => Object.assign(document.createElement("span"), {textContent: x}))); ar.append(row); }
-          if (st.more) ar.append(Object.assign(document.createElement("em"), {textContent: `… ещё ${st.more} ${plural(st.more, "предмет", "предмета", "предметов")} →`}));
+          if (!box) { row(st.name, st.qty || "есть, не считал", "h"); st.brief.forEach(([l, x]) => row(l, x, "b")); }
+          else row(st.name || "Коробка " + id, st.name ? id : "", "h");
+          if (box && !st.items.length) ar.append(Object.assign(document.createElement("p"), {textContent: st.boxes ? `${st.boxes} ${plural(st.boxes, "коробка", "коробки", "коробок")} внутри` : "Пусто"}));
+          st.items?.slice(0, n).forEach(it => row(it.name, it.qty || "есть, не считал"));
+          const more = (st.more || 0) + Math.max(0, (st.items?.length || 0) - n);
+          if (more) ar.append(Object.assign(document.createElement("em"), {textContent: `… ещё ${more} ${plural(more, "предмет", "предмета", "предметов")} →`}));
         }
-        ar.style.transform = `translate3d(${Math.max(8, Math.min(cw - ar.offsetWidth - 8, mx - ar.offsetWidth / 2))}px,${Math.max(8, Math.min(ch - ar.offsetHeight - 8, bot + 6))}px,0)`;
+        cards.push({ar, mx, top, bot, sel, w: ar.offsetWidth, h: ar.offsetHeight});
       }
     }
+    // Greedy: the picked label first, then from the middle out; each takes the spot under its ring, over it, or next to
+    // what is already placed — whichever covers least, the spot it had last frame winning a tie (no hopping).
+    const cb = cam.getBoundingClientRect(), over = (a, b) => Math.max(0, Math.min(a[0] + a[2], b[0] + b[2]) - Math.max(a[0], b[0])) * Math.max(0, Math.min(a[1] + a[3], b[1] + b[3]) - Math.max(a[1], b[1]));
+    d.querySelectorAll(".scanh .close,.scanp,.ours").forEach(e => { const b = e.getBoundingClientRect(); if (b.width) taken.push([b.left - cb.left - 6, b.top - cb.top - 6, b.width + 12, b.height + 12, 20]); });  // a button under a label is worse than two labels touching
+    cards.sort((a, b) => b.sel - a.sel || Math.abs(a.mx - cw / 2) - Math.abs(b.mx - cw / 2)).forEach(c => {
+      const fx = x => Math.max(8, Math.min(cw - c.w - 8, x)), fy = y => Math.max(8, Math.min(ch - c.h - 8, y)),
+        x0 = fx(c.mx - c.w / 2), y0 = fy(c.bot + 12), was = c.ar.at || [x0, y0],
+        xs = [x0, ...taken.flatMap(t => [t[0] + t[2] + 8, t[0] - 8 - c.w])].map(fx),
+        ys = [y0, c.top - 12 - c.h, ...taken.flatMap(t => [t[1] + t[3] + 8, t[1] - 8 - c.h])].map(fy),
+        cost = ([x, y]) => taken.reduce((s, t) => s + over([x, y, c.w, c.h], t) * (t[4] || 1), 0) + (Math.hypot(x - x0, y - y0) + Math.hypot(x - was[0], y - was[1])) / 1e2,
+        [x, y] = xs.flatMap(x => ys.map(y => [x, y])).reduce((b, p) => cost(p) < cost(b) ? p : b);
+      taken.push([x, y, c.w, c.h, 5]); c.ar.at = [x, y];
+      c.ar.style.transform = `translate3d(${x}px,${y}px,0)`; c.ar.style.zIndex = c.sel ? 2 : "";
+      const up = y + c.h / 2 < (c.top + c.bot) / 2, ex = Math.max(x + 18, Math.min(x + c.w - 18, c.mx));  // a thread from the ring to its label
+      g.globalAlpha = 1; g.strokeStyle = css.getPropertyValue("--ok"); g.lineWidth = 2; g.beginPath(); g.moveTo(c.mx, up ? c.top : c.bot); g.lineTo(ex, up ? y + c.h : y); g.stroke();
+    });
     for (const [n, e] of els) if (!e.dataset.t) { e.remove(); els.delete(n); }
   };
   // A tap picks on touch, not on release: a label that slid from under the finger lost the click («чаще игнорирует»).
@@ -569,7 +602,7 @@ async function qrScan(f) {
       const tr = s.getVideoTracks()[0], z = tr.getCapabilities?.().zoom;
       if (z && tr.getSettings().zoom > Math.max(z.min, 1)) tr.applyConstraints({advanced: [{zoom: Math.max(z.min, 1)}]}).catch(() => {});  // some phones start zoomed in
       if (!d.open) return s.getTracks().forEach(t => t.stop());
-      v.muted = true; v.srcObject = s; await v.play(); requestAnimationFrame(draw);
+      v.muted = true; v.srcObject = s; await v.play(); if (!last) requestAnimationFrame(draw);
       const det = new BarcodeDetector({formats: ["qr_code"]});
       while (d.open) { await frame(det); await new Promise(r => setTimeout(r, 120)); }
     } catch (e) {

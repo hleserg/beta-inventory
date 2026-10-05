@@ -284,9 +284,10 @@ def peek(boxes: str = "", items: str = ""):
                                                 for r in top], more=total - len(top),
                                          boxes=c.execute("SELECT count(*) FROM boxes WHERE parent_id=?", (bid,)).fetchone()[0])
         for iid in dict.fromkeys(x.strip() for x in items.split(",")[:20] if x.strip().isdigit()):
-            r = c.execute("SELECT name FROM items WHERE id=?", (int(iid),)).fetchone()
-            if r:
-                out["items"][iid] = r["name"]
+            if r := c.execute("SELECT * FROM items WHERE id=?", (int(iid),)).fetchone():
+                fields, here = core.item_fields(r), [s for s in core.stock_of_item(c, r["id"]) if s["box_id"] != core.TRANSIT]
+                out["items"][iid] = dict(name=r["name"], brief=core.brief_of(r["type"], fields),
+                                         qty=qty_text(sum(s["qty"] or 0 for s in here), any(s["qty"] is None for s in here), core.unit_of(r["type"], fields)))
     return out
 
 
