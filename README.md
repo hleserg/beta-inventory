@@ -10,9 +10,9 @@ the history remembers where it went.
 AI agents (Claude Code, Codex, any MCP client) can check stock, run an
 inventory and write new part cards for you.
 
-> **Status: v0 prototype.** Boxes, labels, cards, stock moves, search by
-> words and by meaning, and projects work. The UI is Russian for now. Agents
-> read and write over MCP; GitHub sync is next.
+> **Status: prototype in daily use.** Boxes, labels, cards, stock moves, the
+> camera scanner, search by words and by meaning, projects with GitHub sync and
+> agents over MCP work. The UI is Russian for now.
 
 ## Install
 
@@ -71,7 +71,8 @@ Items have a two-level type: a category (Electronics) and a type inside it
 category's, then the type's; a deeper level can override a field, e.g. a
 resistor makes the photo optional and adds a required value, while only
 modules require a pinout. Each field can be required and can carry a search
-weight.
+weight. Fields marked `brief: true` (up to three) are shown over the thing's
+label in the camera scanner.
 
 ## What works
 
@@ -79,11 +80,11 @@ weight.
   printer or a batch on one sheet at real size; each label's NFC link is
   written from the phone or copied. Boxes nest and stand in places. An empty
   box asks what goes in.
-- **Items** with photo, markdown description, files and per-type fields.
-  Quantity lives on the box + item pair.
-- **Take / return / restock / recount / empty box** — every change is a
-  movement with author and project. One-of-a-kind things (tools, anything
-  with a tag) go without a count: scan its tag to take it, scan a box to put
+- **Items** with photo (rotatable in place), markdown description, files and
+  per-type fields. Quantity lives on the box + item pair.
+- **Take / return / restock / recount / move to another box / empty box** —
+  every change is a movement with author and project. One-of-a-kind things
+  (tools, anything with a tag) go without a count: scan its tag to take it, scan a box to put
   it back.
 - **NFC readers** at the shelves (`/readers`): a reader sends what it read,
   `POST /api/tap {"reader": "<its id>", "code": "<tag URL>"}`. A box's tag
@@ -92,6 +93,12 @@ weight.
   until you accept it; a portable one forgets its box after
   `READER_FORGET_MIN` minutes. The answer is 200 done, 403 not accepted yet,
   404 not a tag of ours, 409 touch a box first.
+- **Camera scanner** (the QR button): one of our codes in view and nothing
+  else like a QR — its page opens by itself. Several of ours — each gets a
+  ring and a card over it (a box: what it holds; a thing: name, count, brief
+  fields); tap one to open it. A code read once is followed frame by frame, not
+  read again, so the ring stays on it while the phone moves. `#dbg` in the
+  address draws what the scanner sees.
 - **Search** by name, other names, description and typed fields, ranked by
   relevance; box IDs and places too. Below the word matches, a small local
   model adds items close in meaning, so "step-down" finds a buck converter.
@@ -107,13 +114,17 @@ weight.
   `list_projects`; `create_item`, `update_item` (photos and files by URL, the
   server downloads them), `change_stock` (history names the agent as author),
   `accept_project` / `skip_project` for the GitHub inbox, `project_needs` /
-  `set_project_need` for what a project needs.
+  `set_project_need` for what a project needs, `stats` for the inventory at a
+  glance, `post_finding` for a note on `/stats`, `ask_owner` for a question.
   Tick «Передать агенту» on a card and it shows up in `agent_queue`, together
   with the skill that says how to fill it in; `update_item` takes it off.
   Each field's `hint` in the profile tells agents what goes in it, so any MCP
   client writes a full card. Claude Code and Codex also get the skills:
   `ln -s "$PWD/skills/inventory-new-card" "$PWD/skills/inventory-enrich-card" ~/.agents/skills/`
   (Claude Code: `~/.claude/skills/`).
+- **Bell** (`/alerts`): questions agents asked with `ask_owner`, a stale
+  agent queue, an overdue backup. The owner answers a question there; the
+  answer reaches the agent once, in `agent_queue` → `answers`.
 
 ## Planned
 

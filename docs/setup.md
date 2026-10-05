@@ -60,7 +60,8 @@ address filled in:
 1. Turn NFC on.
 2. In `chrome://flags/#unsafely-treat-insecure-origin-as-secure` add the site
    address, port included, choose *Enabled*, tap *Relaunch*. Chrome lets only
-   "secure" sites write NFC tags, and a home site has no HTTPS.
+   "secure" sites write NFC tags and use the camera, and a home site has no
+   HTTPS.
 3. Chrome menu ⋮ → *Add to Home screen* (or *Install app*).
 4. Tap «Разрешить чтение меток» (allow reading tags). While the site or app is
    open, a tapped tag then opens its box right there. With the site closed, a
@@ -81,6 +82,9 @@ Write → Add a record → URL/URI → paste → Write. iPhone XS and newer read
 without any app.
 
 App on the home screen: Safari → Share → *Add to Home Screen*.
+
+The site's scanner (the QR button) needs Chrome on Android. On iPhone, point
+the Camera app at a label instead: it opens the box the same way.
 
 ## 6. Labels
 
