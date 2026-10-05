@@ -151,7 +151,7 @@ dialog{border:1px solid var(--line);border-radius:12px;background:var(--card);co
 body:has(main :is(input:not([type=checkbox],[type=radio],[type=file],#find),textarea):focus){--bar:0px}  /* the keyboard is up: the page's own field wins the space */
 body:has(main :is(input:not([type=checkbox],[type=radio],[type=file],#find),textarea):focus) .bar{display:none}  /* the search field keeps the bar: it rides on it */
 @media print{.bar,.fbar,.put{display:none}}
-.pick{position:relative;display:flex;width:100%}.row .pick{flex:1;width:auto;min-width:0}.stock .pick{grid-column:1/-1}
+.pick{position:relative;display:flex;width:100%}.row .pick{flex:1;width:auto;min-width:10em}.stock .pick{grid-column:1/-1}
 .pick input{flex:1;min-width:0;padding-right:2.4em}
 .pick select{position:absolute;inset:0;opacity:0;pointer-events:none}
 .pick>button{position:absolute;right:1px;top:1px;bottom:1px;min-height:0;background:none;color:var(--mut);padding:0 12px}
