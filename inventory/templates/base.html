@@ -525,6 +525,50 @@ async function qrScan(f) {
       return [Math.min(...ps.map(p => p.x)) - e, Math.min(...ps.map(p => p.y)) - e, Math.max(...ps.map(p => p.x)) + e, Math.max(...ps.map(p => p.y)) + e]; });
   };
   const src = document.createElement("canvas"), dbg = location.hash == "#dbg";  // #dbg: the code's own box and the sizes drawn over the picture
+  // A code's look: its patch of a small grey frame, at most 32×32 cells, less its mean (light and shade then do not matter).
+  // A cell is the mean of its pixels, not one pixel of them: a blurred or half-pixel-shifted frame then still looks alike.
+  const gc = document.createElement("canvas");
+  const grey = (vw, vh) => {
+    const sc = Math.min(1, 480 / vw), w = Math.round(vw * sc), h = Math.round(vh * sc);
+    if (gc.width != w || gc.height != h) { gc.width = w; gc.height = h; }
+    const c = gc.getContext("2d", {willReadFrequently: true}); c.drawImage(src, 0, 0, w, h);
+    const px = c.getImageData(0, 0, w, h).data, G = new Float64Array((w + 1) * (h + 1));  // summed: G[y][x] = all the grey above and left of it
+    for (let y = 0; y < h; y++) for (let x = 0, row = 0; x < w; x++) {
+      const i = (y * w + x) * 4; row += px[i] * .3 + px[i + 1] * .59 + px[i + 2] * .11; G[(y + 1) * (w + 1) + x + 1] = G[y * (w + 1) + x + 1] + row; }
+    return [G, w, h, sc];
+  };
+  const patch = (G, w, h, m, ax, ay) => {  // the cells of m's grid at (ax, ay), less their mean; null off the frame
+    const {n, st} = m, W = w + 1, out = new Float32Array(n * n); let sum = 0;
+    if (ax < 0 || ay < 0 || ax + n * st > w || ay + n * st > h) return null;
+    for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) {
+      const a = (ay + j * st) * W + ax + i * st, b = a + st * W;
+      sum += out[j * n + i] = G[b + st] - G[b] - G[a + st] + G[a]; }
+    sum /= n * n; for (let i = 0; i < n * n; i++) out[i] -= sum;
+    return out;
+  };
+  const look = (G, w, h, sc, q) => {
+    const xs = q.map(p => p[0] * sc), ys = q.map(p => p[1] * sc), x0 = Math.round(Math.min(...xs)), y0 = Math.round(Math.min(...ys));
+    const side = Math.max(Math.max(...xs) - x0, Math.max(...ys) - y0), m = {n: 0, st: Math.max(1, Math.ceil(side / 32))};
+    m.n = Math.max(4, Math.floor(side / m.st)); m.o = m.at = [x0, y0]; m.r = Math.max(8, Math.round(side / 2));  // r: how far it is looked for
+    m.p0 = patch(G, w, h, m, x0, y0);
+    if (m.p0) m.dev = m.p0.reduce((a, v) => a + Math.abs(v), 0) || 1;  // how much the code itself varies: the scale for a match
+    return m;
+  };
+  // ponytail: shift only — a code turned or brought nearer is found while it still looks alike, then read again; scale/turn if that falls short
+  const find = (G, w, h, m) => {
+    let best = Infinity, bx = 0, by = 0;
+    const sad = (ax, ay) => {  // contrast evened out too: a frame duller or brighter than the read one still matches
+      const p = patch(G, w, h, m, ax, ay); if (!p) return Infinity;
+      const dev = p.reduce((a, v) => a + Math.abs(v), 0), k = m.dev / dev; if (dev < m.dev * .2) return Infinity;
+      let e = 0; for (let i = 0; i < p.length && e < best; i++) e += Math.abs(p[i] * k - m.p0[i]); return e; };  // worse than the best already: stop
+    const step = Math.max(2, m.st);  // a cell is st wide, so a step of st still lands near; the 1-px pass below settles it
+    for (let dy = -m.r; dy <= m.r; dy += step) for (let dx = -m.r; dx <= m.r; dx += step) { const e = sad(m.at[0] + dx, m.at[1] + dy); if (e < best) { best = e; bx = m.at[0] + dx; by = m.at[1] + dy; } }
+    for (let moved = 1; moved && best < Infinity;) {  // then pixel by pixel downhill to the closest fit
+      moved = 0; const [cx, cy] = [bx, by];
+      for (const [dx, dy] of [[-1, -1], [0, -1], [1, -1], [-1, 0], [1, 0], [-1, 1], [0, 1], [1, 1]]) { const e = sad(cx + dx, cy + dy); if (e < best) { best = e; bx = cx + dx; by = cy + dy; moved = 1; } } }
+    if (best > m.dev * .5) return false;  // nothing near looks like it
+    m.at = [bx, by]; return true;
+  };
   const frame = async det => {
     // read from a frame drawn here, not from the <video>: the code's corners are then in the picture's own pixels, as drawn below
     // (rings sat off their codes on phones: above-right on its side, on the left half upright)
@@ -532,18 +576,21 @@ async function qrScan(f) {
     if (src.width != vw || src.height != vh) { src.width = vw; src.height = vh; }
     src.getContext("2d").drawImage(v, 0, 0, vw, vh);
     const codes = await det.detect(src).catch(() => []), now = Date.now();
-    // A code read once is followed, not read again: a frame that misses it moves its ring as far as the codes read in it moved,
-    // so with three labels in view none blinks out. Gone: unread 2 s, or followed out of the picture.
-    let dx = 0, dy = 0, moved = 0;
+    // A code read once is followed by its look, not read again: its picture is kept, and each frame it is looked for near where it was,
+    // so the ring stays on it while the phone moves. Read again: picture and corners renewed. Gone: not found 1.5 s, or out of the picture.
+    const [G, gw, gh, sc] = grey(vw, vh);
     for (const c of codes) {
-      const q = corners(c), m = marks.get(c.rawValue);
-      if (m) { const [ax, ay] = mid(m.q), [bx, by] = mid(q); dx += bx - ax; dy += by - ay; moved++; }
-      marks.set(c.rawValue, {u: c.rawValue, q, t: now, s: m?.s || q, b: c.boundingBox});  // s: where it is drawn, gliding to q (draw)
+      const q = corners(c), m = marks.get(c.rawValue), {x, y, width, height} = c.boundingBox;
+      marks.set(c.rawValue, Object.assign(look(G, gw, gh, sc, q), {u: c.rawValue, q, q0: q, t: now, ft: now, s: m?.s || q, b0: {x, y, width, height}, d: [0, 0]}));  // s: where it is drawn, gliding to q (draw)
     }
     for (const [u, m] of marks) {
-      if (m.t < now && moved) m.q = m.q.map(([x, y]) => [x + dx / moved, y + dy / moved]);
+      if (m.t < now && m.p0 && find(G, gw, gh, m)) {
+        m.ft = now; const dx = (m.at[0] - m.o[0]) / sc, dy = (m.at[1] - m.o[1]) / sc;
+        m.q = m.q0.map(([x, y]) => [x + dx, y + dy]); m.d = [dx, dy];
+      }
+      m.b = {...m.b0, x: m.b0.x + m.d[0], y: m.b0.y + m.d[1]};
       const [x, y] = mid(m.q);
-      if (now - m.t > 2000 || x < 0 || y < 0 || x > vw || y > vh) marks.delete(u);
+      if (now - m.ft > 1500 || x < 0 || y < 0 || x > vw || y > vh) marks.delete(u);
     }
     const seen = [...marks.values()];
     check(seen.map(c => key(c.u)).filter(k => k && !(f && k[0] == "i")));
@@ -597,7 +644,7 @@ async function qrScan(f) {
       const half = Math.max(...q.map(([x, y]) => Math.hypot(x - mx, y - my))), pad = Math.max(12, half * .35);  // wide of the code, never on it
       const ring = q.map(([x, y]) => { const l = Math.hypot(x - mx, y - my) || 1; return [x + (x - mx) / l * pad, y + (y - my) / l * pad]; });
       c.p = [mx, my, half + pad];  // for a tap (pick)
-      g.globalAlpha = sel ? 1 : Math.max(.35, 1 - Math.max(0, now - c.t - 500) / 1500);  // an unread code fades, not blinks
+      g.globalAlpha = sel ? 1 : Math.max(.35, 1 - Math.max(0, now - c.ft - 500) / 1000);  // a code lost from sight fades, not blinks
       g.strokeStyle = g.fillStyle = st ? css.getPropertyValue("--ok") : st === false ? css.getPropertyValue("--nok") : "#fff";
       g.beginPath(); ring.forEach(([x, y], n) => g[n ? "lineTo" : "moveTo"](x, y)); g.closePath();
       if (sel) { g.globalAlpha = .3; g.fill(); g.globalAlpha = 1; }
