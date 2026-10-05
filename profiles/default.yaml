@@ -252,6 +252,48 @@ categories:
             type: choice
             options: [керамический, электролитический, танталовый, плёночный]
             search: 2
+      - key: transistor
+        label: Транзистор
+        hint: биполярные и полевые — S8050, 2N2222, IRLZ44N
+        fields:
+          - key: photo
+            required: false
+          - key: polarity
+            label: Структура
+            type: choice
+            options: [NPN, PNP, N-канал, P-канал]
+            search: 2
+          - key: package
+            label: Корпус
+            type: choice
+            options: [TO-92, TO-220, SOT-23, другой]
+          - key: pinout
+            label: Выводы
+            type: text
+            hint: "надписью к себе, ножки вниз, слева направо: E-B-C (у MOSFET G-D-S)"
+      - key: diode
+        label: Диод
+        hint: выпрямительные, быстрые, Шоттки, стабилитроны — 1N4007, FR107, 1N5819, 1N4148
+        fields:
+          - key: photo
+            required: false
+          - key: kind
+            label: Вид
+            type: choice
+            options: [выпрямительный, быстрый, Шоттки, сигнальный, стабилитрон, TVS]
+            search: 2
+          - key: voltage
+            label: Обратное напряжение
+            type: text
+            hint: 1000 В; у стабилитрона — напряжение стабилизации
+          - key: current
+            label: Ток
+            type: text
+            hint: 1 А
+          - key: package
+            label: Корпус
+            type: choice
+            options: [DO-41, DO-15, DO-35, DO-201, SMA, SOD-123, другой]
       - key: connector
         label: Разъём
         hint: JST, Dupont, клеммники

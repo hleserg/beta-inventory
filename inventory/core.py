@@ -430,6 +430,8 @@ def change_stock(box_id, item_id, action, qty, author, project_id=None):
         it = c.execute("SELECT single, type FROM items WHERE id=?", (item_id,)).fetchone()
         rows = {r["box_id"]: r["qty"] for r in c.execute("SELECT box_id, qty FROM stock WHERE item_id=?", (item_id,))}
     if it and single_of(it) and action != "count":  # №43: one of a kind — no count asked, and it lies in one place
+        if qty is not None and qty > 1:  # silently moving 1 of «10» lost the other 9
+            raise ValueError(f"Это одна штука — без счёта, а не {qty}. Их много — снимите «Одна штука» на карточке")
         qty = 1
         if action in ("put", "return") and box_id != HANDS and HANDS not in rows and rows:
             return (rows[box_id] or 1) if box_id in rows else transfer(item_id, next(iter(rows)), box_id, author)

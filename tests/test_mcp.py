@@ -100,6 +100,8 @@ def test_single(monkeypatch):
     assert call("change_stock", box_id=a, item_id=iid, action="take", qty=None, agent="Мара").structured_content["qty"] == 0
     assert call("change_stock", box_id=b, item_id=iid, action="put", qty=None, agent="Мара").structured_content["qty"] == 1
     assert [(s["box_id"], s["qty"]) for s in call("get_item", item_id=iid).structured_content["stock"]] == [(b, 1)]
+    err = call("change_stock", box_id=b, item_id=iid, action="put", qty=10, agent="Мара")
+    assert err.is_error and "одна штука" in err.content[0].text  # a count for a one-of-a-kind is a mistake, not silently 1
 
 
 def test_card_tools(monkeypatch):
