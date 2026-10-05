@@ -397,7 +397,7 @@ async function qrScan(f) {
       <h3></h3><p></p><button type="button" class="scango" hidden></button></div>`;
   const $ = q => d.querySelector(q), v = $("video"), cv = $("canvas"), cam = $(".cam"), h2 = $("h2"), h3 = $("h3"), p = $(".scanp p"), btn = $(".scango"),
     css = getComputedStyle(d);
-  let mode = "qr", auto = false, gone = false, after = null, timer = 0, snapped = null, s = null, said = "";
+  let mode = "qr", auto = false, crowd = false, gone = false, after = null, timer = 0, snapped = null, s = null, said = "";
   const known = {}, marks = new Map(), els = new Map();  // known: "b"+id / "i"+id → undefined unasked, null asking, false not ours, else /api/peek's
   const ownOrigins = new Set([location.origin]);
   try { const published = {{ core.setting("PUBLIC_BASE_URL")|tojson }}; if (published) ownOrigins.add(new URL(published).origin); } catch {}
@@ -442,7 +442,7 @@ async function qrScan(f) {
   $(".close").onclick = () => gone || (gone = true, history.back());
   d.onclick = e => {
     const m = e.target.closest("[data-m]"), t = e.target.closest("[data-u]");
-    if (m) { mode = m.dataset.m; auto = false; snapped = null; clearTimeout(timer); }
+    if (m) { mode = m.dataset.m; auto = crowd = false; snapped = null; clearTimeout(timer); }
     if (t) { e.preventDefault(); go(t.dataset.u); }
   };
   const el = (k, tag, cls) => {
@@ -450,25 +450,39 @@ async function qrScan(f) {
     if (!e) { e = document.createElement(tag); e.className = cls; els.set(k, e); cam.append(e); }
     e.dataset.t = 1; return e;
   };
+  const corners = c => {  // in the video's pixels; Android may give fewer than 4 corners: the box's own then
+    const {x, y, width: w, height: h} = c.boundingBox;
+    return (c.cornerPoints?.length === 4 ? c.cornerPoints : [{x, y}, {x: x + w, y}, {x: x + w, y: y + h}, {x, y: y + h}]).map(p => [p.x, p.y]);
+  };
+  const mid = q => q.reduce((a, p) => [a[0] + p[0] / 4, a[1] + p[1] / 4], [0, 0]);
   const frame = async det => {
-    const codes = await det.detect(v).catch(() => []), now = Date.now();
-    for (const c of codes) marks.set(c.rawValue, {c, t: now});
-    for (const [u, m] of marks) if (now - m.t > 500) marks.delete(u);  // out of sight half a second: gone; a blink keeps it
-    const seen = [...marks.values()].map(m => m.c);
-    check(seen.map(c => key(c.rawValue)).filter(k => k && !(f && k[0] == "i")));
-    const mine = seen.filter(c => state(c.rawValue)), wait = seen.some(c => !state(c.rawValue) && state(c.rawValue) !== false);
-    if (!f && mode == "qr" && mine.length > 1) { mode = "ar"; auto = true; }
-    if (auto && mine.length < 2 && !wait) { mode = "qr"; auto = false; }
+    const codes = await det.detect(v).catch(() => []), now = Date.now(), vw = v.videoWidth || 1, vh = v.videoHeight || 1;
+    // A code read once is followed, not read again: a frame that misses it moves its ring as far as the codes read in it moved,
+    // so with three labels in view none blinks out. Gone: unread 2 s, or followed out of the picture.
+    let dx = 0, dy = 0, moved = 0;
+    for (const c of codes) {
+      const q = corners(c), m = marks.get(c.rawValue);
+      if (m) { const [ax, ay] = mid(m.q), [bx, by] = mid(q); dx += bx - ax; dy += by - ay; moved++; }
+      marks.set(c.rawValue, {u: c.rawValue, q, t: now});
+    }
+    for (const [u, m] of marks) {
+      if (m.t < now && moved) m.q = m.q.map(([x, y]) => [x + dx / moved, y + dy / moved]);
+      const [x, y] = mid(m.q);
+      if (now - m.t > 2000 || x < 0 || y < 0 || x > vw || y > vh) marks.delete(u);
+    }
+    const seen = [...marks.values()];
+    check(seen.map(c => key(c.u)).filter(k => k && !(f && k[0] == "i")));
+    const mine = seen.filter(c => state(c.u)), wait = seen.some(c => !state(c.u) && state(c.u) !== false);
+    if (mine.length > 1) crowd = true;  // two of ours seen: a tap picks, never «the one left» (it is the one the others blinked away from)
+    if (!f && mode == "qr" && crowd) { mode = "ar"; auto = true; }
     // the picture: cover-scaled, so each code's corners map through the same scale and crop
-    const cw = cam.clientWidth, ch = cam.clientHeight, vw = v.videoWidth || 1, vh = v.videoHeight || 1,
+    const cw = cam.clientWidth, ch = cam.clientHeight,
       k = Math.max(cw / vw, ch / vh), ox = (cw - vw * k) / 2, oy = (ch - vh * k) / 2, g = cv.getContext("2d");
     cv.width = cw; cv.height = ch; g.lineWidth = 4; g.lineJoin = "round";
     els.forEach(e => e.dataset.t = "");
     for (const c of seen) {
-      const {x: bx, y: by, width: bw, height: bh} = c.boundingBox;  // Android may give fewer than 4 corners: the box's own then
-      const q = (c.cornerPoints?.length === 4 ? c.cornerPoints : [{x: bx, y: by}, {x: bx + bw, y: by}, {x: bx + bw, y: by + bh}, {x: bx, y: by + bh}])
-        .map(({x, y}) => [x * k + ox, y * k + oy]);
-      const mx = q.reduce((a, b) => a + b[0], 0) / 4, my = q.reduce((a, b) => a + b[1], 0) / 4, st = state(c.rawValue), u = c.rawValue, id = key(u)?.slice(1);
+      const q = c.q.map(([x, y]) => [x * k + ox, y * k + oy]);
+      const [mx, my] = mid(q), u = c.u, st = state(u), id = key(u)?.slice(1);
       g.strokeStyle = st ? css.getPropertyValue("--ok") : st === false ? css.getPropertyValue("--nok") : "#fff";
       g.beginPath();
       q.forEach(([x, y], n) => { const l = Math.hypot(x - mx, y - my) || 1; g[n ? "lineTo" : "moveTo"](x + (x - mx) / l * 6, y + (y - my) / l * 6); });
@@ -500,16 +514,16 @@ async function qrScan(f) {
     d.querySelectorAll("[data-m]").forEach(b => b.classList.toggle("on", b.dataset.m == mode));
     const head = f || mode == "qr" && seen.length < 2 ? "Сканировать QR" : mode == "qr" ? "QR в кадре" : "AR · содержимое";
     if (h2.textContent != head) h2.textContent = head;
-    const one = mode == "qr" && mine.length == 1 && !wait ? mine[0].rawValue : null;
+    const one = mode == "qr" && !crowd && mine.length == 1 && !wait ? mine[0].u : null;
     if (one !== snapped) { clearTimeout(timer); snapped = one; if (one) { blip(); timer = setTimeout(() => go(one), 800); } }
-    if (mode == "ar") say(auto ? "Несколько наших наклеек" : "Что в коробках?", auto ? "Нажмите нужное содержимое или наведите камеру так, чтобы осталась одна наклейка."
+    if (mode == "ar") say(auto ? "Несколько наших наклеек" : "Что в коробках?", auto ? "Нажмите на подпись нужной коробки."
       : "Наведите камеру на наклейки. Нажмите на подпись, чтобы открыть коробку.");
     else if (one) {
       const isBox = !!one.match(BOX), what = isBox ? `Коробка ${key(one).slice(1)}.` : `Предмет «${state(one).name}».`, open = [isBox ? "Открыть коробку сейчас" : "Открыть сейчас", () => go(one)];
       seen.length > 1 ? say("Один наш код найден", `Нашу наклейку выделили зелёным, чужую — красным. Открываем ${isBox ? "нашу коробку" : "предмет"}.`, null, open)
         : say("Код найден", what + " Открываем автоматически…", ICO_BOX, open);
     }
-    else if (n > 1) say("Несколько наших наклеек", "Нажмите на нужную или наведите так, чтобы в кадре осталась одна.");
+    else if (crowd && n) say("Несколько наших наклеек", "Нажмите на нужную.");
     else if (seen.length && !wait) say("Наведите на код", "Этого кода нет в каталоге. Наведите на нашу наклейку.", ICO_QR);
     else say("Наведите на код", "Держите наклейку в кадре. Снимок и кнопка спуска не нужны.", ICO_QR);
   };
