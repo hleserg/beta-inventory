@@ -806,6 +806,9 @@ def test_alerts():
     qid = core.ask_owner("Где лежит паяльник?", "Мара")
     assert c.post(f"/alerts/questions/{qid}/delete", follow_redirects=False).status_code == 303
     assert "Где лежит паяльник" not in c.get("/alerts").text
+    qid = core.ask_owner("Где лежит флюс?", "Мара")
+    assert c.post(f"/alerts/questions/{qid}/answer", data={"answer": "В ящике у окна"}, follow_redirects=False).status_code == 303
+    assert "Где лежит флюс" not in c.get("/alerts").text
 
     assert "Бэкап" not in c.get("/alerts").text  # no backup ever reported: the alert is off
     assert c.post("/backup/done").status_code == 200

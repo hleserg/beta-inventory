@@ -938,7 +938,13 @@ def alerts_page(req: Request):
 
 @app.post("/alerts/questions/{question_id}/delete")
 def question_delete(question_id: int):
-    core.delete_question(question_id)
+    core.close_question(question_id)
+    return go("/alerts")
+
+
+@app.post("/alerts/questions/{question_id}/answer")
+def question_answer(question_id: int, answer: str = Form("")):
+    core.close_question(question_id, answer)
     return go("/alerts")
 
 

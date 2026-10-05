@@ -250,6 +250,10 @@ def init():
         if "for_agent_at" not in [r["name"] for r in c.execute("PRAGMA table_info(items)")]:  # the bell: how long it waits
             c.execute("ALTER TABLE items ADD COLUMN for_agent_at TEXT")
             c.execute("UPDATE items SET for_agent_at=updated_at WHERE for_agent")
+        if "answer" not in [r["name"] for r in c.execute("PRAGMA table_info(questions)")]:  # the owner answers in the bell
+            c.execute("ALTER TABLE questions ADD COLUMN answer TEXT")
+            c.execute("ALTER TABLE questions ADD COLUMN closed_at TEXT")
+            c.execute("ALTER TABLE questions ADD COLUMN seen INTEGER NOT NULL DEFAULT 0")
         if "single" not in [r["name"] for r in c.execute("PRAGMA table_info(items)")]:  # cards from before №43
             c.execute("ALTER TABLE items ADD COLUMN single INTEGER")
             one = [k for k, t in TYPES.items() if t["single"]]  # a tool put in «не считал» is one
@@ -628,7 +632,7 @@ def set_for_agent(item_id, on):
     with db() as c:
         c.execute("UPDATE items SET for_agent=?, for_agent_at=datetime('now','localtime') WHERE id=?", (int(on), item_id))
         if on:  # handed back: the owner has answered the agent's questions on it
-            c.execute("DELETE FROM questions WHERE item_id=?", (item_id,))
+            c.execute("UPDATE questions SET closed_at=datetime('now','localtime') WHERE item_id=? AND closed_at IS NULL", (item_id,))
 
 
 def ask_owner(text, author, item_id=None):
@@ -640,9 +644,23 @@ def ask_owner(text, author, item_id=None):
                          (item_id, text.strip(), author)).lastrowid
 
 
-def delete_question(question_id):
+def close_question(question_id, answer=None):
+    """× or «Ответить» in the bell: the agent gets it in agent_queue; the last answer on a card hands it back."""
     with db() as c:
-        c.execute("DELETE FROM questions WHERE id=?", (question_id,))
+        c.execute("UPDATE questions SET answer=?, closed_at=datetime('now','localtime') WHERE id=?",
+                  ((answer or "").strip() or None, question_id))
+        if answer:
+            c.execute("UPDATE items SET for_agent=1, for_agent_at=datetime('now','localtime') WHERE id=(SELECT item_id FROM questions WHERE id=?)"
+                      " AND NOT EXISTS (SELECT 1 FROM questions WHERE item_id=items.id AND closed_at IS NULL)", (question_id,))
+
+
+def take_answers():
+    """Closed questions no agent has read yet; reading marks them.
+    ponytail: the first agent to call takes them all, a per-author filter if two agents ask at once."""
+    with db() as c:
+        rows = [dict(r) for r in c.execute("SELECT id, item_id, text, answer, author FROM questions WHERE closed_at IS NOT NULL AND NOT seen")]
+        c.execute("UPDATE questions SET seen=1 WHERE closed_at IS NOT NULL")
+    return rows
 
 
 def own_upload(v):
@@ -1001,7 +1019,7 @@ def alerts():
     cfg, out = PROFILE.get("alerts", {}), []
     with db() as c:
         out += [dict(kind="question", **r) for r in c.execute(
-            "SELECT q.*, i.name AS item FROM questions q LEFT JOIN items i ON i.id=q.item_id ORDER BY q.id DESC")]
+            "SELECT q.*, i.name AS item FROM questions q LEFT JOIN items i ON i.id=q.item_id WHERE q.closed_at IS NULL ORDER BY q.id DESC")]
         stamp = DATA / "backup-ok"  # POST /backup/done touches it; never touched = no backup set up, no alert
         if "backup_hours" in cfg and stamp.exists() and time.time() - stamp.stat().st_mtime > cfg["backup_hours"] * 3600:
             out.append(dict(kind="backup", at=datetime.fromtimestamp(stamp.stat().st_mtime).strftime("%Y-%m-%d %H:%M")))

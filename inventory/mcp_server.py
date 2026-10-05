@@ -81,14 +81,15 @@ def card(item_id):
                     single=core.single_of(it))
 
 
-@server.tool(annotations=READ)
+@server.tool(annotations=LOGGED)
 def agent_queue() -> dict[str, Any]:
     """Cards a person ticked «Передать агенту»: fill each in (identify, datasheet, right type, every field)
-    as `skill` says, then update_item takes it off this list."""
+    as `skill` says, then update_item takes it off this list. `answers`: the owner's replies to ask_owner,
+    each shown once; answer null = closed without one, drop that question."""
     with db() as c:
         items = [dict(r, url=link(f"/i/{r['id']}")) for r in c.execute(
             "SELECT id, name, type FROM items WHERE for_agent ORDER BY updated_at")]
-    return dict(items=items, skill=ENRICH.read_text(encoding="utf-8"))
+    return dict(items=items, answers=core.take_answers(), skill=ENRICH.read_text(encoding="utf-8"))
 
 
 @server.tool(annotations=READ)

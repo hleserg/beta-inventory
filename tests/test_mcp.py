@@ -233,3 +233,18 @@ def test_ask_owner():
     r = call("ask_owner", question="Что за плата с надписью **HW-131**?", agent="Codex").structured_content
     assert r["url"].endswith("/alerts")
     assert "HW-131" in TestClient(app).get("/alerts").text
+
+
+def test_owner_answers():
+    """An answer typed in the bell, or a question closed with ×, reaches the next agent_queue once."""
+    c, box = TestClient(app), core.new_boxes(1)[0]
+    iid = call("create_item", type="resistor", name="R?", agent="Codex", box_id=box, fields={"value": "?"}).structured_content["id"]
+    a = call("ask_owner", question="Какой номинал?", agent="Codex", item_id=iid).structured_content["id"]
+    b = call("ask_owner", question="Где паяльник?", agent="Мара").structured_content["id"]
+    c.post(f"/alerts/questions/{a}/answer", data={"answer": "4,7 кОм"})
+    c.post(f"/alerts/questions/{b}/delete")
+    q = call("agent_queue").structured_content
+    got = {x["id"]: x for x in q["answers"]}
+    assert got[a]["answer"] == "4,7 кОм" and got[a]["item_id"] == iid and got[b]["answer"] is None
+    assert iid in [i["id"] for i in q["items"]]  # the answer hands the card back to the agent
+    assert not {a, b} & {x["id"] for x in call("agent_queue").structured_content["answers"]}
