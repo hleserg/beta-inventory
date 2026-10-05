@@ -321,10 +321,12 @@ async def create_item(type: str, name: str, fields: dict[str, Any], agent: str, 
 
 
 @server.tool(annotations=ToolAnnotations(readOnlyHint=False, destructiveHint=True, openWorldHint=False))
-async def update_item(item_id: int, fields: dict[str, Any], name: str = "", type: str = "") -> dict[str, Any]:
+async def update_item(item_id: int, fields: dict[str, Any], name: str = "", type: str = "",
+                      single: bool | None = None) -> dict[str, Any]:
     """Change card fields: only the keys given change, "" clears one. photo: the whole list, get_item's links keep a photo,
     new image URLs add one; files: new [{name, url}] are added, ones already on the card are kept.
-    type: move the card to another type (card_template), its required fields must then be given. Returns the card.
+    type: move the card to another type (card_template), its required fields must then be given.
+    single: tick or untick «одна штука» on the card (get_item's single); only when the owner asks. Returns the card.
     """
     with db() as c:
         it = c.execute("SELECT * FROM items WHERE id=?", (item_id,)).fetchone()
@@ -337,6 +339,8 @@ async def update_item(item_id: int, fields: dict[str, Any], name: str = "", type
     f = await fill(type, old, fields)
     check(name, type, f, old if type == it["type"] else None)
     core.save_item(item_id, name, type, f)
+    if single is not None:
+        core.set_single(item_id, single)
     core.set_for_agent(item_id, False)  # an agent filled it in: off agent_queue
     return card(item_id)
 

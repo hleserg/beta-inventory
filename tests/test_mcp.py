@@ -136,6 +136,8 @@ def test_card_tools(monkeypatch):
     err = call("update_item", item_id=card["id"], fields={"pinout": "A B"})  # a hidden one isn't dropped silently
     assert err.is_error and "card_template" in err.content[0].text
     assert call("update_item", item_id=card["id"], fields={}, type="nope").is_error
+    assert call("update_item", item_id=card["id"], fields={}, single=True).structured_content["single"]
+    assert not call("update_item", item_id=card["id"], fields={}, single=False).structured_content["single"]
     err = call("create_item", type="module", name="X", agent="Claude", fields={"pinout": "A B"})
     assert err.is_error and "Фото: обязательно" in err.content[0].text
 
