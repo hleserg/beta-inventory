@@ -173,6 +173,7 @@ def test_uncounted():
     r = c.post("/items/new?type=resistor", data={"name": "1k россыпь", "value": "1 кОм", "box": box, "qty": ""},
                follow_redirects=False)
     rid = newest()
+    assert "data-uncounted" in c.get("/items/new?type=resistor").text  # the new-card form: «Не считал» in one tap too
     assert "есть, не считал" in c.get(f"/b/{box}").text and "есть, не считал" in c.get("/items").text
     assert c.post("/stock", data={"box": box, "item": rid, "action": "take", "qty": 3}).status_code == 200
     assert "есть, не считал" in c.get(f"/i/{rid}").text  # taking some leaves the pile uncounted

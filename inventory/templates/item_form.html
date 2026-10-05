@@ -48,7 +48,7 @@
     <details{% if errors %} open{% endif %}><summary class="lrow"><span class="ell"><b>Коробка и количество</b><span class="mut sm" id="boxsum">можно оставить пустым</span></span><span class="chev">{{ ico('<path d="M6 9l6 6 6-6"/>', 20) }}</span></summary><div>
       <div class="mut sm">{% if core.SCAN_NFC %}Поднесите телефон к метке коробки — или выберите{% elif core.SCAN_QR %}Наведите камеру на QR коробки — или выберите{% else %}Выберите коробку{% endif %}.</div>
       <div class="row">{{ box_input(value=box, placeholder="коробка: название или ID") }}</div>
-      <div class="row" data-many{% if single %} hidden{% endif %}><span class="grow">Сколько, <span id="unit">{{ unit_of(type, vals) }}</span></span><input type="number" name="qty" value="{{ qty }}" min="0" placeholder="не считал" aria-label="Сколько"></div>
+      <div class="row" data-many{% if single %} hidden{% endif %}><span class="grow">Сколько, <span id="unit">{{ unit_of(type, vals) }}</span></span><input type="number" name="qty" value="{{ qty }}" min="0" placeholder="не считал" aria-label="Сколько"><button type="button" class="ghost" data-uncounted title="Россыпью: есть, а сколько — не считал">Не считал</button></div>
     </div></details>
     <label class="lrow"><span><b>{{ t.to_agent }}</b><br><span class="mut sm">заполнит остальное сам — нужно только название</span></span><input type="checkbox" class="tgl" name="for_agent" value="1"{% if agent %} checked{% endif %}></label>
     {% if core.SCAN_NFC %}<label class="lrow"><span><b>Сразу записать метку</b><br><span class="mut sm">после сохранения — поднести к наклейке NFC</span></span><input type="checkbox" class="tgl" name="nfc" value="1"{% if nfc %} checked{% endif %}></label>{% endif %}
@@ -170,7 +170,12 @@ document.getElementById("cancel").onclick = e => {  // ← back to step 1: the d
   localStorage.removeItem(key);
 };
 // the folded «Коробка и количество» line says what is inside it
-const sum = () => boxsum.textContent = [f.elements.box.value, !one.checked && f.elements.qty.value && f.elements.qty.value + " " + unit.textContent].filter(Boolean).join(" · ") || "можно оставить пустым";
+const qty = f.elements.qty, nc = f.querySelector("[data-uncounted]");
+nc.onclick = () => { qty.value = ""; for (const e of ["input", "change"]) qty.dispatchEvent(new Event(e, {bubbles: true})); };  // empty + a box: «есть, не считал»
+const sum = () => {
+  nc.disabled = !qty.value;
+  boxsum.textContent = [f.elements.box.value, !one.checked && (qty.value ? qty.value + " " + unit.textContent : f.elements.box.value && "не считая")].filter(Boolean).join(" · ") || "можно оставить пустым";
+};
 f.addEventListener("input", sum); f.addEventListener("change", sum); sum();
 f.addEventListener("submit", () => { if (localStorage[key]) localStorage[key] = JSON.stringify({...JSON.parse(localStorage[key]), sent: 1}); });
 {% endif %}
