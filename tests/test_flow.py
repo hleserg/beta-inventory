@@ -181,6 +181,8 @@ def test_uncounted():
     assert "40 шт" in c.get(f"/b/{box}").text  # counted: a number again
     c.post("/stock", data={"box": box, "item": rid, "action": "add", "kind": "put", "qty": ""})
     assert "есть, не считал" in c.get(f"/b/{box}").text  # nothing in hand: a handful more, uncounted
+    c.post("/items/new?type=resistor", data={"name": "2k россыпь", "value": "2 кОм", "qty": ""})
+    assert 'data-step="none"' in c.get(f"/i/{newest()}").text  # lies nowhere: «Положить» offers «Не считал» in one tap
     c.post("/stock", data={"box": box, "item": rid, "action": "add", "kind": "return", "qty": 2})
     assert "2 шт" in c.get(f"/b/{box}").text  # «вернул 2» to an uncounted pair: now there are 2 (№34)
     c.post(f"/b/{box}/clear")

@@ -71,8 +71,8 @@
 </div></div>
 
 {# Sheets: take from a box, put back / put away, write off. Cancel = backdrop, «Отмена» or «назад»; nothing moves. #}
-{% macro n_input(max=none, value=1, req=true) %}{% if single %}<input type="hidden" name="qty" value="1">{% else %}<div class="num"><button type="button" data-step="-1" aria-label="Уменьшить количество">−</button><input type="number" name="qty" min="1"{% if max %} max="{{ max }}"{% endif %} value="{{ value }}" inputmode="numeric"{% if req %} required{% else %} placeholder="не считал"{% endif %} aria-label="Сколько"><button type="button" data-step="1" aria-label="Увеличить количество">+</button>{% if max %}<button type="button" data-step="all" class="all">Все</button>{% endif %}</div>{% endif %}{% endmacro %}
-{% macro n_word(v=1) %}{% if not single %}<span data-n>{{ v }}</span> {{ uw }}{% endif %}{% endmacro %}
+{% macro n_input(max=none, value=1, req=true, blank=false) %}{% if single %}<input type="hidden" name="qty" value="1">{% else %}<div class="num"><button type="button" data-step="-1" aria-label="Уменьшить количество">−</button><input type="number" name="qty" min="1"{% if max %} max="{{ max }}"{% endif %} value="{{ value }}" inputmode="numeric"{% if req %} required{% else %} placeholder="не считал"{% endif %} aria-label="Сколько"><button type="button" data-step="1" aria-label="Увеличить количество">+</button>{% if blank %}<button type="button" data-step="none" class="all" title="Россыпью: есть, а сколько — не считал">Не считал</button>{% endif %}{% if max %}<button type="button" data-step="all" class="all">Все</button>{% endif %}</div>{% endif %}{% endmacro %}
+{% macro n_word(v=1) %}{% if not single %}<span data-n data-u="{{ uw }}">{{ v }} {{ uw }}</span>{% endif %}{% endmacro %}
 {% for s in stock if s.box_id not in ("HANDS", TRANSIT) %}
 <dialog class="sheet" id="take-{{ s.box_id }}"><form method="post" action="/stock">
   <small>Из коробки «{{ s.name or s.box_id }}»</small><h2>Взять</h2><p class="nm">{{ it.name }}</p>
@@ -98,7 +98,7 @@
 {% set put_form %}<form method="post" action="/stock" data-put{% if lies %} hidden{% endif %}{% if stock|length == 1 and not h and not tr %} data-from="{{ stock[0].box_id }}"{% endif %}>
   <input type="hidden" name="item" value="{{ it.id }}"><input type="hidden" name="action" value="add"><input type="hidden" name="kind" value="{{ 'move' if tr else 'return' if h and h.src else 'put' }}"><input type="hidden" name="back" value="/i/{{ it.id }}"><input type="hidden" name="src"{% if tr %} value="{{ TRANSIT }}"{% endif %}>
   {% if not lies %}<small>{{ "Сейчас на руках · " ~ h.qty|qty(unit=u) if h else "Пришло · " ~ tr.qty|qty(unit=u) if tr else "Нигде не лежит" }}</small><h2>{{ "Вернуть" if h else "Куда положить" }}</h2><p class="nm">{{ it.name }}</p>
-  {% if not single %}<label>Сколько</label>{% endif %}{% endif %}{{ n_input((h or tr).qty if h or tr, (h or tr) and (h or tr).qty or 1, false) }}
+  {% if not single %}<label>Сколько</label>{% endif %}{% endif %}{{ n_input((h or tr).qty if h or tr, (h or tr) and (h or tr).qty or 1, false, not h and not tr) }}
   {% if not lies %}<label>Куда {{ "вернуть" if h else "положить" }}</label>{% endif %}<div class="row">{{ box_input(value=h.src if h else "", placeholder="коробка: название или скан", required=True, exclude=TRANSIT if tr else None) }}</div>
   {% if not lies %}{% if h and h.src %}<p class="mut sm">Выбрана коробка, из которой взяли вещь.</p>{% endif %}
   <button>{{ "Вернуть" if h else "Положить" }} {{ n_word((h or tr) and (h or tr).qty or 1) }}</button>
