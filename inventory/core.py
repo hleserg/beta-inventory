@@ -905,7 +905,7 @@ def box_contents(c, box_id):
         "SELECT s.qty, i.* FROM stock s JOIN items i ON i.id=s.item_id WHERE s.box_id=? ORDER BY i.name", (box_id,))]
 
 
-def box_peek(c, box_id, n=2):
+def box_peek(c, box_id, n=5):
     """The AR label over a box (CAMERA.md): (up to n things it gives out most, how many there are in all).
 
     Things with stock left, ranked by take operations from this very box (not pieces, not the HANDS row)

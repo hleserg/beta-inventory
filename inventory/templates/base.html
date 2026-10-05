@@ -132,7 +132,7 @@ dialog{border:1px solid var(--line);border-radius:12px;background:var(--card);co
 .scan button.tag{min-height:52px}.tag.sel{background:var(--ok);color:#10262F}.arc.sel{outline:4px solid var(--ok)}@keyframes fin{from{opacity:0}}
 .tag.no{border-color:var(--nok)}
 .arc{position:absolute;left:0;top:0;animation:fin .25s ease-out;width:max-content;min-height:52px;max-width:min(68vw,270px);background:#F6FBFC;border:1.5px solid #A9DCEB;color:#15313D;border-radius:14px;padding:8px 12px;font-size:14px;font-weight:700;text-decoration:none;box-shadow:0 4px 14px #0006}
-.arc div{display:flex;justify-content:space-between;gap:10px;padding:3px 0}.arc div span:first-child{overflow-wrap:anywhere}.arc div span+span{flex:none;color:#3F5F6B;font-weight:600}
+.arc div{display:flex;justify-content:space-between;gap:10px;padding:3px 0}.arc div span:first-child{overflow-wrap:anywhere;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden}.arc div span+span{flex:none;color:#3F5F6B;font-weight:600}
 .arc em{display:block;font-style:normal;color:#126985;border-top:1px solid #D4E8EE;margin-top:4px;padding-top:6px}
 .scanp{padding:16px 16px calc(16px + env(safe-area-inset-bottom));color:#C0D2D8}.scanp h3{display:flex;align-items:center;gap:8px;margin:0 0 4px;color:#fff;font-size:18px}.scanp p{margin:0 0 12px}.scanp a{color:#9ED8EA}
 .camseg{display:grid;grid-template-columns:1fr 1fr;background:#1C3A45;border-radius:12px;padding:3px;margin-bottom:14px}.scan .camseg button{background:none;color:#C0D2D8;min-height:44px;border-radius:10px;padding:6px}.scan .camseg button.on{background:#DDEFF4;color:#15313D}

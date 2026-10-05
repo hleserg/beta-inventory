@@ -823,11 +823,11 @@ def test_alerts():
 
 
 def test_peek():
-    """The camera (CAMERA.md): only catalog codes count; over a box, up to two things it gives out most, and its name for the tag."""
+    """The camera (CAMERA.md): only catalog codes count; over a box, up to five things it gives out most, and its name for the tag."""
     a, b, inner = core.new_boxes(3)
     c.post(f"/b/{a}", data={"name": "Шкаф-обзор"})
     ids = {}
-    for n in ("Бета", "Альфа", "Гамма"):
+    for n in ("Бета", "Альфа", "Гамма", "Дельта", "Эпсилон", "Эта", "Яша"):
         c.post("/items/new?type=resistor", data={"dup_ok": "1", "name": n, "value": "x", "box": a, "qty": 4})
         ids[n] = newest()
     with core.db() as db:
@@ -837,11 +837,11 @@ def test_peek():
     j = r.json()
     assert set(j["boxes"]) == {a, b} and list(j["items"]) == [str(ids["Бета"])]  # unknown codes are not ours
     assert j["boxes"][a]["name"] == "Шкаф-обзор" and j["boxes"][b] == {"name": "", "items": [], "more": 0, "boxes": 0}  # an empty box
-    first = j["boxes"][a]  # no takes in half a year: two at random, one more
-    assert len(first["items"]) == 2 and first["more"] == 1 and first["boxes"] == 1 and first["items"][0]["qty"] == "4 шт"
+    first = j["boxes"][a]  # no takes in half a year: five at random, two more
+    assert len(first["items"]) == 5 and first["more"] == 2 and first["boxes"] == 1 and first["items"][0]["qty"] == "4 шт"
 
     def top():
-        return [x["name"] for x in c.get(f"/api/peek?boxes={a}").json()["boxes"][a]["items"]]
+        return [x["name"] for x in c.get(f"/api/peek?boxes={a}").json()["boxes"][a]["items"]][:2]
 
     def took(name, days, times=1):
         with core.db() as db:
