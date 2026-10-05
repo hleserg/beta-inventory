@@ -124,19 +124,23 @@ dialog{border:1px solid var(--line);border-radius:12px;background:var(--card);co
 .scan[open]{display:flex;flex-direction:column}.scan button{min-height:0}
 .scanh{display:flex;align-items:center;gap:12px;padding:calc(12px + env(safe-area-inset-top)) 16px 12px}.scanh h2{margin:0;font-size:20px;color:#fff}
 .scan .close{display:grid;place-items:center;width:46px;height:46px;padding:0;background:none;border:1.5px solid #fff6;border-radius:12px;color:#fff}
-.cam{flex:1;position:relative;overflow:hidden;background:#0B1C22}.cam video,.cam canvas{position:absolute;inset:0;width:100%;height:100%}.cam video{object-fit:cover}.cam canvas{pointer-events:none}
+.cam{flex:1;position:relative;overflow:hidden;background:#0B1C22}.cam video,.cam canvas{position:absolute;inset:0;width:100%;height:100%}.cam video{object-fit:contain}.cam canvas{pointer-events:none}
 .aim{position:absolute;left:50%;top:46%;transform:translate(-50%,-50%);width:min(62vw,240px);aspect-ratio:1;color:#7FD0E6;pointer-events:none}.aim svg{width:100%;height:100%}
 .aim span{position:absolute;top:calc(100% + 14px);left:50%;transform:translateX(-50%);white-space:nowrap;font-size:14px;color:#DDEFF4;background:#10262Fb3;padding:4px 10px;border-radius:99px}
 .ours{position:absolute;top:12px;left:50%;transform:translateX(-50%);background:#10262Fd9;border:1.5px solid var(--ok);color:#fff;border-radius:99px;padding:5px 12px;font-size:14px;font-weight:700;white-space:nowrap}
-.tag{position:absolute;transform:translate(-50%,calc(-100% - 10px));background:#10262F;border:1.5px solid var(--ok);color:#fff;border-radius:99px;padding:4px 10px;font-size:13px;font-weight:700;white-space:nowrap}
-.scan button.tag{min-height:44px}
-.tag.no{border-color:var(--nok);transform:translate(-50%,10px)}
-.arc{position:absolute;width:max-content;min-height:44px;max-width:min(68vw,270px);background:#F6FBFC;border:1.5px solid #A9DCEB;color:#15313D;border-radius:14px;padding:8px 12px;font-size:14px;font-weight:700;text-decoration:none;box-shadow:0 4px 14px #0006}
+.tag{position:absolute;left:0;top:0;background:#10262F;border:2px solid var(--ok);color:#fff;border-radius:99px;padding:8px 16px;font-size:16px;font-weight:700;white-space:nowrap;max-width:min(70vw,300px);overflow:hidden;text-overflow:ellipsis;animation:fin .25s ease-out}
+.scan button.tag{min-height:52px}.tag.sel{background:var(--ok);color:#10262F}.arc.sel{outline:4px solid var(--ok)}@keyframes fin{from{opacity:0}}
+.tag.no{border-color:var(--nok)}
+.arc{position:absolute;left:0;top:0;animation:fin .25s ease-out;width:max-content;min-height:52px;max-width:min(68vw,270px);background:#F6FBFC;border:1.5px solid #A9DCEB;color:#15313D;border-radius:14px;padding:8px 12px;font-size:14px;font-weight:700;text-decoration:none;box-shadow:0 4px 14px #0006}
 .arc div{display:flex;justify-content:space-between;gap:10px;padding:3px 0}.arc div span:first-child{overflow-wrap:anywhere}.arc div span+span{flex:none;color:#3F5F6B;font-weight:600}
 .arc em{display:block;font-style:normal;color:#126985;border-top:1px solid #D4E8EE;margin-top:4px;padding-top:6px}
 .scanp{padding:16px 16px calc(16px + env(safe-area-inset-bottom));color:#C0D2D8}.scanp h3{display:flex;align-items:center;gap:8px;margin:0 0 4px;color:#fff;font-size:18px}.scanp p{margin:0 0 12px}.scanp a{color:#9ED8EA}
 .camseg{display:grid;grid-template-columns:1fr 1fr;background:#1C3A45;border-radius:12px;padding:3px;margin-bottom:14px}.scan .camseg button{background:none;color:#C0D2D8;min-height:44px;border-radius:10px;padding:6px}.scan .camseg button.on{background:#DDEFF4;color:#15313D}
 .scango{width:100%;min-height:48px;background:#126985;color:#fff}
+/* a phone on its side: the picture takes the whole screen, ✕ and the panel float over its edges */
+@media (orientation:landscape) and (max-height:600px){.scan[open]{display:block}.cam{position:absolute;inset:0}
+.scanh{position:absolute;z-index:1;top:0;left:0;padding:calc(8px + env(safe-area-inset-top)) 8px 8px calc(8px + env(safe-area-inset-left))}.scanh h2,.scanp p{display:none}.scan .close{background:#10262Fb3}
+.scanp{position:absolute;z-index:1;right:calc(8px + env(safe-area-inset-right));bottom:8px;width:min(250px,30vw);padding:8px;border-radius:14px;background:#10262Fcc}.scanp h3{font-size:14px}.camseg{margin-bottom:6px}.scan .camseg button{font-size:13px;min-height:40px}}
 /* №54 the bar: at the thumb, the reach grows left to right; the screen's own action rides above it (.save, .act) */
 .bar{position:fixed;z-index:10;left:0;right:0;bottom:0;padding:8px 10px calc(8px + env(safe-area-inset-bottom));background:var(--card);border-top:1px solid var(--line)}
 .bar>div{max-width:720px;margin:0 auto;display:flex;align-items:center;justify-content:space-between;gap:4px}.bar form{display:none}  /* design: the field lives on the home screen, «Найти» leads there */
@@ -378,8 +382,8 @@ const svg = (d, w = 22) => `<svg viewBox="0 0 24 24" width="${w}" height="${w}" 
 const ICO_QR = '<path d="M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h2v2h-2zM18 18h2v2h-2z"/>',
   ICO_BOX = '<path d="M3 7.5L12 3l9 4.5v9L12 21l-9-4.5z"/><path d="M3 7.5l9 4.5 9-4.5M12 12v9"/>';
 // The camera (design CAMERA.md). A code is ours when /api/peek finds it in the catalog: green; not there: red.
-// One of ours in sight opens by itself; two or more turn on «Содержимое коробок» (AR): under each box its top two things
-// by takes from it, never its name. f: the box field whose QR button was pressed — boxes only, the field is filled.
+// Nothing opens by itself: a tap on a code (or a finger's width off it) picks it; two or more of ours turn on
+// «Содержимое коробок» (AR): under each box its top two things by takes from it. A tag names the thing or box. f: the box field whose QR button was pressed — boxes only, the field is filled.
 // The scanner is a history entry: the phone's «назад» and ✕ close it, the page under it (a sheet, a form) stays.
 async function qrScan(f) {
   if (!("BarcodeDetector" in window && navigator.mediaDevices)) {
@@ -397,7 +401,7 @@ async function qrScan(f) {
       <h3></h3><p></p><button type="button" class="scango" hidden></button></div>`;
   const $ = q => d.querySelector(q), v = $("video"), cv = $("canvas"), cam = $(".cam"), h2 = $("h2"), h3 = $("h3"), p = $(".scanp p"), btn = $(".scango"),
     css = getComputedStyle(d);
-  let mode = "qr", auto = false, crowd = false, gone = false, after = null, timer = 0, snapped = null, s = null, said = "";
+  let mode = "qr", auto = false, crowd = false, gone = false, after = null, snapped = null, picked = null, s = null, said = "";
   const known = {}, marks = new Map(), els = new Map();  // known: "b"+id / "i"+id → undefined unasked, null asking, false not ours, else /api/peek's
   const ownOrigins = new Set([location.origin]);
   try { const published = {{ core.setting("PUBLIC_BASE_URL")|tojson }}; if (published) ownOrigins.add(new URL(published).origin); } catch {}
@@ -429,7 +433,7 @@ async function qrScan(f) {
   const leave = u => { gone = true; d.close(); location.replace(u); };  // replace: «назад» from there skips the scanner
   const go = u => {  // open what a code names
     if (gone) return;
-    gone = true; clearTimeout(timer);
+    gone = true;
     const b = u.match(BOX)?.[1].toUpperCase(), i = u.match(ITEM)?.[1];
     if (f) { after = () => { armed = f; gotBox(b); }; return history.back(); }  // a label read: straight into the field
     if (i) return leave("/I/" + i);  // a thing: its card as scanned, «Взять?» (№37, №43)
@@ -437,13 +441,13 @@ async function qrScan(f) {
     leave("/b/" + b);
   };
   const onPop = () => d.close();
-  d.onclose = () => { gone = true; clearTimeout(timer); s?.getTracks().forEach(t => t.stop()); removeEventListener("popstate", onPop); d.remove(); after?.(); };
+  d.onclose = () => { gone = true; s?.getTracks().forEach(t => t.stop()); removeEventListener("popstate", onPop); d.remove(); after?.(); };
   d.oncancel = e => { e.preventDefault(); gone || (gone = true, history.back()); };  // Esc
   $(".close").onclick = () => gone || (gone = true, history.back());
   d.onclick = e => {
     const m = e.target.closest("[data-m]"), t = e.target.closest("[data-u]");
-    if (m) { mode = m.dataset.m; auto = crowd = false; snapped = null; clearTimeout(timer); }
-    if (t) { e.preventDefault(); go(t.dataset.u); }
+    if (m) { mode = m.dataset.m; auto = crowd = false; snapped = null; }
+    if (t) { e.preventDefault(); if (!e.detail) pick(t.dataset.u); }  // a touch picked it on pointerdown; a key gives detail 0
   };
   const el = (k, tag, cls) => {
     let e = els.get(k);
@@ -463,7 +467,7 @@ async function qrScan(f) {
     for (const c of codes) {
       const q = corners(c), m = marks.get(c.rawValue);
       if (m) { const [ax, ay] = mid(m.q), [bx, by] = mid(q); dx += bx - ax; dy += by - ay; moved++; }
-      marks.set(c.rawValue, {u: c.rawValue, q, t: now});
+      marks.set(c.rawValue, {u: c.rawValue, q, t: now, s: m?.s || q});  // s: where it is drawn, gliding to q (draw)
     }
     for (const [u, m] of marks) {
       if (m.t < now && moved) m.q = m.q.map(([x, y]) => [x + dx / moved, y + dy / moved]);
@@ -475,39 +479,6 @@ async function qrScan(f) {
     const mine = seen.filter(c => state(c.u)), wait = seen.some(c => !state(c.u) && state(c.u) !== false);
     if (mine.length > 1) crowd = true;  // two of ours seen: a tap picks, never «the one left» (it is the one the others blinked away from)
     if (!f && mode == "qr" && crowd) { mode = "ar"; auto = true; }
-    // the picture: cover-scaled, so each code's corners map through the same scale and crop
-    const cw = cam.clientWidth, ch = cam.clientHeight,
-      k = Math.max(cw / vw, ch / vh), ox = (cw - vw * k) / 2, oy = (ch - vh * k) / 2, g = cv.getContext("2d");
-    cv.width = cw; cv.height = ch; g.lineWidth = 4; g.lineJoin = "round";
-    els.forEach(e => e.dataset.t = "");
-    for (const c of seen) {
-      const q = c.q.map(([x, y]) => [x * k + ox, y * k + oy]);
-      const [mx, my] = mid(q), u = c.u, st = state(u), id = key(u)?.slice(1);
-      g.strokeStyle = st ? css.getPropertyValue("--ok") : st === false ? css.getPropertyValue("--nok") : "#fff";
-      g.beginPath();
-      q.forEach(([x, y], n) => { const l = Math.hypot(x - mx, y - my) || 1; g[n ? "lineTo" : "moveTo"](x + (x - mx) / l * 6, y + (y - my) / l * 6); });
-      g.closePath(); g.stroke();
-      const top = Math.min(...q.map(c => c[1])) - 6, bot = Math.max(...q.map(c => c[1])) + 6;
-      if (mode == "qr" || auto) {
-        if (st) { const t = el("t" + u, "button", "tag"); t.type = "button"; t.dataset.u = u;
-          t.textContent = u.match(BOX) ? "Наш · " + id : "Наш · предмет"; t.style.left = mx + "px"; t.style.top = top + "px"; }
-        else if (st === false) { const t = el("n" + u, "span", "tag no"); t.textContent = key(u)?.[0] == "i" && f ? "Не коробка" : "Чужой QR"; t.style.left = mx + "px"; t.style.top = bot + "px"; }
-      }
-      if (mode == "ar" && st && u.match(BOX)) {
-        const a = el("a" + u, "a", "arc"); a.href = "/b/" + id; a.dataset.u = u;
-        const h = !st.items.length ? (st.boxes ? `${st.boxes} ${plural(st.boxes, "коробка", "коробки", "коробок")} внутри` : "Коробка пуста") : null;
-        const sig = JSON.stringify(st);
-        if (a.dataset.sig != sig) {
-          a.dataset.sig = sig; a.replaceChildren();
-          if (h) a.append(h);
-          for (const r of st.items) { const row = document.createElement("div"); row.append(...[r.name, r.qty || "есть, не считал"].map(x => Object.assign(document.createElement("span"), {textContent: x}))); a.append(row); }
-          if (st.more) a.append(Object.assign(document.createElement("em"), {textContent: `… ещё ${st.more} ${plural(st.more, "предмет", "предмета", "предметов")} →`}));
-        }
-        a.style.left = Math.max(8, Math.min(cw - a.offsetWidth - 8, mx - a.offsetWidth / 2)) + "px";
-        a.style.top = Math.max(8, Math.min(ch - a.offsetHeight - 8, bot + 4)) + "px";
-      }
-    }
-    for (const [n, e] of els) if (!e.dataset.t) { e.remove(); els.delete(n); }
     $(".aim").hidden = !!seen.length;
     const ours = $(".ours"), n = mine.length;
     ours.hidden = mode != "ar" || !n; ours.textContent = `${n} ${plural(n, "наша наклейка", "наши наклейки", "наших наклеек")}`;
@@ -515,25 +486,90 @@ async function qrScan(f) {
     const head = f || mode == "qr" && seen.length < 2 ? "Сканировать QR" : mode == "qr" ? "QR в кадре" : "AR · содержимое";
     if (h2.textContent != head) h2.textContent = head;
     const one = mode == "qr" && !crowd && mine.length == 1 && !wait ? mine[0].u : null;
-    if (one !== snapped) { clearTimeout(timer); snapped = one; if (one) { blip(); timer = setTimeout(() => go(one), 800); } }
-    if (mode == "ar") say(auto ? "Несколько наших наклеек" : "Что в коробках?", auto ? "Нажмите на подпись нужной коробки."
-      : "Наведите камеру на наклейки. Нажмите на подпись, чтобы открыть коробку.");
+    // never opens by itself: the camera may read one of three labels for a second before the rest («ловит одну и тут же открывает»)
+    if (one !== snapped) { snapped = one; if (one) blip(); }
+    if (mode == "ar") say(auto ? "Несколько наших наклеек" : "Что в коробках?", auto ? "Нажмите на нужную коробку."
+      : "Наведите камеру на наклейки. Нажмите на коробку, чтобы открыть её.");
     else if (one) {
-      const isBox = !!one.match(BOX), what = isBox ? `Коробка ${key(one).slice(1)}.` : `Предмет «${state(one).name}».`, open = [isBox ? "Открыть коробку сейчас" : "Открыть сейчас", () => go(one)];
-      seen.length > 1 ? say("Один наш код найден", `Нашу наклейку выделили зелёным, чужую — красным. Открываем ${isBox ? "нашу коробку" : "предмет"}.`, null, open)
-        : say("Код найден", what + " Открываем автоматически…", ICO_BOX, open);
+      const isBox = !!one.match(BOX), what = isBox ? `Коробка ${state(one).name || key(one).slice(1)}.` : `Предмет «${state(one).name}».`, open = [isBox ? "Открыть коробку" : "Открыть", () => go(one)];
+      seen.length > 1 ? say("Один наш код найден", `Нашу наклейку выделили зелёным, чужую — красным. Нажмите, чтобы открыть ${isBox ? "коробку" : "предмет"}.`, null, open)
+        : say("Код найден", what + " Нажмите, чтобы открыть.", ICO_BOX, open);
     }
     else if (crowd && n) say("Несколько наших наклеек", "Нажмите на нужную.");
     else if (seen.length && !wait) say("Наведите на код", "Этого кода нет в каталоге. Наведите на нашу наклейку.", ICO_QR);
     else say("Наведите на код", "Держите наклейку в кадре. Снимок и кнопка спуска не нужны.", ICO_QR);
   };
+  // Drawn every screen frame, apart from reading: each ring glides to where its code was last read («дёрганая, нервная»).
+  // The picture is contained, not cropped: what the camera sees is all on screen, no zoom.
+  let last = 0;
+  const calm = matchMedia("(prefers-reduced-motion: reduce)");
+  const draw = ts => {
+    if (!d.open) return;
+    requestAnimationFrame(draw);
+    const a = calm.matches || !last ? 1 : 1 - Math.exp(-(ts - last) / 90), vw = v.videoWidth, vh = v.videoHeight;
+    last = ts;
+    if (!vw) return;
+    const cw = cam.clientWidth, ch = cam.clientHeight, r = devicePixelRatio || 1, now = Date.now(),
+      k = Math.min(cw / vw, ch / vh), ox = (cw - vw * k) / 2, oy = (ch - vh * k) / 2, g = cv.getContext("2d");
+    if (cv.width != Math.round(cw * r) || cv.height != Math.round(ch * r)) { cv.width = Math.round(cw * r); cv.height = Math.round(ch * r); }
+    g.setTransform(r, 0, 0, r, 0, 0); g.clearRect(0, 0, cw, ch); g.lineJoin = "round";
+    els.forEach(e => e.dataset.t = "");
+    for (const c of marks.values()) {
+      c.s = c.s.map(([x, y], n) => [x + (c.q[n][0] - x) * a, y + (c.q[n][1] - y) * a]);
+      const q = c.s.map(([x, y]) => [x * k + ox, y * k + oy]);
+      const [mx, my] = mid(q), u = c.u, st = state(u), id = key(u)?.slice(1), sel = u == picked;
+      const half = Math.max(...q.map(([x, y]) => Math.hypot(x - mx, y - my))), pad = Math.max(12, half * .35);  // wide of the code, never on it
+      const ring = q.map(([x, y]) => { const l = Math.hypot(x - mx, y - my) || 1; return [x + (x - mx) / l * pad, y + (y - my) / l * pad]; });
+      c.p = [mx, my, half + pad];  // for a tap (pick)
+      g.globalAlpha = sel ? 1 : Math.max(.35, 1 - Math.max(0, now - c.t - 500) / 1500);  // an unread code fades, not blinks
+      g.strokeStyle = g.fillStyle = st ? css.getPropertyValue("--ok") : st === false ? css.getPropertyValue("--nok") : "#fff";
+      g.beginPath(); ring.forEach(([x, y], n) => g[n ? "lineTo" : "moveTo"](x, y)); g.closePath();
+      if (sel) { g.globalAlpha = .3; g.fill(); g.globalAlpha = 1; }
+      g.lineWidth = sel ? 6 : 3; g.stroke();
+      const top = Math.min(...ring.map(p => p[1])), bot = Math.max(...ring.map(p => p[1]));
+      if (mode == "qr" || auto) {
+        if (st) { const t = el("t" + u, "button", "tag"); t.type = "button"; t.dataset.u = u; t.classList.toggle("sel", sel);
+          const name = st.name || (u.match(BOX) ? "Коробка " + id : "Предмет");
+          if (t.textContent != name) t.textContent = name;
+          t.style.transform = `translate3d(${mx}px,${top}px,0) translate(-50%,calc(-100% - 8px))`; }
+        else if (st === false) { const t = el("n" + u, "span", "tag no"); t.textContent = key(u)?.[0] == "i" && f ? "Не коробка" : "Чужой QR";
+          t.style.transform = `translate3d(${mx}px,${bot}px,0) translate(-50%,8px)`; }
+      }
+      if (mode == "ar" && st && u.match(BOX)) {
+        const ar = el("a" + u, "a", "arc"); ar.href = "/b/" + id; ar.dataset.u = u; ar.classList.toggle("sel", sel);
+        const h = !st.items.length ? (st.boxes ? `${st.boxes} ${plural(st.boxes, "коробка", "коробки", "коробок")} внутри` : "Коробка пуста") : null;
+        const sig = JSON.stringify(st);
+        if (ar.dataset.sig != sig) {
+          ar.dataset.sig = sig; ar.replaceChildren();
+          if (h) ar.append(h);
+          for (const it of st.items) { const row = document.createElement("div"); row.append(...[it.name, it.qty || "есть, не считал"].map(x => Object.assign(document.createElement("span"), {textContent: x}))); ar.append(row); }
+          if (st.more) ar.append(Object.assign(document.createElement("em"), {textContent: `… ещё ${st.more} ${plural(st.more, "предмет", "предмета", "предметов")} →`}));
+        }
+        ar.style.transform = `translate3d(${Math.max(8, Math.min(cw - ar.offsetWidth - 8, mx - ar.offsetWidth / 2))}px,${Math.max(8, Math.min(ch - ar.offsetHeight - 8, bot + 6))}px,0)`;
+      }
+    }
+    for (const [n, e] of els) if (!e.dataset.t) { e.remove(); els.delete(n); }
+  };
+  // A tap picks on touch, not on release: a label that slid from under the finger lost the click («чаще игнорирует»).
+  // A miss by a finger's width picks the nearest of ours; its ring lights up at once, the page opens a moment later.
+  const pick = u => { if (gone || picked) return; picked = u; blip(); setTimeout(() => go(u), 220); };
+  cam.onpointerdown = e => {
+    const t = e.target.closest("[data-u]");
+    if (t) return pick(t.dataset.u);
+    const b = cam.getBoundingClientRect(), x = e.clientX - b.left, y = e.clientY - b.top;
+    let best = 44, u = null;
+    for (const c of marks.values()) if (state(c.u) && c.p) { const m = Math.hypot(x - c.p[0], y - c.p[1]) - c.p[2]; if (m < best) { best = m; u = c.u; } }
+    if (u) pick(u);
+  };
   const start = async () => {
     $(".aim").hidden = false;
     say("Наведите на код", "Держите наклейку в кадре. Снимок и кнопка спуска не нужны.", ICO_QR);
     try {
-      s = await navigator.mediaDevices.getUserMedia({video: {facingMode: "environment"}});
+      s = await navigator.mediaDevices.getUserMedia({video: {facingMode: "environment", width: {ideal: 1920}, aspectRatio: {ideal: 4 / 3}}});  // sharp enough for a label at the edge
+      const tr = s.getVideoTracks()[0], z = tr.getCapabilities?.().zoom;
+      if (z && tr.getSettings().zoom > Math.max(z.min, 1)) tr.applyConstraints({advanced: [{zoom: Math.max(z.min, 1)}]}).catch(() => {});  // some phones start zoomed in
       if (!d.open) return s.getTracks().forEach(t => t.stop());
-      v.muted = true; v.srcObject = s; await v.play();
+      v.muted = true; v.srcObject = s; await v.play(); requestAnimationFrame(draw);
       const det = new BarcodeDetector({formats: ["qr_code"]});
       while (d.open) { await frame(det); await new Promise(r => setTimeout(r, 120)); }
     } catch (e) {

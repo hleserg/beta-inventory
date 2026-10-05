@@ -823,7 +823,7 @@ def test_alerts():
 
 
 def test_peek():
-    """The camera (CAMERA.md): only catalog codes count; over a box, up to two things it gives out most, never its name."""
+    """The camera (CAMERA.md): only catalog codes count; over a box, up to two things it gives out most, and its name for the tag."""
     a, b, inner = core.new_boxes(3)
     c.post(f"/b/{a}", data={"name": "Шкаф-обзор"})
     ids = {}
@@ -836,7 +836,7 @@ def test_peek():
     assert r.status_code == 200
     j = r.json()
     assert set(j["boxes"]) == {a, b} and list(j["items"]) == [str(ids["Бета"])]  # unknown codes are not ours
-    assert "Шкаф-обзор" not in r.text and j["boxes"][b] == {"items": [], "more": 0, "boxes": 0}  # an empty box
+    assert j["boxes"][a]["name"] == "Шкаф-обзор" and j["boxes"][b] == {"name": "", "items": [], "more": 0, "boxes": 0}  # an empty box
     first = j["boxes"][a]  # no takes in half a year: two at random, one more
     assert len(first["items"]) == 2 and first["more"] == 1 and first["boxes"] == 1 and first["items"][0]["qty"] == "4 шт"
 

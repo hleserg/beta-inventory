@@ -274,13 +274,13 @@ def box(req: Request, box_id: str):
 
 @app.get("/api/peek")
 def peek(boxes: str = "", items: str = ""):
-    """The camera: which codes in sight are ours (in the catalog), and over each box the AR label — never its name."""
+    """The camera: which codes in sight are ours (in the catalog), each one's name for its tag, and over each box the AR label."""
     out = dict(boxes={}, items={})
     with db() as c:
         for bid in dict.fromkeys(x.strip() for x in boxes.upper().split(",")[:20]):
-            if c.execute("SELECT 1 FROM boxes WHERE id=?", (bid,)).fetchone():
+            if r := c.execute("SELECT name FROM boxes WHERE id=?", (bid,)).fetchone():
                 top, total = core.box_peek(c, bid)
-                out["boxes"][bid] = dict(items=[dict(id=r["id"], name=r["name"], qty=qty_text(r["qty"], unit=core.unit_of(r["type"], r["fields"])))
+                out["boxes"][bid] = dict(name=r["name"], items=[dict(id=r["id"], name=r["name"], qty=qty_text(r["qty"], unit=core.unit_of(r["type"], r["fields"])))
                                                 for r in top], more=total - len(top),
                                          boxes=c.execute("SELECT count(*) FROM boxes WHERE parent_id=?", (bid,)).fetchone()[0])
         for iid in dict.fromkeys(x.strip() for x in items.split(",")[:20] if x.strip().isdigit()):
