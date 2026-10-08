@@ -9,7 +9,7 @@ The `inventory` MCP server holds the cards. Its tools describe themselves. This 
 
 1. **`search`**: look up the name, then what the thing is ("датчик тока"). If it is found, don't create a new card: use `change_stock` to add the pieces and `update_item` for what the card lacks.
 2. **`card_template()`**: pick the type. Then call **`card_template(type)`** to get the fields. Follow its `name_hint` when naming the item; keep the name short and distinctive without silently shortening an owner's existing name. Every field has a `hint` that says what goes in it. For the description, the hint lists the sections in order. Write each of those sections.
-3. **Web**: look up the datasheet, pinout and a guide, and one clear photo of the board. For the photo, pass a *direct* image link: it ends in `.jpg`/`.png` and opens as a picture, not as a shop page. For a household thing (category «Дом») look up the manual and care instead: descaling, filters, consumables — the field hints say what.
+3. **Web**: look up the datasheet, pinout and a guide, and one clear photo of the board. For the photo, pass a *direct* image link: it ends in `.jpg`/`.png` and opens as a picture, not as a shop page. **The owner sent photos in chat?** They beat any web photo: pass each one as `data:image/jpeg;base64,…` in `photo` (a list keeps their order; the first is the cover). Never put a placeholder when the owner gave photos. For a household thing (category «Дом») look up the manual and care instead: descaling, filters, consumables — the field hints say what.
 4. **`create_item`**: pass `agent` = your name as the user knows you (Claude, Codex). With `box_id` and `qty` it also puts the pieces into the box.
 5. **Reply**: give the card link and say what you are unsure of.
 
@@ -21,3 +21,4 @@ The `inventory` MCP server holds the cards. Its tools describe themselves. This 
 | Words like "high-side", "шунт", "pull-up" left unexplained | Explain them in plain words, or leave them out. |
 | The pinout comes from another board revision | Add «сверьте с шелкографией». |
 | «Другие названия» is empty | Fill in how people call it in Russian and English, plus common typos. Search finds the card by these names. |
+| Photos from chat replaced with a web picture, "no way to upload" | `photo` takes `data:image/jpeg;base64,…`: encode the file you hold and pass it. |
