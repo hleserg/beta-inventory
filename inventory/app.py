@@ -101,6 +101,7 @@ def all_boxes():  # for box fields: named first, by name; each with its place â€
 
 
 T.env.globals["all_boxes"] = all_boxes
+T.env.globals["brief_of"] = core.brief_of
 _md = MarkdownIt("commonmark", {"html": False}).enable("table")  # raw HTML off: cards come from agents too
 T.env.filters["md"] = lambda s: Markup(_md.render(s or ""))
 T.env.filters["host"] = lambda s: (urlsplit(s).hostname or s).removeprefix("www.")  # a shop link reads as ozon.ru

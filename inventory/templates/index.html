@@ -11,15 +11,19 @@
     <input type="number" name="qty" min="1" placeholder="не считал"><button>Положить в {{ put }}</button></form>{% endif %}
 </div>{% endmacro %}
 {# №51/№57: what is where — at the top what is in hand, then what I just put away, then everything; filters at the thumb #}
-{% macro row(r, hand=false) %}<div class="line"><a href="/i/{{ r.id }}">{{ thumb(r) }}<span class="grow"><span class="nm">{{ r.name }}</span>{% set tl = type_label(r.type) %}<span class="dt mut" title="{{ tl }}">{{ tl.split(" › ")|last }}</span><br><span class="mut">
+{% macro row(r, hand=false) %}{% set inner %}{{ thumb(r) }}<span class="grow"><span class="nm">{{ r.name }}</span>{% set tl = type_label(r.type) %}<span class="dt mut" title="{{ tl }}">{{ tl.split(" › ")|last }}</span><br><span class="mut">
   {%- if r.boxes|length == 1 %}{% set b = r.boxes[0] %}{{ b.name or b.box_id }}{% if b.where %} · {{ b.where }}{% endif %}
   {%- elif r.boxes %}в {{ r.boxes|length }} местах{% elif r.hands %}{{ t.hands|lower }}{% elif r.tr %}{{ t.transit|lower }}{% else %}{{ t.out|lower }}{% endif %}</span>
   {%- if r.low %} <span class="src warn">{{ t.reorder|lower }}</span>{% endif %}
   {%- if r.hands and r.boxes %} <span class="src">{{ t.hands|lower }}</span>{% endif %}
   {%- if r.tr and (r.boxes or r.hands) %} <span class="src">{{ t.transit|lower }}</span>{% endif %}</span>
-  <span class="qty">{{ (r.inhand if hand else r.total)|qty(not hand and r.uncounted, unit=unit_of(r.type, r.fields)) }}</span></a>
-  {%- if put %}<form method="post" action="/stock"><input type="hidden" name="box" value="{{ put }}"><input type="hidden" name="item" value="{{ r.id }}"><input type="hidden" name="action" value="add"><input type="hidden" name="kind" value="put"><input type="hidden" name="qty" value="1"><input type="hidden" name="back" value="/b/{{ put }}"><button>Сюда</button></form>
-  {%- elif caller is defined %}{{ caller() }}{% endif %}</div>{% endmacro %}
+  <span class="qty">{{ (r.inhand if hand else r.total)|qty(not hand and r.uncounted, unit=unit_of(r.type, r.fields)) }}</span>{% endset %}
+{%- if put or caller is defined %}<div class="line"><a href="/i/{{ r.id }}">{{ inner }}</a>
+  {%- if put %}<form method="post" action="/stock"><input type="hidden" name="box" value="{{ put }}"><input type="hidden" name="item" value="{{ r.id }}"><input type="hidden" name="action" value="add"><input type="hidden" name="kind" value="put"><input type="hidden" name="qty" value="1"><input type="hidden" name="back" value="/b/{{ put }}"><button>Сюда</button></form>{% else %}{{ caller() }}{% endif %}</div>
+{%- else %}{# a tap opens the brief in place; the card is one more tap #}<details class="ld"><summary class="line"><span class="a">{{ inner }}</span></summary><div class="brief">
+  {%- for k, v in brief_of(r.type, r.fields) %}<div><span class="mut">{{ k }}:</span> {{ v }}</div>{% endfor %}
+  {%- for b in r.boxes %}<div>{{ box_link(b.box_id, b.name) }}{% if b.where %} · {{ b.where }}{% endif %} — <span class="qty">{{ b.qty|qty(unit=unit_of(r.type, r.fields)) }}</span></div>{% endfor %}
+  <a class="btn" href="/i/{{ r.id }}">Открыть карточку</a></div></details>{% endif %}{% endmacro %}
 {% macro taken_box(b) %}<div class="line"><a href="/b/{{ b.id }}"><span class="thumb"></span><span class="grow">{{ b.name or b.id }}<br><span class="mut">{{ t.box }}{% if b.name %} ({{ b.id }}){% endif %}</span></span></a>
   <form method="post" action="/b/{{ b.id }}/back"><input type="hidden" name="back" value="{{ request.url.path }}{{ '?' ~ request.url.query if request.url.query }}"><button class="ghost">На место</button></form></div>{% endmacro %}
 <h1>Что где</h1>

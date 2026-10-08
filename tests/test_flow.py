@@ -895,3 +895,18 @@ def test_out_of_stock_and_move():
     assert q("SELECT count(*) FROM stock WHERE item_id=? AND box_id=?", pid, core.HANDS) == 0
     c.post("/stock", data={"box": a, "item": pid, "action": "move", "to": b, "qty": 4})  # part of a pile: it stays loose
     assert dict(core.db().execute("SELECT box_id, qty FROM stock WHERE item_id=?", (pid,)).fetchall()) == {a: None, b: 4}
+
+
+def test_brief_in_list():
+    """A tap on a row in the list opens its brief in place: what it is, every box with its place, then the card."""
+    box = core.new_boxes(1)[0]
+    c.post("/items/new?type=module", files=photo(), data={"name": "Бриф-модуль", "chip": "XL4015", "pinout": "IN OUT",
+                                                           "box": box, "qty": "3"})
+    iid = newest()
+    page = c.get("/").text
+    page = page[page.index("Все · А–Я"):]
+    row = page[page.rindex("<details", 0, page.index("Бриф-модуль")):]
+    row = row[:row.index("</details>")]
+    assert '<details class="ld">' in row and "XL4015" in row and f'href="/i/{iid}">Открыть карточку' in row
+    assert f'href="/b/{box}"' in row
+    assert "Открыть карточку" not in c.get(f"/?put={box}").text  # putting away: a row is still one tap «Сюда»
