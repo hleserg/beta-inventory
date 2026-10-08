@@ -2,6 +2,7 @@
 import asyncio
 import io
 import json
+import mimetypes
 import os
 import urllib.request
 from pathlib import Path
@@ -230,22 +231,26 @@ def fetch(url):
                                     timeout=30) as r:
             data = r.read(FETCH_LIMIT + 1)
     except (OSError, ValueError) as e:
-        raise ToolError(f"Can't download {url}: {e}") from None
+        raise ToolError(f"Can't download {url[:100]}: {e}") from None
     if len(data) > FETCH_LIMIT:
-        raise ToolError(f"{url} is over {FETCH_LIMIT >> 20} MB.")
+        raise ToolError(f"{url[:100]} is over {FETCH_LIMIT >> 20} MB.")
     return data
 
 
 async def upload(url, photo):
-    if not str(url).lower().startswith(("http://", "https://")):
-        raise ToolError(f"{url!r} is not a link: photos and files are given as http(s) URLs.")
+    """A http(s) link, or data:<type>;base64,… for a file the agent holds itself (urllib reads both)."""
+    url = str(url)
+    data_url = url.lower().startswith("data:")
+    if not (data_url or url.lower().startswith(("http://", "https://"))):
+        raise ToolError(f"{url[:100]!r} is not a link: photos and files are given as http(s) or data:…;base64 URLs.")
     data = await asyncio.to_thread(fetch, url)
     if photo:
         try:
             Image.open(io.BytesIO(data)).verify()
         except Exception:
-            raise ToolError(f"{url} is not a picture: give a direct link to the image file.") from None
-    return await asyncio.to_thread(core.save_bytes, data, Path(urlparse(url).path).suffix.lower()[:10], photo)
+            raise ToolError(f"{url[:100]} is not a picture: give a direct link to the image file.") from None
+    ext = mimetypes.guess_extension(url[5:].split(";")[0].split(",")[0]) or "" if data_url else Path(urlparse(url).path).suffix
+    return await asyncio.to_thread(core.save_bytes, data, ext.lower()[:10], photo)
 
 
 async def photo_of(x):
@@ -309,6 +314,7 @@ def check(name, type_key, f, old=None):
 async def create_item(type: str, name: str, fields: dict[str, Any], agent: str, box_id: str = "",
                       qty: int | None = 0) -> dict[str, Any]:
     """New card. Fields by card_template(type), keys as there; photo: a list of direct image URLs (one string is fine), the server downloads them;
+    a picture you hold yourself (the owner sent it in chat) goes as data:image/jpeg;base64,…;
     {url, crop: [x0, y0, x1, y1]} takes that part of the picture (pixels; a /u/ link: of the stored photo),
     e.g. one cell of an organizer's photo for its own card; files: [{name, url}]. With box_id and qty, puts qty into that box (history author: agent, your name);
     qty null puts some in uncounted, «есть, не считал». With qty and no box_id, the qty is in hand (box HANDS),

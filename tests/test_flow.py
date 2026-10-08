@@ -361,6 +361,21 @@ def test_crop_photo():
         asyncio.run(mcp_server.fill("module", {}, {"photo": {"url": whole, "crop": [0, 0, 50, 10]}}))
 
 
+def test_photo_as_data_url():
+    """A photo the agent has only in its chat (the owner sent it there) goes in as data:…;base64, no link needed."""
+    import asyncio
+    import base64
+    import pytest
+    from inventory import mcp_server
+    b = io.BytesIO()
+    Image.new("RGB", (40, 30), "blue").save(b, "JPEG")
+    url = "data:image/jpeg;base64," + base64.b64encode(b.getvalue()).decode()
+    [name] = asyncio.run(mcp_server.fill("module", {}, {"photo": url}))["photo"]
+    assert Image.open(core.UPLOADS / name).size == (40, 30)
+    with pytest.raises(mcp_server.ToolError, match="not a picture"):
+        asyncio.run(mcp_server.fill("module", {}, {"photo": "data:image/jpeg;base64," + base64.b64encode(b"junk" * 500).decode()}))
+
+
 def test_old_single_photo():
     """Cards from before several photos held one name, not a list."""
     iid = core.save_item(None, "старое", "module", {"photo": "x.jpg", "pinout": "A"})
