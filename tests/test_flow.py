@@ -940,3 +940,12 @@ def test_brief_in_list():
     assert '<details class="ld">' in row and "XL4015" in row and f'href="/i/{iid}">Открыть карточку' in row
     assert f'href="/b/{box}"' in row
     assert "Открыть карточку" not in c.get(f"/?put={box}").text  # putting away: a row is still one tap «Сюда»
+
+
+def test_mcp_takes_big_body():
+    """Two phone photos as data: URLs are over the SDK's 4 MiB cap; /mcp still takes them."""
+    pad = "x" * 6 * 1024 * 1024
+    # no lifespan here: the session manager starts once per process, and test_mcp starts it
+    r = TestClient(app, raise_server_exceptions=False).post("/mcp", json={"jsonrpc": "2.0", "id": 1, "method": "tools/list", "params": {"_meta": {"pad": pad}}},
+                                                        headers={"Accept": "application/json, text/event-stream"})
+    assert r.status_code != 413

@@ -72,7 +72,9 @@ class ReplaceNav:
 app.add_middleware(ReplaceNav)
 # Agents: MCP at /mcp, same port and data as the site. Host 0.0.0.0 turns the localhost-only Host check
 # off: agents come by LAN name, and the site has no auth by design (LAN only).
-app.router.routes.extend(mcp_server.streamable_http_app(stateless_http=True, json_response=True, host="0.0.0.0").routes)
+# The SDK caps a request at 4 MiB; photos come inline as data: URLs, two phone shots are over that.
+app.router.routes.extend(mcp_server.streamable_http_app(stateless_http=True, json_response=True, host="0.0.0.0",
+                                                        max_request_body_size=64 * 1024 * 1024).routes)
 app.mount("/u", StaticFiles(directory=core.UPLOADS), name="uploads")
 STATIC = Path(__file__).parent / "static"
 app.mount("/static", StaticFiles(directory=STATIC), name="static")
