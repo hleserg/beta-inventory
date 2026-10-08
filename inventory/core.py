@@ -727,6 +727,21 @@ def turn_photo(name, deg):
     return save_bytes(buf.getvalue(), ".jpg")
 
 
+def crop_photo(name, box):
+    """Cut [x0, y0, x1, y1] (pixels of the stored photo) out of a stored photo — one cell of an organizer for its own card.
+    → the new file's name; the whole photo stays."""
+    try:
+        im = Image.open(UPLOADS / name)
+        x0, y0, x1, y1 = (int(v) for v in box)
+    except (OSError, TypeError, ValueError):
+        raise ValueError("crop wants [x0, y0, x1, y1] in pixels of a readable photo")
+    if not (0 <= x0 < x1 <= im.width and 0 <= y0 < y1 <= im.height):
+        raise ValueError(f"crop {list(box)} is outside the photo, {im.width}×{im.height}")
+    buf = io.BytesIO()
+    im.crop((x0, y0, x1, y1)).convert("RGB").save(buf, "JPEG", quality=PHOTO_QUALITY, optimize=True)
+    return save_bytes(buf.getvalue(), ".jpg")
+
+
 def rotate_box_photo(box_id, name, deg):
     with db() as c:
         b = c.execute("SELECT photos FROM boxes WHERE id=?", (box_id,)).fetchone()

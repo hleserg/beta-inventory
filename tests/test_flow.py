@@ -346,6 +346,21 @@ def test_box_photos():
     assert f"/u/{b}" not in c.get(f"/b/{box}").text
 
 
+def test_crop_photo():
+    """An organizer's photo, one cell per card: the agent gives the /u/ link and the cell's frame."""
+    import asyncio
+    import pytest
+    from inventory import mcp_server
+    b = io.BytesIO()
+    Image.new("RGB", (40, 30), "red").save(b, "PNG")
+    whole = core.save_bytes(b.getvalue(), ".png", photo=True)
+    f = asyncio.run(mcp_server.fill("module", {}, {"photo": [{"url": f"HTTP://INV.LAN/u/{whole}", "crop": [10, 5, 30, 25]}]}))
+    [cut] = f["photo"]
+    assert cut != whole and Image.open(core.UPLOADS / cut).size == (20, 20) and (core.UPLOADS / whole).is_file()
+    with pytest.raises(mcp_server.ToolError, match="outside"):
+        asyncio.run(mcp_server.fill("module", {}, {"photo": {"url": whole, "crop": [0, 0, 50, 10]}}))
+
+
 def test_old_single_photo():
     """Cards from before several photos held one name, not a list."""
     iid = core.save_item(None, "старое", "module", {"photo": "x.jpg", "pinout": "A"})

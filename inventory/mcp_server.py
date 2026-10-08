@@ -248,6 +248,18 @@ async def upload(url, photo):
     return await asyncio.to_thread(core.save_bytes, data, Path(urlparse(url).path).suffix.lower()[:10], photo)
 
 
+async def photo_of(x):
+    """One photo given by an agent: a link, or {url, crop: [x0, y0, x1, y1]} — that part of the picture."""
+    url, box = (x.get("url", ""), x.get("crop")) if isinstance(x, dict) else (x, None)
+    name = core.own_upload(url) or await upload(url, photo=True)
+    if not box:
+        return name
+    try:
+        return await asyncio.to_thread(core.crop_photo, name, box)
+    except ValueError as e:
+        raise ToolError(f"{url}: {e}.") from None
+
+
 async def fill(type_key, old, given):
     """Agent's field values → stored card fields, merged over old. Unknown keys fail, hidden stored ones stay."""
     defs = {fd["key"]: fd for fd in core.fields_for(type_key)}
@@ -261,8 +273,8 @@ async def fill(type_key, old, given):
                             + (" (kept from the card's former type, not shown)" if k in old else "")
                             + f". Put it into the description. See card_template({type_key!r}).")
         if fd["type"] == "photo":
-            pics = [v] if isinstance(v, str) else v or []  # one photo as a plain string is fine too
-            f[k] = [core.own_upload(x) or await upload(x, photo=True) for x in pics if x]
+            pics = [v] if isinstance(v, (str, dict)) else v or []  # one photo as a plain string is fine too
+            f[k] = [await photo_of(x) for x in pics if x]
         elif fd["type"] == "files":
             have = [x["file"] for x in f.get(k, [])]
             for x in v or []:
@@ -297,7 +309,8 @@ def check(name, type_key, f, old=None):
 async def create_item(type: str, name: str, fields: dict[str, Any], agent: str, box_id: str = "",
                       qty: int | None = 0) -> dict[str, Any]:
     """New card. Fields by card_template(type), keys as there; photo: a list of direct image URLs (one string is fine), the server downloads them;
-    files: [{name, url}]. With box_id and qty, puts qty into that box (history author: agent, your name);
+    {url, crop: [x0, y0, x1, y1]} takes that part of the picture (pixels; a /u/ link: of the stored photo),
+    e.g. one cell of an organizer's photo for its own card; files: [{name, url}]. With box_id and qty, puts qty into that box (history author: agent, your name);
     qty null puts some in uncounted, «есть, не считал». With qty and no box_id, the qty is in hand (box HANDS),
     not put away yet. A type whose card_template says single (tools): one lies there, whatever qty says.
 
