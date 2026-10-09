@@ -482,6 +482,15 @@ def test_single():
     assert flag(rid) == 0  # a rescan keeps the hand's choice
     assert c.post(f"/i/{rid}/tag").status_code == 200 and flag(rid) == 0  # written from the site: same rule
 
+    c.post("/items/new?type=resistor", data={"name": "шлейфы пакетом", "value": "x", "box": a, "qty": "10"})
+    pid = newest()  # a tag on a bag of ten is a tag on the bag: still counted, the return sheet keeps its count
+    assert c.post(f"/i/{pid}/tag").json() == {"single": False} and flag(pid) is None
+    c.get(f"/I/{pid}")
+    assert flag(pid) is None and stock(pid) == {a: 10}
+    c.post("/stock", data={"box": a, "item": pid, "action": "take", "qty": "10"})
+    card = c.get(f"/i/{pid}").text
+    assert 'type="number" name="qty"' in card and 'id="single" checked' not in card
+
     # №48: a new card of one of a kind hides its count, reorder level and unit; ticked by hand, it is one
     assert re.search(r'name="single" value="1" checked.*data-many hidden', c.get("/items/new?type=hand_tool").text, re.S)
     new = c.get("/items/new?type=resistor").text

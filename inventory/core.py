@@ -627,10 +627,14 @@ def set_single(item_id, on):
 
 
 def tag_item(item_id):
-    """A tag got written or scanned (№43): the thing is one of a kind from now on, unless unticked by hand before."""
+    """A tag got written or scanned (№43): the thing is one of a kind from now on, unless unticked by hand before
+    or counted in pieces — a tag on a bag of ten is a tag on the bag. Says whether it is one of a kind now."""
     with db() as c:
-        if c.execute("UPDATE items SET single=1 WHERE id=? AND single IS NULL", (item_id,)).rowcount:
+        many = c.execute("SELECT coalesce(sum(qty), 0) > 1 FROM stock WHERE item_id=?", (item_id,)).fetchone()[0]
+        if not many and c.execute("UPDATE items SET single=1 WHERE id=? AND single IS NULL", (item_id,)).rowcount:
             c.execute("UPDATE stock SET qty=1 WHERE qty IS NULL AND item_id=?", (item_id,))
+        it = c.execute("SELECT single, type FROM items WHERE id=?", (item_id,)).fetchone()
+        return bool(it) and single_of(it)
 
 
 def set_for_agent(item_id, on):

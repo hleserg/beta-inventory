@@ -782,7 +782,7 @@ addEventListener("click", async e => {  // «Записать на метку» 
     st.textContent = "Записано ✓ Проверьте: коснитесь метки телефоном.";
     const i = b.dataset.nfcw.match(/\/I\/(\d+)$/), s = document.getElementById("single");  // №43: a thing with a tag is one of a kind
     // the tag is written by now: a lost request after it must not read as «не записалось»
-    if (i) try { if ((await fetch(`/i/${i[1]}/tag`, {method: "POST"})).ok && s && "auto" in s.dataset) s.checked = true; }
+    if (i) try { const r = await fetch(`/i/${i[1]}/tag`, {method: "POST"}); if (r.ok && s && "auto" in s.dataset) s.checked = (await r.json()).single; }
       catch { st.textContent += " Отметку «одна штука» сайт не получил — поставьте её сами."; }
   } catch (e) {
     if (ctl !== nfcWrite) return;  // a newer tap took over: it owns the status and nfcBusy

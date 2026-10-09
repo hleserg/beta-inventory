@@ -632,9 +632,8 @@ async def item_single(req: Request, item_id: int):
 
 
 @app.post("/i/{item_id}/tag")
-def item_tag(item_id: int):  # the card wrote its tag (base.html)
-    core.tag_item(item_id)
-    return go(f"/i/{item_id}")
+def item_tag(item_id: int):  # the card wrote its tag (base.html); says whether that made it one of a kind
+    return {"single": core.tag_item(item_id)}
 
 
 @app.post("/i/{item_id}/need")
