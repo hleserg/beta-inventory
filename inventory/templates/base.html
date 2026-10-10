@@ -522,7 +522,7 @@ async function qrScan(f) {
       if (a < b && r > .6 && r < 1.6 && far > 10 && far < 40) g[root(b)] = root(a);
     }));
     sq.forEach((p, n) => { const k = root(n); if (k != n || sq.some((o, b) => b != n && root(b) == k)) out.set(k, [...(out.get(k) || []), p]); });
-    return [...out.values()].map(ps => { const e = Math.max(...ps.map(p => p.m)) * 4;
+    return [...out.values()].map(ps => { const e = Math.max(...ps.map(p => p.m)) * 6;  // finder centre to the edge is 3.5 modules: 6 puts the box outside it
       return [Math.min(...ps.map(p => p.x)) - e, Math.min(...ps.map(p => p.y)) - e, Math.max(...ps.map(p => p.x)) + e, Math.max(...ps.map(p => p.y)) + e]; });
   };
   const src = document.createElement("canvas"), dbg = location.hash == "#dbg";  // #dbg: the code's own box and the sizes drawn over the picture
@@ -656,7 +656,7 @@ async function qrScan(f) {
       c.s = c.s.map(([x, y], n) => [x + (c.q[n][0] - x) * a, y + (c.q[n][1] - y) * a]);
       const q = c.s.map(([x, y]) => [x * k + ox, y * k + oy]);
       const [mx, my] = mid(q), u = c.u, st = state(u), id = key(u)?.slice(1), sel = u == picked;
-      const half = Math.max(...q.map(([x, y]) => Math.hypot(x - mx, y - my))), pad = Math.max(12, half * .35);  // wide of the code, never on it
+      const half = Math.max(...q.map(([x, y]) => Math.hypot(x - mx, y - my))), pad = Math.max(12, half * .6);  // Android gives the finder squares' centres, not the code's corners: 0.72 of a version-2 code, so ×1.6 lands ~10% outside the edge (×1.35 sat on it)
       const ring = q.map(([x, y]) => { const l = Math.hypot(x - mx, y - my) || 1; return [x + (x - mx) / l * pad, y + (y - my) / l * pad]; });
       c.p = [mx, my, half + pad];  // for a tap (pick)
       g.globalAlpha = sel ? 1 : Math.max(.35, 1 - Math.max(0, now - c.ft - 500) / 1000);  // a code lost from sight fades, not blinks

@@ -152,6 +152,7 @@ def test_phone_app():
     sw = c.get("/sw.js").text
     assert "serviceWorker" in c.get("/").text and "/offline" in sw
     assert "AbortSignal.timeout" in sw  # a stalled Wi-Fi link shows «Нет связи» instead of a silent tap (10.10)
+    assert "half * .6" in c.get("/").text  # the ring encloses the code: Android gives the finder squares' centres, not the corners (10.10)
     assert c.get("/offline").status_code == 200
     box = core.new_boxes(1)[0]
     page = c.get(f"/b/{box}").text
