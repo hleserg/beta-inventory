@@ -22,9 +22,11 @@ self.addEventListener("fetch", e => {
   if (e.request.mode === "navigate" && e.request.method === "GET") e.respondWith(fetch(e.request, { signal: AbortSignal.timeout(10000) })
     .then(r => { e.waitUntil(flush().catch(() => {})); return r; }, () => caches.match("/offline")));
   else if (e.request.method === "POST" && new URL(e.request.url).pathname === "/stock") e.respondWith((async () => {
-    const body = new URLSearchParams(await e.request.clone().text()); body.set("op", crypto.randomUUID());
-    try { return await fetch("/stock", { method: "POST", body, redirect: "manual", signal: AbortSignal.timeout(10000) }); }
+    // The page sends FormData (multipart): read as text it was garbage → 422. X-Replace (№67) is passed on, or the page's fetch got an opaque redirect.
+    const body = new URLSearchParams(await e.request.clone().formData()), rep = e.request.headers.has("X-Replace"); body.set("op", crypto.randomUUID());
+    try { return await fetch("/stock", { method: "POST", body, headers: rep ? { "X-Replace": "1" } : {}, redirect: "manual", signal: AbortSignal.timeout(10000) }); }
     catch { await req((await store("readwrite")).add(body.toString())); self.registration.sync?.register("stock").catch(() => {});
-      return Response.redirect("/offline?q=1", 303); }
+      // the page's fetch must not see a failure: it would post the form again the usual way and queue the take twice
+      return rep ? new Response(null, { status: 204, headers: { "X-Location": "/offline?q=1" } }) : Response.redirect("/offline?q=1", 303); }
   })());
 });

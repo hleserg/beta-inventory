@@ -377,7 +377,7 @@ function nfcScan() {  // one reader per page: two would both fire and the second
       for (const rec of e.message.records) {
         const u = ["url", "absolute-url"].includes(rec.recordType) ? new TextDecoder().decode(rec.data) : "";
         const b = u.match(BOX), i = u.match(ITEM);
-        const hit = go => { blip(); setTimeout(go, 200); };  // felt and heard before the page changes, as a QR read is
+        const hit = go => { blip(!!i); setTimeout(go, 200); };  // felt and heard before the page changes, as a QR read is
         if (/^https:\/\/t\.me\/skhlebnikov\/?$/i.test(u)) return hit(() => gotBox("GVGEA"));
         if (b) return hit(() => gotBox(b[1].toUpperCase()));
         if (i) return hit(() => location.href = "/I/" + i[1]);  // a thing's tag: its card as scanned (№37, №43)
@@ -392,12 +392,14 @@ function fab() {  // the corner button: NFC where the phone reads tags (unless t
   nfcScan().catch(e => alert("NFC не включился: " + e.message));
 }
 const plural = (n, one, few, many) => n % 10 == 1 && n % 100 != 11 ? one : [2, 3, 4].includes(n % 10) && ![12, 13, 14].includes(n % 100) ? few : many;
-function blip() {  // the snap: a double buzz and a rising two-tone beep, felt in a pocket-loud room («поощутимее»)
-  navigator.vibrate?.([70, 50, 110]);
-  try { const a = new AudioContext(), o = a.createOscillator(), g = a.createGain(), t = a.currentTime;
-    o.type = "triangle"; o.frequency.setValueAtTime(1320, t); o.frequency.setValueAtTime(1980, t + .08);
-    g.gain.setValueAtTime(.6, t); g.gain.setValueAtTime(.6, t + .14); g.gain.exponentialRampToValueAtTime(.001, t + .2);
-    o.connect(g).connect(a.destination); o.start(t); o.stop(t + .2); o.onended = () => a.close(); } catch {}
+function blip(item) {  // the snap, felt and heard: soft sine bells faded in, not a harsh beep («мерзкий и тревожный»);
+  // done before the page changes (~.2 s). A box: one long buzz, two notes rising a fifth; a thing: two short buzzes, one higher note
+  navigator.vibrate?.(item ? [40, 40, 40] : 120);
+  try { const a = new AudioContext(), t = a.currentTime;
+    (item ? [880] : [523, 784]).forEach((f, k) => { const o = a.createOscillator(), g = a.createGain(), s = t + k * .07;
+      o.frequency.value = f; g.gain.setValueAtTime(.0001, s); g.gain.exponentialRampToValueAtTime(.35, s + .012); g.gain.exponentialRampToValueAtTime(.0001, s + .15);
+      o.connect(g).connect(a.destination); o.start(s); o.stop(s + .16); });
+    setTimeout(() => a.close(), 500); } catch {}
 }
 const svg = (d, w = 22) => `<svg viewBox="0 0 24 24" width="${w}" height="${w}" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${d}</svg>`;
 const ICO_QR = '<path d="M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h2v2h-2zM18 18h2v2h-2z"/>',
@@ -422,7 +424,7 @@ async function qrScan(f) {
       <h3></h3><p></p><button type="button" class="scango" hidden></button></div>`;
   const $ = q => d.querySelector(q), v = $("video"), cv = $("canvas"), cam = $(".cam"), h2 = $("h2"), h3 = $("h3"), p = $(".scanp p"), btn = $(".scango"),
     css = getComputedStyle(d);
-  let mode = "qr", auto = false, crowd = false, gone = false, after = null, snapped = null, picked = null, s = null, said = "", doubt = [], sure = 0;
+  let mode = "qr", auto = false, crowd = false, gone = false, after = null, snapped = null, picked = null, s = null, said = "", doubt = [], sure = 0, snapAt = 0;
   const known = {}, marks = new Map(), els = new Map();  // known: "b"+id / "i"+id → undefined unasked, null asking, false not ours, else /api/peek's
   const ownOrigins = new Set([location.origin]);
   try { const published = {{ core.setting("PUBLIC_BASE_URL")|tojson }}; if (published) ownOrigins.add(new URL(published).origin); } catch {}
@@ -638,8 +640,11 @@ async function qrScan(f) {
     const one = mode == "qr" && !crowd && mine.length == 1 && !wait ? mine[0].u : null;
     // One of ours and nothing else like a QR in view: opens by itself, two frames running. Something like a QR not read yet
     // (the camera reads one of three labels a second before the rest, «ловит одну и тут же открывает»): wait for it, shown as «уточняем».
-    doubt = mode == "qr" ? unread(finders(vw, vh), [...was, ...codes.map(corners)]) : [];
-    if (one !== snapped) { snapped = one; if (one) blip(); }
+    // Only once ours is read (before that it can't hold anything up, and the dashed squares jumped frame to frame — «дёргает»);
+    // and for a second at most: a finder-like square that never reads (a pattern, a shop code) pinned «уточняем» for good.
+    doubt = one ? unread(finders(vw, vh), [...was, ...codes.map(corners)]) : [];
+    if (one !== snapped) { snapped = one; snapAt = performance.now(); if (one) blip(ITEM.test(one)); }
+    if (performance.now() - snapAt > 1000) doubt = [];
     sure = one && !doubt.length ? sure + 1 : 0;
     if (sure > 1 && !picked && !gone) { picked = one; setTimeout(() => go(one), 220); }
     if (mode == "ar") say(auto ? "Несколько наших наклеек" : "Что в коробках?", auto ? "Нажмите на нужную наклейку."
@@ -739,7 +744,7 @@ async function qrScan(f) {
   };
   // A tap picks on touch, not on release: a label that slid from under the finger lost the click («чаще игнорирует»).
   // A miss by a finger's width picks the nearest of ours; its ring lights up at once, the page opens a moment later.
-  const pick = u => { if (gone || picked) return; picked = u; blip(); setTimeout(() => go(u), 220); };
+  const pick = u => { if (gone || picked) return; picked = u; blip(ITEM.test(u)); setTimeout(() => go(u), 220); };
   cam.onpointerdown = e => {
     const t = e.target.closest("[data-u]");
     if (t) return pick(t.dataset.u);
@@ -1181,7 +1186,7 @@ addEventListener("keydown", e => {
 {% block main %}{% endblock %}</main>
 {% block bar %}{% include "_bar.html" %}{% endblock %}
 <script>{const K = "qty0", n = e => parseFloat(e.textContent.replace(",", ".")) || 0, all = () => document.querySelectorAll(".qty[data-k]");
-addEventListener("submit", e => { if (/\/stock$/.test(e.target.action)) try { sessionStorage[K] = JSON.stringify([location.pathname, Object.fromEntries([...all()].map(q => [q.dataset.k, n(q)]))]); } catch {} }, true);
+addEventListener("submit", e => { if (/\/stock$/.test(e.target.getAttribute("action"))) try { sessionStorage[K] = JSON.stringify([location.pathname, Object.fromEntries([...all()].map(q => [q.dataset.k, n(q)]))]); } catch {} }, true);
 try { const [p, o] = JSON.parse(sessionStorage[K] || "[]"); sessionStorage.removeItem(K);  // К3: the page came back from the redirect — what changed?
   if (p?.toLowerCase() == location.pathname.toLowerCase()) for (const q of all()) { const a = o[q.dataset.k] ?? 0, b = n(q); if (a != b) q.classList.add(b > a ? "up" : "dn"); } } catch {}}
 </script>

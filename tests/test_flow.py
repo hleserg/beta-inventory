@@ -153,6 +153,7 @@ def test_phone_app():
     sw = c.get("/sw.js").text
     assert "serviceWorker" in c.get("/").text and "/offline" in sw
     assert "AbortSignal.timeout" in sw  # a stalled Wi-Fi link shows «Нет связи» instead of a silent tap (10.10)
+    assert ".formData()" in sw and '"X-Replace": "1"' in sw  # the page's multipart body read right, and №67 still replaces the page
     assert "indexedDB" in sw and '"op"' in sw and "/offline?q=1" in sw and 'id="queued"' in c.get("/offline?q=1").text  # П3
     home = c.get("/").text
     assert "view-transition" not in home  # К1 dropped: on the phone the flight stuttered and was mostly missed
@@ -161,7 +162,9 @@ def test_phone_app():
     assert "@keyframes bump" in home and "sessionStorage[K]" in home  # К3: a changed stock number bounces green/red
     assert "location.pathname.toLowerCase()" in home and "bump 1.4s .25s" in home  # /B/ID from a QR is /b/ID after the redirect; after the page settles
     assert "[...was, ...codes.map(corners)]" in home  # a code's own squares, where it was in the read picture: no «уточняем» on it
-    assert "vibrate?.([70, 50, 110])" in home and "hit(() => gotBox(b[1]" in home  # a stronger snap, on an NFC tag too
+    assert "performance.now() - snapAt > 1000" in home  # a square that never reads holds «уточняем» a second at most
+    assert 'getAttribute("action")))' in home  # К3: the form's <button name="action"> shadowed form.action — the bump never armed
+    assert "[523, 784]" in home and "blip(ITEM.test(one))" in home and "blip(!!i)" in home  # a box and a thing sound and buzz apart, NFC too
     assert "text-wrap:balance;overflow-wrap:break-word;hyphens:auto}" in home  # «Самовосстанавливающиеся» in a box title broke over its item count
     assert ".car.zoom .strip" in home  # К4: the full-screen photo zooms with two fingers
     assert "animation-timeline:view()" in home  # К5: the box cover shrinks on scroll, no JS
