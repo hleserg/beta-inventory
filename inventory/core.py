@@ -943,18 +943,29 @@ def box_contents(c, box_id):
         "SELECT s.qty, i.* FROM stock s JOIN items i ON i.id=s.item_id WHERE s.box_id=? ORDER BY i.name", (box_id,))]
 
 
+def box_tree(c, box_id):
+    """The box and every box inside it, however deep (a cycle ends at the first repeat)."""
+    return [r[0] for r in c.execute(
+        "WITH RECURSIVE t(id) AS (SELECT ? UNION SELECT b.id FROM boxes b JOIN t ON b.parent_id=t.id) SELECT id FROM t", (box_id,))]
+
+
 def box_peek(c, box_id, n=5):
     """The AR label over a box (CAMERA.md): (up to n things it gives out most, how many there are in all).
 
-    Things with stock left, ranked by take operations from this very box (not pieces, not the HANDS row)
-    in the last 1 month, else 3, else 6; ties by the later take, name, id. No takes in 6 months: n at random.
+    Counts the boxes inside it too, however deep (10.10: a shelf's label shows what the shelf holds, not only
+    what lies loose on it). Things with stock left, ranked by take operations from any of those boxes (not pieces,
+    not the HANDS row) in the last 1 month, else 3, else 6; ties by the later take, name, id. No takes in 6 months: n at random.
     """
-    rows = [r for r in box_contents(c, box_id) if r["qty"] is None or r["qty"] > 0]
+    tree = box_tree(c, box_id)
+    ph = ",".join("?" * len(tree))
+    rows = [dict(r, fields=item_fields(r), single=single_of(r)) for r in c.execute(
+        f"SELECT sum(s.qty) AS qty, i.* FROM stock s JOIN items i ON i.id=s.item_id WHERE s.box_id IN ({ph}) GROUP BY i.id", tree)
+        if r["qty"] is None or r["qty"] > 0]
     have = {r["id"] for r in rows}
     for months in (1, 3, 6):
         hits = {h["item_id"]: (h["n"], h["last"]) for h in c.execute(
-            "SELECT item_id, count(*) AS n, max(at) AS last FROM movements WHERE box_id=? AND kind='take' AND delta<0 "
-            "AND at >= datetime('now', 'localtime', ?) GROUP BY item_id", (box_id, f"-{months} months")) if h["item_id"] in have}
+            f"SELECT item_id, count(*) AS n, max(at) AS last FROM movements WHERE box_id IN ({ph}) AND kind='take' AND delta<0 "
+            "AND at >= datetime('now', 'localtime', ?) GROUP BY item_id", (*tree, f"-{months} months")) if h["item_id"] in have}
         if hits:
             rows.sort(key=lambda r: (norm(r["name"]), r["id"]))
             rows.sort(key=lambda r: hits.get(r["id"], (0, ""))[1], reverse=True)

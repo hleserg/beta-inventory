@@ -910,6 +910,26 @@ def test_peek():
             db.execute("INSERT INTO movements(item_id, box_id, delta, kind, author, at) "
                        "VALUES (?, ?, -1, 'take', 't', datetime('now', 'localtime', '-2 days'))", (ids[name], a))
     assert top() == ["Альфа", "Бета"]  # same popularity and date: names go A–Я
+    # 10.10: a shelf's label counts the boxes inside it, however deep
+    deep = core.new_boxes(1)[0]
+    with core.db() as db:
+        db.execute("UPDATE boxes SET parent_id=? WHERE id=?", (inner, deep))
+    c.post("/items/new?type=resistor", data={"dup_ok": "1", "name": "Омега", "value": "x", "box": inner, "qty": 2})
+    ids["Омега"] = newest()
+    c.post("/items/new?type=resistor", data={"dup_ok": "1", "name": "Тета", "value": "x", "box": deep, "qty": 3})
+    with core.db() as db:
+        for _ in range(5):
+            db.execute("INSERT INTO movements(item_id, box_id, delta, kind, author, at) VALUES (?, ?, -1, 'take', 't', "
+                       "datetime('now', 'localtime', '-1 days'))", (ids["Омега"], inner))
+    first = c.get(f"/api/peek?boxes={a}").json()["boxes"][a]
+    assert [x["name"] for x in first["items"]][:2] == ["Омега", "Альфа"] and first["items"][0]["qty"] == "2 шт"
+    assert first["more"] == 4 and first["boxes"] == 1  # 9 things in the tree, five shown; `boxes` is still the direct children
+    with core.db() as db:
+        db.execute("UPDATE boxes SET parent_id=? WHERE id=?", (deep, a))  # a cycle must not hang the walk
+        assert sorted(core.box_tree(db, a)) == sorted([a, inner, deep])
+    assert c.get(f"/api/peek?boxes={a}").json()["boxes"][a]["more"] == 4
+    with core.db() as db:
+        db.execute("UPDATE boxes SET parent_id=NULL WHERE id=?", (a,))  # the shared test DB goes on without the cycle
 
 
 def test_out_of_stock_and_move():
