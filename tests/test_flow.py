@@ -149,7 +149,9 @@ def test_phone_app():
     box = core.new_boxes(1)[0]
     new = c.get(f"/items/new?type=module&box={box}").text
     assert f'value="{box}"' in new and f'<option value="{box}" ' in new  # opened from a box: that box, its name shown
-    assert "serviceWorker" in c.get("/").text and "/offline" in c.get("/sw.js").text
+    sw = c.get("/sw.js").text
+    assert "serviceWorker" in c.get("/").text and "/offline" in sw
+    assert "AbortSignal.timeout" in sw  # a stalled Wi-Fi link shows «Нет связи» instead of a silent tap (10.10)
     assert c.get("/offline").status_code == 200
     box = core.new_boxes(1)[0]
     page = c.get(f"/b/{box}").text

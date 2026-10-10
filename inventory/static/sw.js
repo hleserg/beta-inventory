@@ -3,5 +3,6 @@
 self.addEventListener("install", e => { self.skipWaiting(); e.waitUntil(caches.open("v1").then(c => c.add("/offline"))); });
 self.addEventListener("fetch", e => {
   // Form posts go straight to the network: a failed photo upload then gets the browser's «resend», not a page that drops it.
-  if (e.request.mode === "navigate" && e.request.method === "GET") e.respondWith(fetch(e.request).catch(() => caches.match("/offline")));
+  // A stalled Wi-Fi link: without the timeout an installed app shows nothing at all for minutes, the tap looks dead. 10 s, then «Нет связи» with «Обновить».
+  if (e.request.mode === "navigate" && e.request.method === "GET") e.respondWith(fetch(e.request, { signal: AbortSignal.timeout(10000) }).catch(() => caches.match("/offline")));
 });
