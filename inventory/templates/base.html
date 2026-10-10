@@ -320,7 +320,7 @@ dialog.sheet{inset:0;margin:auto;border-radius:26px;padding-bottom:18px;max-heig
 .bx>.what>.hero,.bx>.what>.car:not(.full){transform-origin:50% 100%;animation:off linear both;animation-timeline:view();animation-range:exit 0% exit 100%}}}
 @media (prefers-reduced-motion:reduce){@view-transition{navigation:none}*,::before,::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}}
 /* К3: a number changed by «Взять»/«Вернуть» bounces, green up, red down, the colour fading */
-@keyframes bump{0%,45%{color:var(--c)}25%{scale:1.3}}.qty.up,.qty.dn{display:inline-block;animation:bump .6s ease-out}.qty.up{--c:#1E9E6A}.qty.dn{--c:var(--bad)}
+@keyframes bump{0%,70%{color:var(--c)}20%{scale:1.45}40%{scale:.95}60%{scale:1.1}}.qty.up,.qty.dn{display:inline-block;animation:bump 1.4s .25s ease-out both}.qty.up{--c:#1E9E6A}.qty.dn{--c:var(--bad)}
 </style>
 </head>
 <body>
@@ -387,9 +387,10 @@ function nfcScan() {  // one reader per page: two would both fire and the second
       for (const rec of e.message.records) {
         const u = ["url", "absolute-url"].includes(rec.recordType) ? new TextDecoder().decode(rec.data) : "";
         const b = u.match(BOX), i = u.match(ITEM);
-        if (/^https:\/\/t\.me\/skhlebnikov\/?$/i.test(u)) return gotBox("GVGEA");
-        if (b) return gotBox(b[1].toUpperCase());
-        if (i) return location.href = "/I/" + i[1];  // a thing's tag: its card as scanned (№37, №43)
+        const hit = go => { blip(); setTimeout(go, 200); };  // felt and heard before the page changes, as a QR read is
+        if (/^https:\/\/t\.me\/skhlebnikov\/?$/i.test(u)) return hit(() => gotBox("GVGEA"));
+        if (b) return hit(() => gotBox(b[1].toUpperCase()));
+        if (i) return hit(() => location.href = "/I/" + i[1]);  // a thing's tag: its card as scanned (№37, №43)
       }
     };
     return r.scan().then(() => { const b = document.getElementById("scan");  // the ring: NFC listens, a tag opens its box (№65: no window)
@@ -401,11 +402,12 @@ function fab() {  // the corner button: NFC where the phone reads tags (unless t
   nfcScan().catch(e => alert("NFC не включился: " + e.message));
 }
 const plural = (n, one, few, many) => n % 10 == 1 && n % 100 != 11 ? one : [2, 3, 4].includes(n % 10) && ![12, 13, 14].includes(n % 100) ? few : many;
-function blip() {  // the snap: a short buzz and a click
-  navigator.vibrate?.(30);
-  try { const a = new AudioContext(), o = a.createOscillator(), g = a.createGain();
-    o.frequency.value = 1800; g.gain.setValueAtTime(.15, a.currentTime); g.gain.exponentialRampToValueAtTime(.001, a.currentTime + .05);
-    o.connect(g).connect(a.destination); o.start(); o.stop(a.currentTime + .05); o.onended = () => a.close(); } catch {}
+function blip() {  // the snap: a double buzz and a rising two-tone beep, felt in a pocket-loud room («поощутимее»)
+  navigator.vibrate?.([70, 50, 110]);
+  try { const a = new AudioContext(), o = a.createOscillator(), g = a.createGain(), t = a.currentTime;
+    o.type = "triangle"; o.frequency.setValueAtTime(1320, t); o.frequency.setValueAtTime(1980, t + .08);
+    g.gain.setValueAtTime(.6, t); g.gain.setValueAtTime(.6, t + .14); g.gain.exponentialRampToValueAtTime(.001, t + .2);
+    o.connect(g).connect(a.destination); o.start(t); o.stop(t + .2); o.onended = () => a.close(); } catch {}
 }
 const svg = (d, w = 22) => `<svg viewBox="0 0 24 24" width="${w}" height="${w}" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${d}</svg>`;
 const ICO_QR = '<path d="M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h2v2h-2zM18 18h2v2h-2z"/>',
@@ -534,9 +536,9 @@ async function qrScan(f) {
     return found.filter(p => p.n > 1).map(p => ({x: p.x / sc, y: p.y / sc, m: p.m / sc}));
   };
   // Squares outside every code read: two alike, as far apart as a code's corners → a box around them, in the video's pixels
-  const unread = (sq, seen) => {
-    sq = sq.filter(p => !seen.some(c => {
-      const xs = c.q.map(q => q[0]), ys = c.q.map(q => q[1]), e = (Math.max(...xs) - Math.min(...xs)) * .3;
+  const unread = (sq, seen) => {  // seen: the corners of each code read, where it was in the picture the squares come from
+    sq = sq.filter(p => !seen.some(q => {
+      const xs = q.map(q => q[0]), ys = q.map(q => q[1]), e = (Math.max(...xs) - Math.min(...xs)) * .3;
       return p.x > Math.min(...xs) - e && p.x < Math.max(...xs) + e && p.y > Math.min(...ys) - e && p.y < Math.max(...ys) + e;
     }));
     const g = sq.map((p, n) => n), root = n => g[n] == n ? n : (g[n] = root(g[n])), out = new Map();
@@ -614,6 +616,9 @@ async function qrScan(f) {
     const vw = v.videoWidth || 1, vh = v.videoHeight || 1;
     if (src.width != vw || src.height != vh) { src.width = vw; src.height = vh; }
     src.getContext("2d").drawImage(v, 0, 0, vw, vh);
+    // where each ring was when this picture was taken: a read takes a good part of a second, the rings follow the newest picture meanwhile,
+    // and a code's own squares, matched against where its ring is by then, looked like a code not read yet («уточняем» on the code itself)
+    const was = [...marks.values()].map(m => m.q);
     const [G, gw, gh, sc] = grey(src, vw, vh), codes = await det.detect(src).catch(() => []), now = Date.now();
     // A code read once is followed by its look, not read again: its picture is kept, and each frame it is looked for near where it was,
     // so the ring stays on it while the phone moves. Read again: picture and corners renewed. Gone: not found 1.5 s, or out of the picture.
@@ -643,7 +648,7 @@ async function qrScan(f) {
     const one = mode == "qr" && !crowd && mine.length == 1 && !wait ? mine[0].u : null;
     // One of ours and nothing else like a QR in view: opens by itself, two frames running. Something like a QR not read yet
     // (the camera reads one of three labels a second before the rest, «ловит одну и тут же открывает»): wait for it, shown as «уточняем».
-    doubt = mode == "qr" ? unread(finders(vw, vh), seen) : [];
+    doubt = mode == "qr" ? unread(finders(vw, vh), [...was, ...codes.map(corners)]) : [];
     if (one !== snapped) { snapped = one; if (one) blip(); }
     sure = one && !doubt.length ? sure + 1 : 0;
     if (sure > 1 && !picked && !gone) { picked = one; setTimeout(() => go(one), 220); }
@@ -1188,7 +1193,7 @@ addEventListener("keydown", e => {
 <script>{const K = "qty0", n = e => parseFloat(e.textContent.replace(",", ".")) || 0, all = () => document.querySelectorAll(".qty[data-k]");
 addEventListener("submit", e => { if (/\/stock$/.test(e.target.action)) try { sessionStorage[K] = JSON.stringify([location.pathname, Object.fromEntries([...all()].map(q => [q.dataset.k, n(q)]))]); } catch {} }, true);
 try { const [p, o] = JSON.parse(sessionStorage[K] || "[]"); sessionStorage.removeItem(K);  // К3: the page came back from the redirect — what changed?
-  if (p == location.pathname) for (const q of all()) { const a = o[q.dataset.k] ?? 0, b = n(q); if (a != b) q.classList.add(b > a ? "up" : "dn"); } } catch {}}
+  if (p?.toLowerCase() == location.pathname.toLowerCase()) for (const q of all()) { const a = o[q.dataset.k] ?? 0, b = n(q); if (a != b) q.classList.add(b > a ? "up" : "dn"); } } catch {}}
 </script>
 </body>
 </html>
