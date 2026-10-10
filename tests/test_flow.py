@@ -162,6 +162,7 @@ def test_phone_app():
     assert "location.pathname.toLowerCase()" in home and "bump 1.4s .25s" in home  # /B/ID from a QR is /b/ID after the redirect; after the page flies in
     assert "[...was, ...codes.map(corners)]" in home  # a code's own squares, where it was in the read picture: no «уточняем» on it
     assert "vibrate?.([70, 50, 110])" in home and "hit(() => gotBox(b[1]" in home  # a stronger snap, on an NFC tag too
+    assert "text-wrap:balance;overflow-wrap:break-word;hyphens:auto}" in home  # «Самовосстанавливающиеся» in a box title broke over its item count
     assert ".car.zoom .strip" in home  # К4: the full-screen photo zooms with two fingers
     assert "animation-timeline:view()" in home  # К5: the box cover shrinks on scroll, no JS
     assert "half * .6" in c.get("/").text  # the ring encloses the code: Android gives the finder squares' centres, not the corners (10.10)
