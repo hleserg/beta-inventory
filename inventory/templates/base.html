@@ -424,7 +424,7 @@ async function qrScan(f) {
       <h3></h3><p></p><button type="button" class="scango" hidden></button></div>`;
   const $ = q => d.querySelector(q), v = $("video"), cv = $("canvas"), cam = $(".cam"), h2 = $("h2"), h3 = $("h3"), p = $(".scanp p"), btn = $(".scango"),
     css = getComputedStyle(d);
-  let mode = "qr", auto = false, crowd = false, gone = false, after = null, snapped = null, picked = null, s = null, said = "", doubt = [], sure = 0, snapAt = 0;
+  let mode = "qr", auto = false, crowd = false, gone = false, after = null, snapped = null, picked = null, s = null, said = "", doubt = [], sure = 0;
   const known = {}, marks = new Map(), els = new Map();  // known: "b"+id / "i"+id → undefined unasked, null asking, false not ours, else /api/peek's
   const ownOrigins = new Set([location.origin]);
   try { const published = {{ core.setting("PUBLIC_BASE_URL")|tojson }}; if (published) ownOrigins.add(new URL(published).origin); } catch {}
@@ -542,6 +542,19 @@ async function qrScan(f) {
     return [...out.values()].map(ps => { const e = Math.max(...ps.map(p => p.m)) * 6;  // finder centre to the edge is 3.5 modules: 6 puts the box outside it
       return [Math.min(...ps.map(p => p.x)) - e, Math.min(...ps.map(p => p.y)) - e, Math.max(...ps.map(p => p.x)) + e, Math.max(...ps.map(p => p.y)) + e]; });
   };
+  // Read from a half-size copy with a white margin round it first: over the whole 1920 frame the phone's reader took seconds
+  // or never read a sharp code filling the frame (one code «оч долго читается и не может распознаться»); the margin is the blank
+  // edge a QR needs when the label's own is cut off. The full frame only when the small copy finds nothing (a far, small code).
+  const sm = document.createElement("canvas"), P = 48;
+  const read = async (det, vw, vh) => {
+    const k = Math.min(1, 960 / Math.max(vw, vh)), w = Math.round(vw * k), h = Math.round(vh * k);
+    if (sm.width != w + 2 * P || sm.height != h + 2 * P) { sm.width = w + 2 * P; sm.height = h + 2 * P; }
+    const c = sm.getContext("2d"); c.fillStyle = "#fff"; c.fillRect(0, 0, sm.width, sm.height); c.drawImage(src, P, P, w, h);
+    const back = ({x, y}) => ({x: (x - P) / k, y: (y - P) / k}), small = await det.detect(sm).catch(() => []);
+    if (!small.length) return k < 1 ? det.detect(src).catch(() => []) : [];
+    return small.map(c => { const {x, y, width, height} = c.boundingBox, o = back({x, y});
+      return {rawValue: c.rawValue, cornerPoints: c.cornerPoints?.map(back), boundingBox: {x: o.x, y: o.y, width: width / k, height: height / k}}; });
+  };
   const src = document.createElement("canvas"), dbg = location.hash == "#dbg";  // #dbg: the code's own box and the sizes drawn over the picture
   if (dbg) window.scanMarks = marks;  // and a test reads where each ring is
   // A code's look: its patch of a small grey frame, at most 32×32 cells, less its mean (light and shade then do not matter).
@@ -611,7 +624,7 @@ async function qrScan(f) {
     // where each ring was when this picture was taken: a read takes a good part of a second, the rings follow the newest picture meanwhile,
     // and a code's own squares, matched against where its ring is by then, looked like a code not read yet («уточняем» on the code itself)
     const was = [...marks.values()].map(m => m.q);
-    const [G, gw, gh, sc] = grey(src, vw, vh), codes = await det.detect(src).catch(() => []), now = Date.now();
+    const [G, gw, gh, sc] = grey(src, vw, vh), codes = await read(det, vw, vh), now = Date.now();
     // A code read once is followed by its look, not read again: its picture is kept, and each frame it is looked for near where it was,
     // so the ring stays on it while the phone moves. Read again: picture and corners renewed. Gone: not found 1.5 s, or out of the picture.
     // The read picture is old by the time it is read: the renewed look is looked for in the newest one, from where the ring is now.
@@ -640,11 +653,8 @@ async function qrScan(f) {
     const one = mode == "qr" && !crowd && mine.length == 1 && !wait ? mine[0].u : null;
     // One of ours and nothing else like a QR in view: opens by itself, two frames running. Something like a QR not read yet
     // (the camera reads one of three labels a second before the rest, «ловит одну и тут же открывает»): wait for it, shown as «уточняем».
-    // Only once ours is read (before that it can't hold anything up, and the dashed squares jumped frame to frame — «дёргает»);
-    // and for a second at most: a finder-like square that never reads (a pattern, a shop code) pinned «уточняем» for good.
-    doubt = one ? unread(finders(vw, vh), [...was, ...codes.map(corners)]) : [];
-    if (one !== snapped) { snapped = one; snapAt = performance.now(); if (one) blip(ITEM.test(one)); }
-    if (performance.now() - snapAt > 1000) doubt = [];
+    doubt = mode == "qr" ? unread(finders(vw, vh), [...was, ...codes.map(corners)]) : [];
+    if (one !== snapped) { snapped = one; if (one) blip(ITEM.test(one)); }
     sure = one && !doubt.length ? sure + 1 : 0;
     if (sure > 1 && !picked && !gone) { picked = one; setTimeout(() => go(one), 220); }
     if (mode == "ar") say(auto ? "Несколько наших наклеек" : "Что в коробках?", auto ? "Нажмите на нужную наклейку."
@@ -760,6 +770,7 @@ async function qrScan(f) {
       s = await navigator.mediaDevices.getUserMedia({video: {facingMode: "environment", width: {ideal: 1920}, aspectRatio: {ideal: 4 / 3}}});  // sharp enough for a label at the edge
       const tr = s.getVideoTracks()[0], z = tr.getCapabilities?.().zoom;
       if (z && tr.getSettings().zoom > Math.max(z.min, 1)) tr.applyConstraints({advanced: [{zoom: Math.max(z.min, 1)}]}).catch(() => {});  // some phones start zoomed in
+      if (tr.getCapabilities?.().focusMode?.includes("continuous")) tr.applyConstraints({advanced: [{focusMode: "continuous"}]}).catch(() => {});
       if (!d.open) return s.getTracks().forEach(t => t.stop());
       v.muted = true; v.srcObject = s; await v.play(); if (!last) requestAnimationFrame(draw);
       const det = new BarcodeDetector({formats: ["qr_code"]});

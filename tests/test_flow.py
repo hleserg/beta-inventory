@@ -162,7 +162,8 @@ def test_phone_app():
     assert "@keyframes bump" in home and "sessionStorage[K]" in home  # К3: a changed stock number bounces green/red
     assert "location.pathname.toLowerCase()" in home and "bump 1.4s .25s" in home  # /B/ID from a QR is /b/ID after the redirect; after the page settles
     assert "[...was, ...codes.map(corners)]" in home  # a code's own squares, where it was in the read picture: no «уточняем» on it
-    assert "performance.now() - snapAt > 1000" in home  # a square that never reads holds «уточняем» a second at most
+    assert "snapAt" not in home and 'doubt = mode == "qr" ? unread(' in home  # an unread square holds «уточняем» until it reads, however long
+    assert "det.detect(sm)" in home and 'focusMode: "continuous"' in home  # a big sharp code is read from a small padded copy, kept in focus
     assert 'getAttribute("action")))' in home  # К3: the form's <button name="action"> shadowed form.action — the bump never armed
     assert "[523, 784]" in home and "blip(ITEM.test(one))" in home and "blip(!!i)" in home  # a box and a thing sound and buzz apart, NFC too
     assert "text-wrap:balance;overflow-wrap:break-word;hyphens:auto}" in home  # «Самовосстанавливающиеся» in a box title broke over its item count
