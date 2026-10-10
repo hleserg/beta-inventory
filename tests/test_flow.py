@@ -155,11 +155,11 @@ def test_phone_app():
     assert "AbortSignal.timeout" in sw  # a stalled Wi-Fi link shows «Нет связи» instead of a silent tap (10.10)
     assert "indexedDB" in sw and '"op"' in sw and "/offline?q=1" in sw and 'id="queued"' in c.get("/offline?q=1").text  # П3
     home = c.get("/").text
-    assert "@view-transition{navigation:auto}" in home and "pagereveal" in home  # К1: pages cross-fade, the photo flies
+    assert "view-transition" not in home  # К1 dropped: on the phone the flight stuttered and was mostly missed
     assert "@keyframes pop" in home and "c.ok = ts" in home  # К2: the ring snaps on a known code, labels slide out
     assert "prefers-reduced-motion:reduce" in home  # motion off when the phone asks
     assert "@keyframes bump" in home and "sessionStorage[K]" in home  # К3: a changed stock number bounces green/red
-    assert "location.pathname.toLowerCase()" in home and "bump 1.4s .25s" in home  # /B/ID from a QR is /b/ID after the redirect; after the page flies in
+    assert "location.pathname.toLowerCase()" in home and "bump 1.4s .25s" in home  # /B/ID from a QR is /b/ID after the redirect; after the page settles
     assert "[...was, ...codes.map(corners)]" in home  # a code's own squares, where it was in the read picture: no «уточняем» on it
     assert "vibrate?.([70, 50, 110])" in home and "hit(() => gotBox(b[1]" in home  # a stronger snap, on an NFC tag too
     assert "text-wrap:balance;overflow-wrap:break-word;hyphens:auto}" in home  # «Самовосстанавливающиеся» in a box title broke over its item count

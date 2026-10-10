@@ -8,12 +8,6 @@
 <link rel="manifest" href="/manifest.webmanifest">
 <link rel="apple-touch-icon" href="/static/icon-192.png">
 <script>if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js")
-// К1: only one element per page may carry a transition name — the thumb of the card being opened (or just left)
-{const fly = u => { const m = u && new URL(u).pathname.match(/^\/[ib]\/[^/]+$/), th = m && document.querySelector(`a[href="${m[0]}"] img.thumb`);
-  for (const e of document.querySelectorAll(".vt,.vt0")) e.classList.remove("vt", "vt0");
-  if (th) { th.classList.add("vt"); document.querySelector(".car .strip>img")?.classList.add("vt0"); } };
-addEventListener("pageswap", e => { if (e.viewTransition) fly(e.activation?.entry?.url); });
-addEventListener("pagereveal", e => { if (e.viewTransition) fly(navigation.activation?.from?.url); });}
 </script>
 <title>{% block title %}{{ t.items }}{% endblock %}</title>
 <style>
@@ -310,15 +304,11 @@ dialog.sheet{inset:0;margin:auto;border-radius:26px;padding-bottom:18px;max-heig
 .line .side{flex-direction:row;align-items:center;gap:12px}
 .bx .line>a>.grow:has(>.nm),.bx .line>.a>.grow:has(>.nm){grid-template-columns:minmax(0,1fr) auto}
 }
-/* К1: pages cross-fade, the tapped photo flies between the list and the card (Chrome 126+, others just open the page) */
-@view-transition{navigation:auto}
-.car .strip>img:first-child{view-transition-name:photo}.thumb.vt{view-transition-name:photo}.car .strip>img.vt0{view-transition-name:none}
-::view-transition-group(*){animation-duration:.25s}
 /* К5: on a phone the box's cover shrinks and fades as it scrolls off the top — a scroll timeline, no JS; old browsers keep it still */
 @keyframes off{to{opacity:0;scale:.8}}
 @media (max-width:1023.98px) and (prefers-reduced-motion:no-preference){@supports (animation-timeline:view()){
 .bx>.what>.hero,.bx>.what>.car:not(.full){transform-origin:50% 100%;animation:off linear both;animation-timeline:view();animation-range:exit 0% exit 100%}}}
-@media (prefers-reduced-motion:reduce){@view-transition{navigation:none}*,::before,::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}}
+@media (prefers-reduced-motion:reduce){*,::before,::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}}
 /* К3: a number changed by «Взять»/«Вернуть» bounces, green up, red down, the colour fading */
 @keyframes bump{0%,70%{color:var(--c)}20%{scale:1.45}40%{scale:.95}60%{scale:1.1}}.qty.up,.qty.dn{display:inline-block;animation:bump 1.4s .25s ease-out both}.qty.up{--c:#1E9E6A}.qty.dn{--c:var(--bad)}
 </style>
