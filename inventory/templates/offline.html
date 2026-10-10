@@ -3,5 +3,7 @@
 {% block main %}
 <h1>Нет связи с сервером</h1>
 <p>Инвентарь работает только в домашней сети. Подключитесь к домашнему Wi-Fi и обновите страницу.</p>
-<p><button onclick="location.reload()">Обновить</button></p>
+<p id="queued" hidden>Взять/вернуть записано в телефоне и уйдёт само, как только появится связь.</p>
+<p><button onclick="location.reload()">Обновить</button> <button id="back" hidden onclick="history.back()">Назад</button></p>
+<script>if (/[?&]q=1/.test(location.search)) queued.hidden = back.hidden = false;</script>
 {% endblock %}

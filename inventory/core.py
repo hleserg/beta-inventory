@@ -949,6 +949,15 @@ def box_tree(c, box_id):
         "WITH RECURSIVE t(id) AS (SELECT ? UNION SELECT b.id FROM boxes b JOIN t ON b.parent_id=t.id) SELECT id FROM t", (box_id,))]
 
 
+def put_hints(c, item_id, n=3):
+    """«Куда положить?»: boxes holding the most other things of this one's type; not where it already lies, not HANDS/TRANSIT."""
+    return c.execute(
+        "SELECT b.id, b.name, count(DISTINCT s.item_id) AS n FROM stock s JOIN items i ON i.id=s.item_id JOIN boxes b ON b.id=s.box_id "
+        "WHERE i.type=(SELECT type FROM items WHERE id=?) AND s.box_id NOT IN (?, ?) "
+        "AND s.box_id NOT IN (SELECT box_id FROM stock WHERE item_id=?) GROUP BY b.id ORDER BY n DESC, b.name LIMIT ?",
+        (item_id, HANDS, TRANSIT, item_id, n)).fetchall()
+
+
 def box_peek(c, box_id, n=5):
     """The AR label over a box (CAMERA.md): (up to n things it gives out most, how many there are in all).
 
@@ -967,6 +976,8 @@ def box_peek(c, box_id, n=5):
             f"SELECT item_id, count(*) AS n, max(at) AS last FROM movements WHERE box_id IN ({ph}) AND kind='take' AND delta<0 "
             "AND at >= datetime('now', 'localtime', ?) GROUP BY item_id", (*tree, f"-{months} months")) if h["item_id"] in have}
         if hits:
+            for r in rows:
+                r["takes"] = hits.get(r["id"], (0, ""))[0]
             rows.sort(key=lambda r: (norm(r["name"]), r["id"]))
             rows.sort(key=lambda r: hits.get(r["id"], (0, ""))[1], reverse=True)
             rows.sort(key=lambda r: hits.get(r["id"], (0, ""))[0], reverse=True)

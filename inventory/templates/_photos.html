@@ -9,7 +9,7 @@
 const car = document.getElementById("car"), strip = car.firstElementChild, cnt = car.querySelector(".cnt");
 const at = () => Math.round(strip.scrollLeft / strip.clientWidth), full = () => car.classList.contains("full");
 strip.addEventListener("scroll", () => { if (cnt) cnt.textContent = `${at() + 1} / ${strip.children.length}`; }, {passive: true});
-const show = on => { const i = at(); car.classList.toggle("full", on); strip.scrollLeft = i * strip.clientWidth; };
+const show = on => { const i = at(); zoom(0, 0, 1); car.classList.toggle("full", on); strip.scrollLeft = i * strip.clientWidth; };
 strip.onclick = () => { if (!full()) { history.pushState({pics: 1}, ""); show(true); } };
 car.querySelector(".x").onclick = () => history.back();
 for (const b of car.querySelectorAll(".rot button")) b.onclick = async () => {  // №21: saved at once, no «Изменить» needed
@@ -21,5 +21,23 @@ for (const b of car.querySelectorAll(".rot button")) b.onclick = async () => {  
   for (const e of document.querySelectorAll(`input[name$="__keep"][value="${was}"]`)) e.value = now;
 };
 addEventListener("popstate", () => { if (full()) show(false); });
+// К4: zoom is a transform on the photo itself — nothing re-lays out; the point under the fingers stays under them
+let z = 1, ox = 0, oy = 0, img, last;
+const pts = new Map(), mid = () => { const [a, b] = pts.values(); return [(a.x + b.x) / 2, (a.y + b.y) / 2, Math.hypot(a.x - b.x, a.y - b.y)]; };
+function zoom(mx, my, nz) {
+  img ??= strip.children[at()]; const cx = innerWidth / 2, cy = innerHeight / 2;
+  nz = Math.min(5, nz); ox = mx - cx - (mx - cx - ox) * nz / z; oy = my - cy - (my - cy - oy) * nz / z; z = nz;
+  if (z <= 1) { z = 1; ox = oy = 0; }
+  img.style.transform = z > 1 ? `translate(${ox}px,${oy}px) scale(${z})` : ""; car.classList.toggle("zoom", z > 1);
+  if (z == 1) img = null;
+}
+strip.addEventListener("pointerdown", e => { if (!full()) return; pts.set(e.pointerId, {x: e.clientX, y: e.clientY}); car.classList.add("drag"); last = pts.size == 2 ? mid() : null; });
+strip.addEventListener("pointermove", e => {
+  const p = pts.get(e.pointerId); if (!p) return; const dx = e.clientX - p.x, dy = e.clientY - p.y; p.x = e.clientX; p.y = e.clientY;
+  if (last) { const m = mid(); ox += m[0] - last[0]; oy += m[1] - last[1]; zoom(m[0], m[1], z * m[2] / last[2]); last = m; }
+  else if (z > 1) { ox += dx; oy += dy; zoom(p.x, p.y, z); }
+});
+for (const t of ["pointerup", "pointercancel"]) strip.addEventListener(t, e => { pts.delete(e.pointerId); last = pts.size == 2 ? mid() : null; if (!pts.size) car.classList.remove("drag"); });
+strip.addEventListener("dblclick", e => { if (full()) zoom(e.clientX, e.clientY, z > 1 ? 1 : 2.5); });
 addEventListener("keydown", e => { if (e.key == "Escape" && full()) history.back(); });
 }</script>{% endmacro %}

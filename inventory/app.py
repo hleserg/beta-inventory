@@ -307,7 +307,9 @@ def box_page(req, b, draft=False):
                 items += [dict(i, box=k["id"], src=k["name"] or k["id"]) for i in core.box_contents(c, k["id"])]
         items.sort(key=lambda i: i["name"].lower())
         places = c.execute("SELECT * FROM places ORDER BY name").fetchall()
-        return page(req, "box.html", b=b, pics=json.loads(b["photos"]), where=core.box_crumbs(c, b["id"]), contents=contents, top=box_top(b["id"]),
+        tree = len(core.box_tree(c, b["id"])) - 1 if any(k["kids"] or k["n"] for k in children) else 0
+        peek = core.box_peek(c, b["id"], 3) if tree else ([], 0)  # П5: a shelf sums up its boxes, however deep
+        return page(req, "box.html", tree=tree, hot=[i for i in peek[0] if i.get("takes")], total=peek[1], b=b, pics=json.loads(b["photos"]), where=core.box_crumbs(c, b["id"]), contents=contents, top=box_top(b["id"]),
                     items=items, nested=[k for k in children if k["kids"] or k["n"] > 1], empty=[k for k in children if not k["kids"] and not k["n"]],
                     children=children, places=places, projects=core.projects(c), draft=draft, picking="from" in req.query_params,
                     nfc=f"{public_base(req)}/b/{b['id']}".lower())  # NFC Tools writes it as typed
@@ -545,8 +547,14 @@ def resolve_link(link):
 
 @app.get("/share")
 def share(title: str = "", text: str = "", url: str = ""):
+    return shared_card(title, text, url)
+
+
+def shared_card(title, text, url, photos=()):
     """A shop's «Поделиться» (Web Share Target names; over plain HTTP on Android — the HTTP Shortcuts app): a new card
     with the shop link, handed to an agent. Shop pages turn bots away, so the agent goes by the name: clean it up here."""
+    if not (title or text or url):  # a photo alone: nothing to clean up
+        return RedirectResponse("/items/new?" + urlencode({"photo": photos}, doseq=True), 302)
     short = url or next(iter(re.findall(r"https?://\S+", text)), "")
     name = title or text.replace(short, "")
     for junk in PROFILE.get("share_junk", []):
@@ -555,16 +563,28 @@ def share(title: str = "", text: str = "", url: str = ""):
     if not name.strip():  # Yandex shares the link alone; its path has the name: /card/<name-slug>/<id>
         slugs = [p for p in urlsplit(link).path.split("/") if "-" in p and re.search(r"[^\W\d_]", p)]
         name = max(slugs, key=lambda p: p.count("-"), default="").replace("-", " ")
-    return RedirectResponse("/items/new?" + urlencode({"name": " ".join(name.split()), "link": link}), 302)
+    return RedirectResponse("/items/new?" + urlencode({"name": " ".join(name.split()), "link": link, "photo": photos}, doseq=True), 302)
+
+
+@app.post("/share")
+async def share_post(req: Request):
+    """The installed app's share_target: a photo from the gallery (or a shop link) → a new card with it."""
+    form = await req.form()
+    photos = [save_upload(u, photo=True) for u in form.getlist("photo") if getattr(u, "filename", "")]
+    return shared_card(*(str(form.get(k, "")) for k in ("title", "text", "url")), photos)
 
 
 @app.get("/items/new")
 def item_new(req: Request, box: str = "", type: str = "", name: str = "", link: str = ""):
     if not type:  # the query rides through the picker: a box, or what a shop shared
-        return page(req, "type_pick.html", keep=urlencode(dict(req.query_params)))
-    key = next((fd["key"] for fd in core.fields_for(check_type(type)) if fd.get("share")), None)
-    return card_form(req, type=type, box=box.upper(), name=name, vals={key: link} if key and link else None,
-                     agent=True, nfc=True, shared=urlencode({"name": name, "link": link}) if link else "")
+        return page(req, "type_pick.html", keep=urlencode(req.query_params.multi_items()))
+    fields = core.fields_for(check_type(type))
+    key = next((fd["key"] for fd in fields if fd.get("share")), None)
+    pk = next((fd["key"] for fd in fields if fd.get("type") == "photo"), None)
+    photos = [n for x in req.query_params.getlist("photo") if (n := core.own_upload(x))]
+    vals = {**({key: link} if key and link else {}), **({pk: photos} if pk and photos else {})}
+    return card_form(req, type=type, box=box.upper(), name=name, vals=vals, agent=True, nfc=True,
+                     shared=urlencode({"name": name, "link": link, "photo": photos}, doseq=True) if link or photos else "")
 
 
 @app.post("/items/new")
@@ -612,7 +632,7 @@ def item(req: Request, item_id: int):
     with db() as c:
         it = get_item(c, item_id)
         return page(req, "item.html", it=it, f=json.loads(it["fields"]), fields=core.fields_for(it["type"]),
-                    stock=core.stock_of_item(c, item_id), projects=core.projects(c),
+                    stock=core.stock_of_item(c, item_id), projects=core.projects(c), hints=core.put_hints(c, item_id),
                     needs=c.execute("SELECT p.id, p.name, n.qty FROM needs n JOIN projects p ON p.id=n.project_id "
                                     "WHERE n.item_id=? ORDER BY p.name", (item_id,)).fetchall(),
                     nfc=f"{public_base(req).lower()}/I/{item_id}", single=core.single_of(it),  # №37, №43: a scan
@@ -682,9 +702,15 @@ def item_rotate(item_id: int, photo: str = Form(), deg: int = Form()):
 
 # --- stock ---
 
+DONE_OPS = set()  # ponytail: in memory — a restart forgets them; a table if replays ever outlive one
+
+
 @app.post("/stock")
 def stock(box: str = Form(), item: int = Form(), action: str = Form(), qty: int | None = Form(None),
-          kind: str = Form("put"), project: str = Form(""), back: str = Form("/"), src: str = Form(""), to: str = Form("")):
+          kind: str = Form("put"), project: str = Form(""), back: str = Form("/"), src: str = Form(""), to: str = Form(""),
+          op: str = Form("")):  # op: the app's key per tap (sw.js): a post replayed after a lost answer is done once
+    if op in DONE_OPS:
+        return go(back if back.startswith("/") and not back.startswith("//") else "/")
     if action == "move":  # «Переложить» from a box's sheet: all of it or some to another box, no stop in hand
         core.transfer(item, box, to, AUTHOR, qty)
     elif action == "out":  # «Закончилось»: none left in this box — it goes, and with no box left it is «нет в наличии»
@@ -695,6 +721,8 @@ def stock(box: str = Form(), item: int = Form(), action: str = Form(), qty: int 
         if action != "take":
             action = "count" if action == "set" else kind if kind in ("put", "return", "buy") else "put"
         core.change_stock(box, item, action, qty, AUTHOR, int(project) if project and action in ("take", "buy") else None)
+    if op:
+        DONE_OPS.add(op) if len(DONE_OPS) < 10000 else DONE_OPS.clear()
     return go(back if back.startswith("/") and not back.startswith("//") else "/")
 
 
@@ -779,6 +807,12 @@ def reader_delete(id: str = Form()):
 @app.get("/manifest.webmanifest")
 def manifest():
     return JSONResponse({"name": PROFILE["name"], "short_name": PROFILE["name"], "start_url": "/", "id": "/", "scope": "/", "display": "standalone",
+                         "share_target": {"action": "/share", "method": "POST", "enctype": "multipart/form-data",
+                                          "params": {"title": "title", "text": "text", "url": "url",
+                                                     "files": [{"name": "photo", "accept": ["image/*"]}]}},
+                         "shortcuts": [{"name": n, "url": u, "icons": [{"src": "/static/icon-192.png", "sizes": "192x192"}]}
+                                       for n, u in (("Сканировать", "/?qr=1"), (PROFILE["terms"].get("hands", "На руках"), "/?hands=1"),
+                                                    ("Новая вещь", "/items/new"))],
                          "background_color": "#EFF6F8", "theme_color": "#126985",
                          "icons": [{"src": f"/static/icon{m}-{n}.png", "sizes": f"{n}x{n}", "type": "image/png", "purpose": p}
                                    for m, p in (("", "any"), ("-maskable", "maskable")) for n in (192, 512)]},

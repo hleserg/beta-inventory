@@ -12,6 +12,7 @@
 {% if not bare %}{% set n = items|length %}
 <div class="bhead"><div class="grow"><h1 id="bname">{{ b.name or b.id }}</h1>{% if b.name %}<span class="idchip">{{ b.id }}</span>{% endif %}</div>
   <div class="cnt"><b>{{ n }}</b><small>{{ 'предмет' if n % 10 == 1 and n % 100 != 11 else 'предмета' if n % 10 in [2, 3, 4] and n % 100 not in [12, 13, 14] else 'предметов' }}</small></div></div>
+{% if tree %}<p class="mut sm" data-tree>{{ t.boxes }} внутри: {{ tree }} · {{ t.items|lower }} во всех: {{ total }}{% if hot %} · берут чаще: {% for i in hot %}<a href="/i/{{ i.id }}">{{ i.name }}</a>{{ ", " if not loop.last }}{% endfor %}{% endif %}</p>{% endif %}
 {% endif %}
 </div>
 <div class="where">{# desktop: the cover stays left, the contents run as a table on the right #}
@@ -29,7 +30,7 @@
 <div class="card list">{% for i in items %}
 <div class="line"><a href="/i/{{ i.id }}">{% if pk and i.fields[pk] %}<img class="thumb" src="/u/{{ i.fields[pk][0] }}" alt="" loading="lazy">{% else %}<span class="thumb bx">{{ ico(I_BOX) }}</span>{% endif %}
   <span class="grow"><span class="nm">{{ i.name }}</span><span class="mut">{{ type_label(i.type).split(" › ")|last }}{% if i.src %} · {{ t.box|lower }} {{ i.src }}{% endif %}</span></span></a>
-  <span class="side"><span class="qty">{{ i.qty|qty(unit=unit_of(i.type, i.fields)) }}</span>{% if i.qty != 0 %}<button type="button" class="ghost dots" aria-expanded="false">Взять</button>{% endif %}</span></div>
+  <span class="side"><span class="qty" data-k="{{ i.id }}">{{ i.qty|qty(unit=unit_of(i.type, i.fields)) }}</span>{% if i.qty != 0 %}<button type="button" class="ghost dots" aria-expanded="false">Взять</button>{% endif %}</span></div>
 {% if i.qty != 0 %}<form method="post" action="/stock" class="tacts" hidden>
   <input type="hidden" name="box" value="{{ i.box }}"><input type="hidden" name="item" value="{{ i.id }}"><input type="hidden" name="back" value="/b/{{ b.id }}">
   {% if projects %}<select name="project"><option value="">Без проекта</option>{% for p in projects %}<option value="{{ p.id }}">{{ p.name }}</option>{% endfor %}</select>{% endif %}

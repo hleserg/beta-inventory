@@ -7,7 +7,14 @@
 <link rel="icon" href="/static/icon.svg" type="image/svg+xml">
 <link rel="manifest" href="/manifest.webmanifest">
 <link rel="apple-touch-icon" href="/static/icon-192.png">
-<script>if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js")</script>
+<script>if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js")
+// К1: only one element per page may carry a transition name — the thumb of the card being opened (or just left)
+{const fly = u => { const m = u && new URL(u).pathname.match(/^\/[ib]\/[^/]+$/), th = m && document.querySelector(`a[href="${m[0]}"] img.thumb`);
+  for (const e of document.querySelectorAll(".vt,.vt0")) e.classList.remove("vt", "vt0");
+  if (th) { th.classList.add("vt"); document.querySelector(".car .strip>img")?.classList.add("vt0"); } };
+addEventListener("pageswap", e => { if (e.viewTransition) fly(e.activation?.entry?.url); });
+addEventListener("pagereveal", e => { if (e.viewTransition) fly(navigation.activation?.from?.url); });}
+</script>
 <title>{% block title %}{{ t.items }}{% endblock %}</title>
 <style>
 /* design/codex tokens: --bg paper, --fg ink, --card surface, --acc accent, --bad danger */
@@ -52,6 +59,9 @@ label{display:block;margin:14px 0 4px;font-weight:600}
 .car.full .x{display:block;position:absolute;top:10px;right:10px}
 .car.full .rot{display:flex;gap:8px;position:absolute;top:10px;left:10px}
 html:has(.car.full){overflow:hidden}
+/* К4: full screen fades in; two fingers zoom, one pans a zoomed photo, a double tap toggles 2.5× */
+.car.full{animation:fin .2s ease-out}.car.full .strip{touch-action:pan-x}.car.full img{transition:transform .2s ease-out}
+.car.zoom .strip{overflow:hidden;touch-action:none}.car.drag img{transition:none}
 .pic{position:relative;display:inline-flex;touch-action:none;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}.pic img{pointer-events:none}
 .pic.drag{opacity:.5}.pic:first-child:not(:only-child) img{outline:2px solid var(--acc);outline-offset:1px}  /* №64: the first is the face */
 .pic button{position:absolute;top:-6px;right:-6px;min-height:0;padding:0 6px;border-radius:50%}
@@ -105,7 +115,7 @@ details{margin:8px 0}
 summary{cursor:pointer;color:var(--acc)}
 .qty{font-weight:700;white-space:nowrap;font-variant-numeric:tabular-nums}
 .chips{display:flex;gap:6px;flex-wrap:wrap}
-.chips a{display:inline-flex;align-items:center;min-height:44px;padding:0 14px;border:1px solid var(--line);border-radius:999px;text-decoration:none;font-size:.9em;font-weight:750;background:var(--card);color:var(--fg)}
+.chips a,.chips button{display:inline-flex;align-items:center;min-height:44px;padding:0 14px;border:1px solid var(--line);border-radius:999px;text-decoration:none;font-size:.9em;font-weight:750;background:var(--card);color:var(--fg)}
 .seg a{font-size:1em}
 .chips a.on{background:var(--accent-soft);color:var(--accent-deep);border-color:var(--acc)}
 .md img{max-width:100%}.md pre{overflow-x:auto}.md table td,.md table th{border:1px solid var(--line);padding:4px 6px}
@@ -129,14 +139,16 @@ dialog{border:1px solid var(--line);border-radius:12px;background:var(--card);co
 .aim{position:absolute;left:50%;top:46%;transform:translate(-50%,-50%);width:min(62vw,240px);aspect-ratio:1;color:#7FD0E6;pointer-events:none}.aim svg{width:100%;height:100%}
 .aim span{position:absolute;top:calc(100% + 14px);left:50%;transform:translateX(-50%);white-space:nowrap;font-size:14px;color:#DDEFF4;background:#10262Fb3;padding:4px 10px;border-radius:99px}
 .ours{position:absolute;top:12px;left:50%;transform:translateX(-50%);background:#10262Fd9;border:1.5px solid var(--ok);color:#fff;border-radius:99px;padding:5px 12px;font-size:14px;font-weight:700;white-space:nowrap}
-.tag{position:absolute;left:0;top:0;background:#10262F;border:2px solid var(--ok);color:#fff;border-radius:99px;padding:8px 16px;font-size:16px;font-weight:700;white-space:nowrap;max-width:min(70vw,300px);overflow:hidden;text-overflow:ellipsis;animation:fin .25s ease-out}
+@keyframes pop{from{opacity:0;translate:0 10px;scale:.85}}  /* К2: labels slide out of the ring; translate/scale compose with the inline transform */
+.tag{position:absolute;left:0;top:0;background:#10262F;border:2px solid var(--ok);color:#fff;border-radius:99px;padding:8px 16px;font-size:16px;font-weight:700;white-space:nowrap;max-width:min(70vw,300px);overflow:hidden;text-overflow:ellipsis;animation:pop .22s ease-out}
 .scan button.tag{min-height:52px}.tag.sel{background:var(--ok);color:#10262F}.arc.sel{outline:4px solid var(--ok)}@keyframes fin{from{opacity:0}}
 .tag.no{border-color:var(--nok)}
 .tag.wait{border:2px dashed #fff;font-size:14px;padding:4px 12px}
-.arc{position:absolute;left:0;top:0;animation:fin .25s ease-out;width:max-content;min-width:150px;max-width:min(68vw,270px);background:#F6FBFC;color:#15313D;border-radius:16px;padding:10px 14px 8px;font-size:14px;font-weight:600;text-decoration:none;box-shadow:0 0 0 1.5px #A9DCEB,0 8px 24px #0009;font-variant-numeric:tabular-nums}
+.arc{position:absolute;left:0;top:0;animation:pop .22s ease-out;width:max-content;min-width:150px;max-width:min(68vw,270px);background:#F6FBFC;color:#15313D;border-radius:16px;padding:10px 14px 8px;font-size:14px;font-weight:600;text-decoration:none;box-shadow:0 0 0 1.5px #A9DCEB,0 8px 24px #0009;font-variant-numeric:tabular-nums}
 .arc div{display:flex;justify-content:space-between;align-items:baseline;gap:12px;padding:3px 0}.arc div span:first-child{overflow-wrap:anywhere;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden}.arc div span+span{flex:none;color:#3F5F6B;font-weight:700}
 .arc .h{font-size:16px;font-weight:800;color:#0E2730;line-height:1.25;padding:0 0 2px}.arc .h span+span{color:#126985;font-weight:800}.arc:not(.it) .h span+span{color:#5A7682;font-weight:600;font-size:13px}
 .arc .h:not(:last-child){border-bottom:1px solid #D4E8EE;margin-bottom:4px;padding-bottom:8px}
+.arc>*{animation:pop .2s ease-out backwards}.arc>:nth-child(2){animation-delay:40ms}.arc>:nth-child(3){animation-delay:80ms}.arc>:nth-child(4){animation-delay:.12s}.arc>:nth-child(5){animation-delay:.16s}.arc>:nth-child(n+6){animation-delay:.2s}
 .arc .b{font-size:13px}.arc .b span:first-child{flex:none;color:#5A7682;font-weight:500}.arc .b span+span{flex:0 1 auto;min-width:0;overflow-wrap:anywhere;text-align:right;color:#15313D}
 .arc p{margin:4px 0 2px;color:#5A7682;font-weight:500}
 .arc em{display:block;font-style:normal;color:#126985;border-top:1px solid #D4E8EE;margin-top:4px;padding-top:6px}
@@ -298,6 +310,17 @@ dialog.sheet{inset:0;margin:auto;border-radius:26px;padding-bottom:18px;max-heig
 .line .side{flex-direction:row;align-items:center;gap:12px}
 .bx .line>a>.grow:has(>.nm),.bx .line>.a>.grow:has(>.nm){grid-template-columns:minmax(0,1fr) auto}
 }
+/* К1: pages cross-fade, the tapped photo flies between the list and the card (Chrome 126+, others just open the page) */
+@view-transition{navigation:auto}
+.car .strip>img:first-child{view-transition-name:photo}.thumb.vt{view-transition-name:photo}.car .strip>img.vt0{view-transition-name:none}
+::view-transition-group(*){animation-duration:.25s}
+/* К5: on a phone the box's cover shrinks and fades as it scrolls off the top — a scroll timeline, no JS; old browsers keep it still */
+@keyframes off{to{opacity:0;scale:.8}}
+@media (max-width:1023.98px) and (prefers-reduced-motion:no-preference){@supports (animation-timeline:view()){
+.bx>.what>.hero,.bx>.what>.car:not(.full){transform-origin:50% 100%;animation:off linear both;animation-timeline:view();animation-range:exit 0% exit 100%}}}
+@media (prefers-reduced-motion:reduce){@view-transition{navigation:none}*,::before,::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}}
+/* К3: a number changed by «Взять»/«Вернуть» bounces, green up, red down, the colour fading */
+@keyframes bump{0%,45%{color:var(--c)}25%{scale:1.3}}.qty.up,.qty.dn{display:inline-block;animation:bump .6s ease-out}.qty.up{--c:#1E9E6A}.qty.dn{--c:var(--bad)}
 </style>
 </head>
 <body>
@@ -597,7 +620,7 @@ async function qrScan(f) {
     // The read picture is old by the time it is read: the renewed look is looked for in the newest one, from where the ring is now.
     for (const c of codes) {
       const q = corners(c), m = marks.get(c.rawValue), {x, y, width, height} = c.boundingBox;
-      const n = Object.assign(look(G, gw, gh, sc, q), {u: c.rawValue, q, q0: q, t: now, ft: now, s: m?.s || q, b0: {x, y, width, height}, d: [0, 0]});  // s: where it is drawn, gliding to q (draw)
+      const n = Object.assign(look(G, gw, gh, sc, q), {u: c.rawValue, q, q0: q, t: now, ft: now, s: m?.s || q, ok: m?.ok, b0: {x, y, width, height}, d: [0, 0]});  // s: where it is drawn, gliding to q (draw)
       if (m?.at && now - m.ft < 500) n.at = m.at;
       marks.set(c.rawValue, n); follow(n);
     }
@@ -657,9 +680,12 @@ async function qrScan(f) {
       const q = c.s.map(([x, y]) => [x * k + ox, y * k + oy]);
       const [mx, my] = mid(q), u = c.u, st = state(u), id = key(u)?.slice(1), sel = u == picked;
       const half = Math.max(...q.map(([x, y]) => Math.hypot(x - mx, y - my))), pad = Math.max(12, half * .6);  // Android gives the finder squares' centres, not the code's corners: 0.72 of a version-2 code, so ×1.6 lands ~10% outside the edge (×1.35 sat on it)
-      const ring = q.map(([x, y]) => { const l = Math.hypot(x - mx, y - my) || 1; return [x + (x - mx) / l * pad, y + (y - my) / l * pad]; });
+      if (st && !c.ok) c.ok = ts;  // К2: ours — the ring snaps in from a size bigger; still asking — it breathes
+      const z = calm.matches || !c.ok ? 0 : Math.max(0, 1 - (ts - c.ok) / 220) ** 2, s1 = 1 + z * .35;
+      const ring = q.map(([x, y]) => { const l = Math.hypot(x - mx, y - my) || 1; return [mx + (x - mx + (x - mx) / l * pad) * s1, my + (y - my + (y - my) / l * pad) * s1]; });
       c.p = [mx, my, half + pad];  // for a tap (pick)
       g.globalAlpha = sel ? 1 : Math.max(.35, 1 - Math.max(0, now - c.ft - 500) / 1000);  // a code lost from sight fades, not blinks
+      if (st === undefined && !calm.matches) g.globalAlpha *= .6 + .4 * Math.sin(ts / 140);
       g.strokeStyle = g.fillStyle = st ? css.getPropertyValue("--ok") : st === false ? css.getPropertyValue("--nok") : "#fff";
       g.beginPath(); ring.forEach(([x, y], n) => g[n ? "lineTo" : "moveTo"](x, y)); g.closePath();
       if (sel) { g.globalAlpha = .3; g.fill(); g.globalAlpha = 1; }
@@ -857,6 +883,10 @@ addEventListener("DOMContentLoaded", async () => {  // №43: a thing's tag scan
   if (!f) return;
   history.replaceState(null, "", location.pathname);  // a reload doesn't ask again
   if (await ask(`Взять «${f.dataset.name}»?`, "Взять", "askTake")) f.requestSubmit();
+});
+addEventListener("DOMContentLoaded", () => {  // the app icon's «Сканировать» shortcut lands on /?qr=1: the camera at once
+  if (!new URLSearchParams(location.search).has("qr")) return;
+  history.replaceState(null, "", location.pathname); qrScan();
 });
 addEventListener("DOMContentLoaded", () => {  // №42: «Сохранить и записать метку» lands on the card with ?nfc=1
   const b = new URLSearchParams(location.search).has("nfc") && document.querySelector("[data-nfcw]");
@@ -1155,5 +1185,10 @@ addEventListener("keydown", e => {
 </script>
 {% block main %}{% endblock %}</main>
 {% block bar %}{% include "_bar.html" %}{% endblock %}
+<script>{const K = "qty0", n = e => parseFloat(e.textContent.replace(",", ".")) || 0, all = () => document.querySelectorAll(".qty[data-k]");
+addEventListener("submit", e => { if (/\/stock$/.test(e.target.action)) try { sessionStorage[K] = JSON.stringify([location.pathname, Object.fromEntries([...all()].map(q => [q.dataset.k, n(q)]))]); } catch {} }, true);
+try { const [p, o] = JSON.parse(sessionStorage[K] || "[]"); sessionStorage.removeItem(K);  // К3: the page came back from the redirect — what changed?
+  if (p == location.pathname) for (const q of all()) { const a = o[q.dataset.k] ?? 0, b = n(q); if (a != b) q.classList.add(b > a ? "up" : "dn"); } } catch {}}
+</script>
 </body>
 </html>

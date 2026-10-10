@@ -1,4 +1,4 @@
-{% extends "base.html" %}{% from "_stock.html" import moves_table %}{% from "_box.html" import box_input, crumbs, nfc_tag, print_btn %}{% from "_photos.html" import carousel %}{% from "_bar.html" import ico %}
+{% extends "base.html" %}{% from "_stock.html" import moves_table %}{% from "_box.html" import box_input, label, crumbs, nfc_tag, print_btn %}{% from "_photos.html" import carousel %}{% from "_bar.html" import ico %}
 {% block title %}{{ it.name }}{% endblock %}
 {% block main %}
 {% set I_BOX, I_DOWN = '<path d="M3 7.5L12 3l9 4.5v9L12 21l-9-4.5z"/><path d="M3 7.5l9 4.5 9-4.5M12 12v9"/>', '<path d="M6 9l6 6 6-6"/>' %}
@@ -22,12 +22,12 @@
 <h2>Где лежит</h2>
 {% for s in stock %}
 <div class="card spot">
-{% if s.box_id == "HANDS" %}<div class="top"><span class="thumb bx">{{ ico(I_HAND) }}</span><span class="grow"><b>{{ s.name }}</b><br><span class="mut sm">{{ s.where }}</span></span><span class="qty">{{ s.qty|qty(unit=u) }}</span></div>
+{% if s.box_id == "HANDS" %}<div class="top"><span class="thumb bx">{{ ico(I_HAND) }}</span><span class="grow"><b>{{ s.name }}</b><br><span class="mut sm">{{ s.where }}</span></span><span class="qty" data-k="{{ s.box_id }}">{{ s.qty|qty(unit=u) }}</span></div>
   <div class="two"><button type="button" class="ghost" data-sheet="put">{{ ico(I_BOX) }} Вернуть</button><button type="button" class="ghost bad" data-sheet="off">Списать</button></div>
 {% else %}<a class="top" href="/b/{{ s.box_id }}"><span class="thumb bx">{% if s.box_id != TRANSIT %}{{ ico(I_BOX) }}{% endif %}</span>
   <span class="grow"><b>{{ s.name or s.box_id }}</b>{% if s.name and s.box_id != TRANSIT %} <span class="mut sm">{{ s.box_id }}</span>{% endif %}
   {% if s.crumbs or s.where %}<br><span class="mut sm">{{ s.crumbs|map("first")|join(" › ") if s.crumbs else s.where }}</span>{% endif %}</span>
-  <span class="qty">{{ s.qty|qty(unit=u) }}</span></a>
+  <span class="qty" data-k="{{ s.box_id }}">{{ s.qty|qty(unit=u) }}</span></a>
   {% if s.box_id == TRANSIT %}{% if not h %}<button type="button" data-sheet="put">Куда положить</button>{% endif %}{# with HANDS too, the put sheet returns the HANDS stock: Codex P1 #}{% else %}<div class="two"><button type="button" data-sheet="take-{{ s.box_id }}">{{ ico(I_BOX) }} Взять</button><button type="button" class="ghost" data-sheet="move-{{ s.box_id }}">Переложить</button></div>{% endif %}
 {% endif %}</div>
 {% else %}<div class="card spot"><div class="top"><span class="thumb bx"></span><span class="grow"><b>{{ t.out }}</b></span><span class="qty">{{ 0|qty(unit=u) }}</span></div>
@@ -100,6 +100,7 @@
   {% if not lies %}<small>{{ "Сейчас на руках · " ~ h.qty|qty(unit=u) if h else "Пришло · " ~ tr.qty|qty(unit=u) if tr else "Нигде не лежит" }}</small><h2>{{ "Вернуть" if h else "Куда положить" }}</h2><p class="nm">{{ it.name }}</p>
   {% if not single %}<label>Сколько</label>{% endif %}{% endif %}{{ n_input((h or tr).qty if h or tr, (h or tr) and (h or tr).qty or 1, false, not h and not tr) }}
   {% if not lies %}<label>Куда {{ "вернуть" if h else "положить" }}</label>{% endif %}<div class="row">{{ box_input(value=h.src if h else "", placeholder="коробка: название или скан", required=True, exclude=TRANSIT if tr else None) }}</div>
+  {% if hints and not (h and h.src) %}<div class="chips" data-hints aria-label="Где лежат такие же">{% for b in hints %}<button type="button" data-v="{{ label(b) }}" onclick="const x=this.form.box;x.value=this.dataset.v;x.dispatchEvent(new Event('input',{bubbles:true}))">{{ b.name or b.id }} · {{ b.n }}</button>{% endfor %}</div>{% endif %}
   {% if not lies %}{% if h and h.src %}<p class="mut sm">Выбрана коробка, из которой взяли вещь.</p>{% endif %}
   <button>{{ "Вернуть" if h else "Положить" }} {{ n_word((h or tr) and (h or tr).qty or 1) }}</button>
   <button type="button" class="ghost" value="cancel">Отмена</button>{% endif %}

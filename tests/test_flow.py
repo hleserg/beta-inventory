@@ -141,6 +141,7 @@ def test_phone_app():
     """Installable app + writing NFC tags from the phone, with setup steps per platform."""
     m = c.get("/manifest.webmanifest").json()
     assert m["display"] == "standalone" and m["scope"] == "/"  # labels' /b/ links fall in the app's scope
+    assert [s["url"] for s in m["shortcuts"]] == ["/?qr=1", "/?hands=1", "/items/new"] and 'has("qr")' in c.get("/").text
     assert "nfcScan" in c.get("/").text and "nfcScan()" in c.get("/phone").text  # a scanned label opens its box
     assert all('id="scan"' in c.get(u).text for u in ("/", "/places", "/history"))  # the QR scan button on every page
     assert c.get("/more").status_code == 200 and 'class="bar"' in c.get("/more").text  # №54
@@ -152,6 +153,14 @@ def test_phone_app():
     sw = c.get("/sw.js").text
     assert "serviceWorker" in c.get("/").text and "/offline" in sw
     assert "AbortSignal.timeout" in sw  # a stalled Wi-Fi link shows «Нет связи» instead of a silent tap (10.10)
+    assert "indexedDB" in sw and '"op"' in sw and "/offline?q=1" in sw and 'id="queued"' in c.get("/offline?q=1").text  # П3
+    home = c.get("/").text
+    assert "@view-transition{navigation:auto}" in home and "pagereveal" in home  # К1: pages cross-fade, the photo flies
+    assert "@keyframes pop" in home and "c.ok = ts" in home  # К2: the ring snaps on a known code, labels slide out
+    assert "prefers-reduced-motion:reduce" in home  # motion off when the phone asks
+    assert "@keyframes bump" in home and "sessionStorage[K]" in home  # К3: a changed stock number bounces green/red
+    assert ".car.zoom .strip" in home  # К4: the full-screen photo zooms with two fingers
+    assert "animation-timeline:view()" in home  # К5: the box cover shrinks on scroll, no JS
     assert "half * .6" in c.get("/").text  # the ring encloses the code: Android gives the finder squares' centres, not the corners (10.10)
     assert c.get("/offline").status_code == 200
     box = core.new_boxes(1)[0]
@@ -181,6 +190,11 @@ def test_uncounted():
     assert c.post("/stock", data={"box": box, "item": rid, "action": "take", "qty": 3}).status_code == 200
     assert "есть, не считал" in c.get(f"/i/{rid}").text  # taking some leaves the pile uncounted
     assert q("SELECT count(*) FROM stock WHERE item_id=? AND box_id=?", rid, core.HANDS) == 0  # loose: nothing to return
+    c.post("/stock", data={"box": box, "item": rid, "action": "set", "qty": 40})
+    for _ in range(2):  # П3: the app replays a queued tap with its op key — the second post changes nothing
+        c.post("/stock", data={"box": box, "item": rid, "action": "take", "qty": 5, "op": "tap-1"})
+    assert "35 шт" in c.get(f"/b/{box}").text
+    c.post("/stock", data={"box": box, "item": rid, "action": "add", "kind": "return", "qty": 5})
     c.post("/stock", data={"box": box, "item": rid, "action": "set", "qty": 40})
     assert "40 шт" in c.get(f"/b/{box}").text  # counted: a number again
     c.post("/stock", data={"box": box, "item": rid, "action": "add", "kind": "put", "qty": ""})
@@ -226,6 +240,17 @@ def test_share_from_a_shop(monkeypatch):
     assert 'value="Драйвер моторов DRV8833"' in form and ">https://ozon.ru/t/Ab1</textarea>" in form
     assert 'name="for_agent" value="1" checked' in form and "d = null;" in form
     assert "Другое…" in form and form.count("link=https%3A%2F%2Fozon.ru%2Ft%2FAb1") >= 2  # another type keeps what was shared
+
+
+def test_share_a_photo():
+    """The installed app's share_target: a photo from the gallery → the type picker → a new card with that photo."""
+    assert c.get("/manifest.webmanifest").json()["share_target"]["params"]["files"][0]["name"] == "photo"
+    r = c.post("/share", files=photo(), follow_redirects=False)
+    n = parse_qsl(urlsplit(r.headers["location"]).query)[0][1]
+    assert r.status_code == 302 and c.get(f"/u/{n}").status_code == 200
+    assert f"photo={n}" in c.get(r.headers["location"]).text  # rides through the picker
+    form = c.get("/items/new", params={"type": "module", "photo": [n, "../etc/passwd"]}).text
+    assert f'name="photo__keep" value="{n}"' in form and "passwd" not in form and "d = null;" in form
 
 
 def test_share_cleans_up(monkeypatch):
@@ -864,6 +889,19 @@ def test_alerts():
     assert 'href="/items?reorder=1"' in c.get("/alerts").text
 
 
+def test_put_hints():
+    """П4 «Куда положить?»: the put sheet offers the boxes holding the most things of the same type."""
+    many, one = core.new_boxes(2)
+    for name, box in (("Подсказка-1", many), ("Подсказка-2", many), ("Подсказка-3", one)):
+        c.post("/items/new?type=resistor", data={"name": name, "value": "1 кОм", "box": box, "qty": 1})
+    c.post("/items/new?type=resistor", data={"name": "Подсказка-новая", "value": "2 кОм", "qty": 1})
+    assert "data-hints" in c.get(f"/i/{newest()}").text
+    with core.db() as db:  # the whole list: earlier tests' boxes hold more resistors and take the top three
+        ids = [b["id"] for b in core.put_hints(db, newest(), 10**6)]
+        assert ids.index(many) < ids.index(one)  # the fuller box first
+        assert one not in [b["id"] for b in core.put_hints(db, newest() - 1, 10**6)]  # not the box it already lies in
+
+
 def test_peek():
     """The camera (CAMERA.md): only catalog codes count; over a box, up to five things it gives out most, and its name for the tag."""
     a, b, inner = core.new_boxes(3)
@@ -924,6 +962,8 @@ def test_peek():
     first = c.get(f"/api/peek?boxes={a}").json()["boxes"][a]
     assert [x["name"] for x in first["items"]][:2] == ["Омега", "Альфа"] and first["items"][0]["qty"] == "2 шт"
     assert first["more"] == 4 and first["boxes"] == 1  # 9 things in the tree, five shown; `boxes` is still the direct children
+    shelf = c.get(f"/b/{a}").text.split("data-tree>")[1].split("</p>")[0]  # П5: the page sums up the tree too
+    assert "внутри: 2 " in shelf and "во всех: 9" in shelf and "берут чаще: <a" in shelf and shelf.index("Омега") < shelf.index("Альфа")
     with core.db() as db:
         db.execute("UPDATE boxes SET parent_id=? WHERE id=?", (deep, a))  # a cycle must not hang the walk
         assert sorted(core.box_tree(db, a)) == sorted([a, inner, deep])
