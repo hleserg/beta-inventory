@@ -374,7 +374,7 @@ function nfcScan() {  // one reader per page: two would both fire and the second
 }
 function fab() {  // the corner button: NFC where the phone reads tags (unless the settings say QR first), else the QR camera
   if (!(SCAN.nfc && "NDEFReader" in window && (SCAN.def !== "qr" || !SCAN.qr))) return qrScan();
-  if (document.getElementById("scan").classList.contains("on")) return SCAN.qr && qrScan();  // NFC listens already, the ring says so; a second tap is the camera
+  if (scanning || document.getElementById("scan").classList.contains("on")) return SCAN.qr && qrScan();  // NFC listens already (or is still arming: a guard, the second tap must not go silent), the ring says so; a second tap is the camera
   nfcScan().catch(e => alert("NFC не включился: " + e.message));
 }
 const plural = (n, one, few, many) => n % 10 == 1 && n % 100 != 11 ? one : [2, 3, 4].includes(n % 10) && ![12, 13, 14].includes(n % 100) ? few : many;
