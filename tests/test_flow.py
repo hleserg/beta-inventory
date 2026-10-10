@@ -1016,6 +1016,9 @@ def test_brief_in_list():
     assert '<details class="ld">' in row and "XL4015" in row and f'href="/i/{iid}">Открыть карточку' in row
     assert f'href="/b/{box}"' in row
     assert "Открыть карточку" not in c.get(f"/?put={box}").text  # putting away: a row is still one tap «Сюда»
+    bare = core.save_item(None, "Пустой-бриф", "module", {})  # no brief fields, no box: the brief would be just the button
+    page = c.get("/").text
+    assert page.index(f'<div class="line"><a href="/i/{bare}">') < page.index("Пустой-бриф")
 
 
 def test_mcp_takes_big_body():

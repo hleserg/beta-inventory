@@ -18,10 +18,11 @@
   {%- if r.hands and r.boxes %} <span class="src">{{ t.hands|lower }}</span>{% endif %}
   {%- if r.tr and (r.boxes or r.hands) %} <span class="src">{{ t.transit|lower }}</span>{% endif %}</span>
   <span class="qty">{{ (r.inhand if hand else r.total)|qty(not hand and r.uncounted, unit=unit_of(r.type, r.fields)) }}</span>{% endset %}
-{%- if put or caller is defined %}<div class="line"><a href="/i/{{ r.id }}">{{ inner }}</a>
-  {%- if put %}<form method="post" action="/stock"><input type="hidden" name="box" value="{{ put }}"><input type="hidden" name="item" value="{{ r.id }}"><input type="hidden" name="action" value="add"><input type="hidden" name="kind" value="put"><input type="hidden" name="qty" value="1"><input type="hidden" name="back" value="/b/{{ put }}"><button>Сюда</button></form>{% else %}{{ caller() }}{% endif %}</div>
+{%- set br = brief_of(r.type, r.fields) %}{# nothing to brief (on hand, no fields) → the tap opens the card #}
+{%- if put or caller is defined or not (br or r.boxes) %}<div class="line"><a href="/i/{{ r.id }}">{{ inner }}</a>
+  {%- if put %}<form method="post" action="/stock"><input type="hidden" name="box" value="{{ put }}"><input type="hidden" name="item" value="{{ r.id }}"><input type="hidden" name="action" value="add"><input type="hidden" name="kind" value="put"><input type="hidden" name="qty" value="1"><input type="hidden" name="back" value="/b/{{ put }}"><button>Сюда</button></form>{% elif caller is defined %}{{ caller() }}{% endif %}</div>
 {%- else %}{# a tap opens the brief in place; the card is one more tap #}<details class="ld"><summary class="line"><span class="a">{{ inner }}</span></summary><div class="brief">
-  {%- for k, v in brief_of(r.type, r.fields) %}<div><span class="mut">{{ k }}:</span> {{ v }}</div>{% endfor %}
+  {%- for k, v in br %}<div><span class="mut">{{ k }}:</span> {{ v }}</div>{% endfor %}
   {%- for b in r.boxes %}<div>{{ box_link(b.box_id, b.name) }}{% if b.where %} · {{ b.where }}{% endif %} — <span class="qty">{{ b.qty|qty(unit=unit_of(r.type, r.fields)) }}</span></div>{% endfor %}
   <a class="btn" href="/i/{{ r.id }}">Открыть карточку</a></div></details>{% endif %}{% endmacro %}
 {% macro taken_box(b) %}<div class="line"><a href="/b/{{ b.id }}"><span class="thumb"></span><span class="grow">{{ b.name or b.id }}<br><span class="mut">{{ t.box }}{% if b.name %} ({{ b.id }}){% endif %}</span></span></a>
