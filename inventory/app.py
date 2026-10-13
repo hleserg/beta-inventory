@@ -23,7 +23,7 @@ from PIL import Image, ImageDraw, ImageFont
 from starlette.background import BackgroundTask
 from starlette.exceptions import HTTPException
 
-from . import core
+from . import core, gate
 from .core import MOVES, PROFILE, db
 from .mcp_server import server as mcp_server
 
@@ -70,6 +70,7 @@ class ReplaceNav:
 
 
 app.add_middleware(ReplaceNav)
+app.add_middleware(gate.Gate)  # added last = runs first: outside requests get /mcp only, with an Access token
 # Agents: MCP at /mcp, same port and data as the site. Host 0.0.0.0 turns the localhost-only Host check
 # off: agents come by LAN name, and the site has no auth by design (LAN only).
 # The SDK caps a request at 4 MiB; photos come inline as data: URLs, two phone shots are over that.

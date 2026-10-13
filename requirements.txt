@@ -8,3 +8,4 @@ pillow
 markdown-it-py
 fastembed
 mcp>=2.2,<3  # v2 API: MCPServer
+pyjwt[crypto]  # Cloudflare Access tokens for agents outside the LAN (gate.py)

@@ -43,12 +43,12 @@ def test_read_tools():
     assert any("ESP32" in t["hint"] for cat in types for t in cat["types"])  # which type is which thing
 
 
-def test_http():
-    with TestClient(app) as c:  # the lifespan starts the MCP session manager
-        r = c.post("/mcp", headers={"Accept": "application/json, text/event-stream", "Host": "inv.lan"},
-                   json={"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {
-                       "protocolVersion": "2025-06-18", "capabilities": {}, "clientInfo": {"name": "t", "version": "0"}}})
-        assert r.status_code == 200 and "inventory" in r.text
+def test_http(live):
+    """live: the lifespan started the MCP session manager."""
+    r = live.post("/mcp", headers={"Accept": "application/json, text/event-stream", "Host": "inv.lan"},
+                  json={"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {
+                      "protocolVersion": "2025-06-18", "capabilities": {}, "clientInfo": {"name": "t", "version": "0"}}})
+    assert r.status_code == 200 and "inventory" in r.text
 
 
 def test_stock_tools():

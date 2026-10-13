@@ -20,3 +20,16 @@ services:
       timeout: 5s
       retries: 3
       start_period: 60s
+
+  # The door for agents outside the LAN (ChatGPT, Claude on the web): docs/outside.md.
+  # Off unless .env says COMPOSE_PROFILES=tunnel. Publishes nothing on the host: it dials out to Cloudflare.
+  tunnel:
+    image: cloudflare/cloudflared:latest
+    command: tunnel --no-autoupdate run
+    environment:
+      TUNNEL_TOKEN: ${TUNNEL_TOKEN:-}
+    depends_on:
+      - inventory
+    restart: unless-stopped
+    profiles:
+      - tunnel

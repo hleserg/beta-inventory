@@ -14,7 +14,7 @@ from mcp.server.mcpserver.exceptions import ToolError  # plain exceptions reach 
 from mcp.types import ToolAnnotations
 from PIL import Image
 
-from . import core
+from . import core, gate
 from .core import PROFILE, db
 
 T = PROFILE["terms"]
@@ -130,7 +130,8 @@ def card_template(type: str = "") -> dict[str, Any]:
 def author(agent):
     if not agent.strip():
         raise ToolError("agent is empty: pass your name, it is shown as the author in history.")
-    return agent.strip()
+    who = gate.OUTSIDE.get()  # came through the internet door: history says so and whose Access login it was
+    return f"{agent.strip()} (извне, {who})" if who else agent.strip()
 
 
 @server.tool(annotations=READ)
@@ -225,11 +226,12 @@ def change_stock(box_id: str, item_id: int, action: Literal["put", "return", "bu
 
 
 def fetch(url):
-    """Download what an agent found online. ponytail: no private-address guard, the site is LAN-only anyway."""
+    """Download what an agent found online. An outside agent (gate.py) gets public addresses only."""
     try:
-        with urllib.request.urlopen(urllib.request.Request(url, headers={"User-Agent": "beta-inventory"}),
-                                    timeout=30) as r:
+        with gate.opener(url)(urllib.request.Request(url, headers={"User-Agent": "beta-inventory"}), timeout=30) as r:
             data = r.read(FETCH_LIMIT + 1)
+    except PermissionError as e:
+        raise ToolError(str(e)) from None
     except (OSError, ValueError) as e:
         raise ToolError(f"Can't download {url[:100]}: {e}") from None
     if len(data) > FETCH_LIMIT:

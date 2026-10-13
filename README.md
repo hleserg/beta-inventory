@@ -124,6 +124,10 @@ label in the camera scanner.
   client writes a full card. Claude Code and Codex also get the skills:
   `ln -s "$PWD/skills/inventory-new-card" "$PWD/skills/inventory-enrich-card" ~/.agents/skills/`
   (Claude Code: `~/.claude/skills/`).
+- **Agents from the internet** (ChatGPT, Claude on the web): a Cloudflare
+  Tunnel to `/mcp` only, locked by Cloudflare Access with OAuth; the server
+  checks the Access token itself and won't download from the LAN for them.
+  The site stays LAN-only. **[docs/outside.md](docs/outside.md)**.
 - **Bell** (`/alerts`): questions agents asked with `ask_owner`, a stale
   agent queue, an overdue backup. The owner answers a question there; the
   answer reaches the agent once, in `agent_queue` → `answers`.
@@ -134,8 +138,8 @@ label in the camera scanner.
 
 ## Non-goals
 
-- No login, no HTTPS, no multi-user. It is meant for a home LAN. If you expose
-  it, put it behind a reverse proxy with auth.
+- No login, no HTTPS, no multi-user. It is meant for a home LAN. Don't expose
+  the site; for agents outside, open only `/mcp` as in docs/outside.md.
 - Not an ERP: no suppliers, prices or purchase orders. A project lists what it
   needs and orders what is short «in transit», nothing more.
 
