@@ -28,6 +28,8 @@ services:
     command: tunnel --no-autoupdate run
     environment:
       TUNNEL_TOKEN: ${TUNNEL_TOKEN:-}
+      # QUIC (UDP) is often throttled on home ISPs and the tunnel drops; TCP holds
+      TUNNEL_TRANSPORT_PROTOCOL: ${TUNNEL_TRANSPORT_PROTOCOL:-http2}
     depends_on:
       - inventory
     restart: unless-stopped
