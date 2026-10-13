@@ -130,8 +130,8 @@ def card_template(type: str = "") -> dict[str, Any]:
 def author(agent):
     if not agent.strip():
         raise ToolError("agent is empty: pass your name, it is shown as the author in history.")
-    who = gate.OUTSIDE.get()  # came through the internet door: history says so and whose Access login it was
-    return f"{agent.strip()} (извне, {who})" if who else agent.strip()
+    who = gate.OUTSIDE.get()  # came through the internet door: history says which connector and whose Access login
+    return f"{agent.strip()} (извне: {who[0]}, {who[1]})" if who else agent.strip()
 
 
 @server.tool(annotations=READ)

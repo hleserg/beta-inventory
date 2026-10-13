@@ -125,7 +125,7 @@ label in the camera scanner.
   `ln -s "$PWD/skills/inventory-new-card" "$PWD/skills/inventory-enrich-card" ~/.agents/skills/`
   (Claude Code: `~/.claude/skills/`).
 - **Agents from the internet** (ChatGPT, Claude on the web): a Cloudflare
-  Tunnel to `/mcp` only, locked by Cloudflare Access with OAuth; the server
+  Tunnel to `/mcp/<key>` only (one key per connector), locked by Cloudflare Access with OAuth; the server
   checks the Access token itself and won't download from the LAN for them.
   The site stays LAN-only. **[docs/outside.md](docs/outside.md)**.
 - **Bell** (`/alerts`): questions agents asked with `ask_owner`, a stale
@@ -139,7 +139,7 @@ label in the camera scanner.
 ## Non-goals
 
 - No login, no HTTPS, no multi-user. It is meant for a home LAN. Don't expose
-  the site; for agents outside, open only `/mcp` as in docs/outside.md.
+  the site; for agents outside, open only `/mcp/<key>` as in docs/outside.md.
 - Not an ERP: no suppliers, prices or purchase orders. A project lists what it
   needs and orders what is short «in transit», nothing more.
 

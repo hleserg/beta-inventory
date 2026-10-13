@@ -14,6 +14,8 @@ KEY = rsa.generate_private_key(public_exponent=65537, key_size=2048)
 INIT = {"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {
     "protocolVersion": "2025-06-18", "capabilities": {}, "clientInfo": {"name": "t", "version": "0"}}}
 ACCEPT = {"Accept": "application/json, text/event-stream"}
+SECRET = "k3f9Qx-_7bq2zzA1b2c3d4e5f6g7h8i9"
+MCP = f"/mcp/{SECRET}"  # each connector has its own address, the key in it names the connector
 
 
 def token(aud=AUD, iss=f"https://{TEAM}", key=KEY, **extra):
@@ -26,15 +28,16 @@ def access(monkeypatch):
     """Access set up for this app, the team's keys served from memory instead of /cdn-cgi/access/certs."""
     monkeypatch.setenv("CF_ACCESS_TEAM", "myteam")
     monkeypatch.setenv("CF_ACCESS_AUD", AUD)
+    monkeypatch.setenv("OUTSIDE_KEYS", f"{SECRET}:chatgpt-дом, other-key-000000000000000000:claude")
     monkeypatch.setitem(gate._jwks, TEAM, SimpleNamespace(
         get_signing_key_from_jwt=lambda t: SimpleNamespace(key=KEY.public_key())))
 
 
-def outside(c, path="/mcp", body=INIT, tok=None, **headers):
+def outside(c, path=MCP, body=INIT, tok=None, **headers):
     h = {**ACCEPT, "Host": "sklad.example.com", "Cf-Ray": "8f00-WAW", **headers}
     if tok:
         h["Cf-Access-Jwt-Assertion"] = tok
-    return c.post(path, headers=h, json=body) if path == "/mcp" else c.get(path, headers=h)
+    return c.post(path, headers=h, json=body) if path.startswith("/mcp") else c.get(path, headers=h)
 
 
 def tool(c, tool_name, **args):
@@ -52,15 +55,19 @@ def test_lan_unchanged(live):
 
 def test_outside_sees_mcp_only(live, access):
     c = live
-    for path in ("/", "/backup", "/settings", "/u/x.jpg", "/mcpx"):
+    for path in ("/", "/backup", "/settings", "/u/x.jpg", "/mcpx", "/mcp", "/mcp/", "/mcp/wrong-key", f"{MCP}/x", f"/mcp/{SECRET[:-1]}"):
         assert outside(c, path, tok=token()).status_code == 404, path
 
 
-def test_fails_closed(live, monkeypatch):
-    monkeypatch.delenv("CF_ACCESS_TEAM", raising=False)
+def test_fails_closed(live, access, monkeypatch):
     c = live
+    monkeypatch.delenv("CF_ACCESS_TEAM")
     r = outside(c, tok=token())
     assert r.status_code == 403 and "CF_ACCESS" in r.json()["error"]
+    monkeypatch.setenv("CF_ACCESS_TEAM", "myteam")
+    monkeypatch.delenv("OUTSIDE_KEYS")  # no connector registered: no address works
+    r = outside(c, tok=token())
+    assert r.status_code == 404 and "OUTSIDE_KEYS" in r.json()["error"]
 
 
 def test_token_checked(live, access):
@@ -89,7 +96,7 @@ def test_outside_agent(live, access):
                fields={"value": "47 Ом"})
     iid = res["structuredContent"]["id"]
     last = tool(c, "get_item", item_id=iid)["structuredContent"]["history"][0]
-    assert "ChatGPT (извне, sergey@example.com)" in json.dumps(last, ensure_ascii=False)
+    assert "ChatGPT (извне: chatgpt-дом, sergey@example.com)" in json.dumps(last, ensure_ascii=False)
 
     for url in ("http://127.0.0.1:8000/backup", "http://192.168.1.1/", "http://localhost/x.png", "http://[::1]/x"):
         err = tool(c, "update_item", item_id=iid, fields={"photo": [url]})

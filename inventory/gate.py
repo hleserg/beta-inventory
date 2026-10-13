@@ -4,9 +4,13 @@ Tunnel, behind Cloudflare Access. See docs/outside.md.
 The site has no login by design, so the gate never trusts the network a request came from. A request that came
 through Cloudflare (it carries a Cf-* header, or its Host is OUTSIDE_HOST) is an outside one: it may open /mcp and
 nothing else, and only with a token Access signed for this application. Everything else passes as before.
-Fails closed: an outside request while CF_ACCESS_TEAM / CF_ACCESS_AUD are unset gets 403.
+Each connector (a ChatGPT connector, Claude on the web) gets its own address /mcp/<key>; OUTSIDE_KEYS maps the keys to
+names, so history says which one acted, and dropping a line cuts that connector off. Access can't tell them apart: it
+hands the origin the same token whichever OAuth client logged in.
+Fails closed: an outside request while CF_ACCESS_TEAM / CF_ACCESS_AUD are unset gets 403, with no OUTSIDE_KEYS 404.
 """
 import contextvars
+import hmac
 import ipaddress
 import json
 import os
@@ -16,7 +20,7 @@ import urllib.request
 import anyio
 import jwt
 
-OUTSIDE = contextvars.ContextVar("outside", default=None)  # the Access identity (email) of an outside request
+OUTSIDE = contextvars.ContextVar("outside", default=None)  # (connector name, Access email) of an outside request
 CF_HEADERS = (b"cf-ray", b"cf-connecting-ip", b"cf-access-jwt-assertion", b"cf-ipcountry")
 _jwks = {}
 
@@ -24,6 +28,16 @@ _jwks = {}
 def team():
     t = os.environ.get("CF_ACCESS_TEAM", "").strip().lower().removeprefix("https://").rstrip("/")
     return t if not t or "." in t else f"{t}.cloudflareaccess.com"  # «myteam» or «myteam.cloudflareaccess.com»
+
+
+def connector(key):
+    """The name OUTSIDE_KEYS («key:name,key:name») gives this key, or None."""
+    name = None
+    for pair in os.environ.get("OUTSIDE_KEYS", "").split(","):
+        k, _, n = pair.strip().partition(":")
+        if k and n.strip() and hmac.compare_digest(k.encode(), key.encode()):
+            name = n.strip()
+    return name
 
 
 def is_outside(headers):
@@ -55,16 +69,19 @@ class Gate:
         if scope["type"] != "http" or not is_outside(scope["headers"]):
             return await self.app(scope, receive, send)
         path = scope["path"]
-        if path != "/mcp" and not path.startswith("/mcp/"):
-            return await deny(send, 404, "only /mcp is open from outside")
+        if not path.startswith("/mcp/"):
+            return await deny(send, 404, "only /mcp/<key> is open from outside")
+        name = connector(path.removeprefix("/mcp/"))
+        if not name:
+            return await deny(send, 404, "unknown connector key: see OUTSIDE_KEYS in .env (docs/outside.md)")
         token = dict(scope["headers"]).get(b"cf-access-jwt-assertion", b"").decode()
         try:
             claims = await anyio.to_thread.run_sync(verify, token)
         except PermissionError as e:
             return await deny(send, 403, str(e))
-        mark = OUTSIDE.set(claims.get("email") or claims.get("sub") or "?")
+        mark = OUTSIDE.set((name, claims.get("email") or claims.get("sub") or "?"))
         try:
-            await self.app(scope, receive, send)
+            await self.app({**scope, "path": "/mcp", "raw_path": b"/mcp"}, receive, send)
         finally:
             OUTSIDE.reset(mark)
 

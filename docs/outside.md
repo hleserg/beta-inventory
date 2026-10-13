@@ -14,15 +14,19 @@ What the server does with an outside request (`inventory/gate.py`):
 
 - A request is "outside" when it carries a `Cf-*` header or its Host is
   `OUTSIDE_HOST`. LAN requests never do, so the LAN works as before.
-- An outside request may open `/mcp` only; anything else is 404.
+- An outside request may open `/mcp/<key>` only, with a key listed in
+  `OUTSIDE_KEYS`; anything else is 404. Each connector gets its own key, so
+  history tells them apart and one can be cut off alone. (Access can't tell
+  them apart for you: the origin sees the same token whichever client logged in.)
 - It must carry `Cf-Access-Jwt-Assertion` signed by your team for this
   application (`CF_ACCESS_AUD`), or it gets 403. With `CF_ACCESS_*` unset,
   every outside request gets 403: a half-made setup stays shut.
 - Photos and files an outside agent gives by URL are downloaded from public
   addresses only, every redirect hop checked: an agent fooled by a page it read
   can't make the server fetch your router, NAS or this very site.
-- History names the author as `ChatGPT (извне, you@example.com)`: the agent's
-  name plus whose Access login it came through.
+- History names the author as `ChatGPT (извне: chatgpt-home, you@example.com)`:
+  the agent's name, the connector's name from `OUTSIDE_KEYS`, and whose Access
+  login it came through.
 
 You need a domain on Cloudflare (free plan is enough) and a Zero Trust
 organization (free for a few users). Dashboard names below are as of
@@ -81,7 +85,13 @@ In `.env`:
 OUTSIDE_HOST=sklad.example.com
 CF_ACCESS_TEAM=myteam
 CF_ACCESS_AUD=4714c1358e65fe4b408ad6d432a5f878f08194bdb4752441fd56faefa9b2b6f2
+OUTSIDE_KEYS=Zq3…f9:chatgpt-home,7bQ…zz:claude
 ```
+
+One `key:name` per connector, comma-separated. Make a key with
+`python3 -c "import secrets; print(secrets.token_urlsafe(24))"`. The
+connector's URL is then `https://sklad.example.com/mcp/<key>`. To cut one
+connector off, delete its pair and restart.
 
 Apply: `git pull && ./install.sh` (or `docker compose up -d`).
 `docker compose ps` shows two containers, `inventory` and `tunnel`.
@@ -91,20 +101,20 @@ Apply: `git pull && ./install.sh` (or `docker compose up -d`).
 From a phone on mobile data, or any machine outside your LAN:
 
 ```sh
-curl -i https://sklad.example.com/mcp      # 401 + WWW-Authenticate: Access wants a login
+curl -i https://sklad.example.com/mcp/<key>  # 401 + WWW-Authenticate: Access wants a login
 curl -i https://sklad.example.com/backup   # 404 or the Access login page, never a zip
 ```
 
 ## 4. Connect the agents
 
 **ChatGPT:** Settings → **Apps & Connectors → Advanced settings → Developer
-mode** on, then **Create**: URL `https://sklad.example.com/mcp`, auth OAuth.
+mode** on, then **Create**: URL `https://sklad.example.com/mcp/<key>`, auth OAuth.
 A browser window opens with the Access login; after it the tools appear.
 Developer mode is what allows write tools (`change_stock`, `create_item`) for a
 custom connector; OpenAI labels it Elevated Risk for good reason: see below.
 
 **Claude (claude.ai, the apps):** Settings → **Connectors → Add custom
-connector** → the same URL.
+connector** → its own URL `https://sklad.example.com/mcp/<another key>`.
 
 **LAN agents** (Claude Code, Codex on your machines) keep using
 `http://inv.lan/mcp` with no login.
@@ -126,3 +136,6 @@ allowed redirect URIs above, add it there.
   in front makes it someone you let in.
 - **Keys.** Lost the phone you log in with? Zero Trust → **My Team → Users**
   → revoke the session.
+- **The connector key** sits in the URL, so it shows up in the access logs of
+  Cloudflare and of this server. It is the second lock, Access is the first;
+  suspect it leaked — change the key in `OUTSIDE_KEYS` and in the connector.
