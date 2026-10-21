@@ -218,6 +218,11 @@ label.chk.rt{justify-content:space-between}
 label.lrow{margin:0;font-weight:400;cursor:pointer}.lrows>details+.lrow{border-top:1px solid var(--line)}.lrows details>div{padding:0 14px 14px;overflow-x:auto}.lrows h2{font-size:15px;margin:12px 0 4px}
 .thumb.bx{display:grid;place-items:center;color:var(--mut);background:var(--bg);border:1px solid var(--line)}
 .more{display:flex;flex-direction:column;min-height:calc(100dvh - var(--bar) - 32px - env(safe-area-inset-bottom))}.more>h1{flex:1}  /* №54: the menu at the thumb */
+/* /chat: the owner's messages on the right, the agents' on the left, a fresh reply outlined */
+.msgs{display:flex;flex-direction:column;gap:8px;margin:8px 0}.msg{max-width:88%;border-radius:18px;padding:10px 14px;background:var(--card);border:1px solid var(--line)}
+.msg.me{align-self:flex-end;background:var(--accent-soft);border-color:transparent}.msg.ag{align-self:flex-start}.msg.unread{border-color:var(--acc)}
+.msg .md>:first-child{margin-top:0}.msg .md>:last-child{margin-bottom:0}.msg .ph{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}.msg .row{margin-top:4px}
+.msg .ph img{width:84px;height:84px;object-fit:cover;border-radius:12px}.say textarea{min-height:5em}.say .row{gap:8px;margin-top:8px}
 .more .thumb{width:44px;height:44px}.more .grow{flex:1;min-width:0}.more .hd{display:flex;align-items:center;justify-content:space-between;margin-top:10px}
 .more .hd h2{margin:0;font-size:13px;font-weight:600;color:var(--mut);text-transform:uppercase;letter-spacing:.05em}.more .hd a{text-decoration:none;display:flex;align-items:center;font-weight:600;min-height:44px}
 .tn .ti{flex:none;width:28px;display:grid;place-items:center;color:var(--mut)}

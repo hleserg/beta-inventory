@@ -124,6 +124,14 @@ label in the camera scanner.
   client writes a full card. Claude Code and Codex also get the skills:
   `ln -s "$PWD/skills/inventory-new-card" "$PWD/skills/inventory-enrich-card" ~/.agents/skills/`
   (Claude Code: `~/.claude/skills/`).
+- **Chat with agents** («Ещё» → «Агент», `/chat`): drop in what came, what
+  went, what to find, a photo of a delivery note; nobody needs to be online.
+  An agent woken by cron takes the messages with `chat_inbox`, books the stock,
+  answers with `chat_reply`, and the bell says it answered. The skill
+  `inventory-chat` comes with `chat_inbox`; outside agents see photos through
+  `view_photo`. The cron side is `scripts/chat-agent.sh`: it asks `/chat/new`
+  first and runs the agent (`claude -p`, or `CHAT_AGENT`) only when something
+  waits: `*/15 * * * * INVENTORY_URL=http://<host>:8000 /path/scripts/chat-agent.sh >> ~/chat-agent.log 2>&1`.
 - **Agents from the internet** (ChatGPT, Claude on the web): a Cloudflare
   Tunnel to `/mcp/<key>` only (one key per connector), locked by Cloudflare Access with OAuth; the server
   checks the Access token itself and won't download from the LAN for them.

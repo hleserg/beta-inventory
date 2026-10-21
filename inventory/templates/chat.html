@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block title %}Агент{% endblock %}
+{% block main %}
+{# The chat with the agents: drop what came in, what to find, a question — an agent woken by cron answers when it gets to it #}
+<h1>Агент</h1>
+<p class="sm mut">Пишите как есть: «пришло 10 резисторов 1к в A7KQ2», «где паяльник», фото накладной. Агент заходит по расписанию — ответ появится здесь.</p>
+<div class="msgs">
+{% for m in msgs %}
+<div class="msg {{ 'ag' if m.by_agent else 'me' }}{% if m.by_agent and not m.done_at %} unread{% endif %}" id="m{{ m.id }}">
+  {% if m.text %}<div class="md">{{ m.text|md }}</div>{% endif %}
+  {% if m.photos %}<div class="ph">{% for p in m.photos %}<a href="/u/{{ p }}"><img src="/u/{{ p }}" alt="" loading="lazy"></a>{% endfor %}</div>{% endif %}
+  <div class="row"><span class="sm mut">{% if m.by_agent %}{{ m.author }} · {% endif %}{{ m.at[8:10] }}.{{ m.at[5:7] }} {{ m.at[11:16] }}
+    {%- if not m.by_agent %} · {{ "разобрано" if m.done_at else "агент взял" if m.taken_at else "ждёт агента" }}{% endif %}</span>
+  {% if not m.by_agent and not m.taken_at %}<form method="post" action="/chat/{{ m.id }}/delete" class="right"><button class="ghost" aria-label="Удалить">×</button></form>{% endif %}</div>
+</div>
+{% else %}<p class="mut">Пока пусто.</p>{% endfor %}
+</div>
+<form method="post" action="/chat" enctype="multipart/form-data" class="card say" id="end">
+  <textarea name="text" placeholder="Пришло: 2 × Arduino Nano в коробку A7KQ2, макетка — на руки"></textarea>
+  <div class="row"><label class="btn ghost">Фото<input type="file" name="photo" accept="image/*" multiple hidden
+    onchange="this.parentNode.firstChild.textContent = this.files.length ? 'Фото: ' + this.files.length : 'Фото'"></label>
+  <button class="right">Отправить</button></div>
+</form>
+<script>document.getElementById("end").scrollIntoView({block: "end"})</script>
+{% endblock %}
