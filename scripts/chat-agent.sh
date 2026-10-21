@@ -8,7 +8,8 @@
 set -eu
 BASE=${INVENTORY_URL:-http://localhost:8000}
 BASE=${BASE%/}
-n=$(curl -fsS --max-time 10 "$BASE/chat/new" | tr -cd 0-9) || exit 0  # the site is down: next time
+# the site is down, or an old one without /chat: next time
+n=$(curl -fsS --max-time 10 "$BASE/chat/new" | sed -n 's/^{"new": *\([0-9][0-9]*\)}$/\1/p') || exit 0
 [ "${n:-0}" -gt 0 ] || exit 0
 
 LOCK=${TMPDIR:-/tmp}/inventory-chat-agent.lock  # one round at a time; a lock left by a killed round goes after an hour
