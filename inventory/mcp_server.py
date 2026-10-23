@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Any, Literal
 from urllib.parse import urlparse
 
-from mcp.server.mcpserver import MCPServer
+from mcp.server.mcpserver import Image as Picture, MCPServer
 from mcp.server.mcpserver.exceptions import ToolError  # plain exceptions reach the agent without their text
 from mcp.types import ToolAnnotations
 from PIL import Image
@@ -20,6 +20,7 @@ from .core import PROFILE, db
 T = PROFILE["terms"]
 FETCH_LIMIT = 20 * 1024 * 1024
 ENRICH = Path(__file__).parent.parent / "skills" / "inventory-enrich-card" / "SKILL.md"
+CHAT = Path(__file__).parent.parent / "skills" / "inventory-chat" / "SKILL.md"
 READ = ToolAnnotations(readOnlyHint=True, openWorldHint=False)
 LOGGED = ToolAnnotations(readOnlyHint=False, destructiveHint=False, openWorldHint=False)  # history keeps every change
 
@@ -27,7 +28,7 @@ server = MCPServer("inventory", instructions=(
     f"Home inventory «{PROFILE['name']}». {T['items']} (items) lie in {T['boxes']} (boxes); a box has a 5-char id "
     f"printed on its label, may sit in another box and stands in a {T['place']} (place). Quantity belongs to the "
     "box×item pair. Start with search; card fields are defined by the profile, see card_template. "
-    "Search before create_item: the item may exist. agent_queue: cards a person handed to an agent to fill in. Each card_template field's hint says what goes in it. Stock changes go through change_stock under your name. "
+    "Search before create_item: the item may exist. agent_queue: cards a person handed to an agent to fill in. chat_inbox: what the owner wrote in the site's chat (deliveries, questions, tasks), answer with chat_reply. Each card_template field's hint says what goes in it. Stock changes go through change_stock under your name. "
     "Data is in the profile's language: answer the user in it."))
 
 
@@ -401,3 +402,44 @@ def post_finding(text: str, agent: str) -> dict[str, Any]:
     if not text.strip():
         raise ToolError("text is empty: write the finding itself.")
     return dict(id=core.add_finding(text, author(agent)), url=link("/stats"))
+
+
+def message(m):
+    return dict(id=m["id"], text=m["text"], author=m["author"], by_agent=bool(m["by_agent"]), at=m["at"],
+                photos=[link(f"/u/{x}") for x in m["photos"]])
+
+
+@server.tool(annotations=LOGGED)
+def chat_inbox(agent: str) -> dict[str, Any]:
+    """What the owner wrote in the site's chat and no agent has answered: deliveries to book, things to find,
+    questions, tasks. `new`: the messages to handle, now yours for 30 minutes (another agent won't get them);
+    `recent`: the talk before them, for context — your earlier question the owner now answers. Handle each as
+    `skill` says, then chat_reply with done = the ids you dealt with. agent: your name."""
+    new, recent = core.chat_take(author(agent))
+    return dict(new=[message(m) for m in new], recent=[message(m) for m in recent],
+                skill=CHAT.read_text(encoding="utf-8"), url=link("/chat"))
+
+
+@server.tool(annotations=LOGGED)
+def chat_reply(text: str, agent: str, done: list[int] | None = None) -> dict[str, Any]:
+    """Answer the owner in the site's chat: what you booked and where, what you found, what you need to know.
+    Markdown with links, short, in the profile's language. done: ids of the owner's messages this reply deals
+    with — they leave chat_inbox; a message you only asked back about is done too, the answer comes as a new one.
+    agent: your name, shown as the author."""
+    if not text.strip():
+        raise ToolError("text is empty: write the reply itself.")
+    return dict(id=core.chat_post(text, [], author(agent), by_agent=True, done=done or ()), url=link("/chat"))
+
+
+@server.tool(annotations=READ)
+def view_photo(photo: str) -> Picture:
+    """Look at a photo from the inventory: a /u/… link from chat_inbox, get_item or get_box, or its file name.
+    For agents that can't open the site's links themselves (an outside connector)."""
+    name = core.own_upload(photo)
+    if not name or Path(name).suffix.lower() not in (".jpg", ".jpeg", ".png", ".webp", ".gif"):
+        raise ToolError(f"{photo[:100]!r} is not a photo here: pass a /u/… photo link as the tools give it.")
+    im = Image.open(core.UPLOADS / name)
+    im.thumbnail((1568, 1568))  # what a model looks at anyway; the original stays on the site
+    out = io.BytesIO()
+    im.convert("RGB").save(out, "JPEG", quality=85)
+    return Picture(data=out.getvalue(), format="jpeg")

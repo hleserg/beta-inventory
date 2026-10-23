@@ -150,6 +150,10 @@ CREATE TABLE IF NOT EXISTS findings(
 CREATE TABLE IF NOT EXISTS questions(
   id INTEGER PRIMARY KEY, item_id INTEGER REFERENCES items(id) ON DELETE CASCADE, text TEXT NOT NULL, author TEXT NOT NULL,
   at TEXT NOT NULL DEFAULT (datetime('now','localtime')));
+CREATE TABLE IF NOT EXISTS messages(
+  id INTEGER PRIMARY KEY, text TEXT NOT NULL DEFAULT '', photos TEXT NOT NULL DEFAULT '[]', author TEXT NOT NULL,
+  by_agent INTEGER NOT NULL DEFAULT 0, taken_by TEXT, taken_at TEXT, done_at TEXT,
+  at TEXT NOT NULL DEFAULT (datetime('now','localtime')));
 CREATE TABLE IF NOT EXISTS trash(
   id INTEGER PRIMARY KEY, kind TEXT NOT NULL, label TEXT NOT NULL, data TEXT NOT NULL,
   at TEXT NOT NULL DEFAULT (datetime('now','localtime')));
@@ -686,6 +690,65 @@ def take_answers():
     return rows
 
 
+# The chat (/chat): the owner drops anything there — what came in, what to find, a question — and an agent woken
+# by cron answers when it gets to it. done_at: an owner's message an agent has dealt with; an agent's one the owner has seen.
+CHAT_LEASE_MIN = 30  # a message an agent took and left unanswered goes back to the others after this long
+
+
+def chat_post(text, photos, author, by_agent=False, done=()):
+    """A message in the chat. done: the owner's messages an agent's reply deals with — they leave chat_take."""
+    if not text.strip() and not photos:
+        raise ValueError("Пустое сообщение: напишите текст или приложите фото")
+    with db() as c:
+        mid = c.execute("INSERT INTO messages(text, photos, author, by_agent) VALUES (?, ?, ?, ?)",
+                        (text.strip(), json.dumps(list(photos)), author, int(by_agent))).lastrowid
+        if done:
+            c.execute(f"UPDATE messages SET done_at=datetime('now','localtime') WHERE NOT by_agent AND done_at IS NULL "
+                      f"AND id IN ({','.join('?' * len(done))})", list(done))
+    return mid
+
+
+def chat(limit=200):
+    """The latest messages, oldest first, photos as a list."""
+    with db() as c:
+        rows = c.execute("SELECT * FROM (SELECT * FROM messages ORDER BY id DESC LIMIT ?) ORDER BY id", (limit,)).fetchall()
+    return [dict(r, photos=json.loads(r["photos"])) for r in rows]
+
+
+def chat_take(author, recent=10):
+    """The owner's unanswered messages for one agent, and the `recent` ones before them (an agent's question the
+    owner now answers). Taking hides them from other agents for CHAT_LEASE_MIN: one delivery isn't booked twice."""
+    with db() as c:
+        c.execute("BEGIN IMMEDIATE")  # two agents woken at once: the second waits and sees the first one's lease
+        new = [dict(r, photos=json.loads(r["photos"])) for r in c.execute(
+            "SELECT * FROM messages WHERE NOT by_agent AND done_at IS NULL "
+            "AND (taken_at IS NULL OR taken_by=? OR taken_at < datetime('now','localtime',?)) ORDER BY id",
+            (author, f"-{CHAT_LEASE_MIN} minutes"))]
+        c.executemany("UPDATE messages SET taken_by=?, taken_at=datetime('now','localtime') WHERE id=?",
+                      [(author, m["id"]) for m in new])
+        before = [dict(r, photos=json.loads(r["photos"])) for r in c.execute(
+            "SELECT * FROM messages WHERE id < ? ORDER BY id DESC LIMIT ?", (new[0]["id"], recent))] if new else []
+    return new, before[::-1]
+
+
+def chat_waiting():
+    """How many of the owner's messages no agent has answered: the cron's runner wakes an agent only for these."""
+    with db() as c:
+        return c.execute("SELECT count(*) FROM messages WHERE NOT by_agent AND done_at IS NULL").fetchone()[0]
+
+
+def chat_seen():
+    """The owner opened the chat: the agents' replies are read, the bell stops counting them."""
+    with db() as c:
+        c.execute("UPDATE messages SET done_at=datetime('now','localtime') WHERE by_agent AND done_at IS NULL")
+
+
+def chat_delete(message_id):
+    """The owner takes back a message no agent has taken yet; one being handled stays."""
+    with db() as c:
+        c.execute("DELETE FROM messages WHERE id=? AND NOT by_agent AND taken_at IS NULL", (message_id,))
+
+
 def own_upload(v):
     """Name of our own upload, given as a /u/ link or bare, or None: a form or an agent can't point at other files."""
     name = str(v).rsplit("/u/", 1)[-1]
@@ -1080,6 +1143,8 @@ def alerts():
     with db() as c:
         out += [dict(kind="question", **r) for r in c.execute(
             "SELECT q.*, i.name AS item FROM questions q LEFT JOIN items i ON i.id=q.item_id WHERE q.closed_at IS NULL ORDER BY q.id DESC")]
+        if n := c.execute("SELECT count(*) FROM messages WHERE by_agent AND done_at IS NULL").fetchone()[0]:
+            out.append(dict(kind="chat", n=n))
         stamp = DATA / "backup-ok"  # POST /backup/done touches it; never touched = no backup set up, no alert
         if "backup_hours" in cfg and stamp.exists() and time.time() - stamp.stat().st_mtime > cfg["backup_hours"] * 3600:
             out.append(dict(kind="backup", at=datetime.fromtimestamp(stamp.stat().st_mtime).strftime("%Y-%m-%d %H:%M")))

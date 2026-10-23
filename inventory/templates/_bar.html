@@ -1,7 +1,7 @@
 {# №54: one bar at the thumb on every screen, the reach grows left to right — Домой · Места · Найти · Ещё · QR (№67, design/codex) #}
 {% set path = (request.url.path if request is defined else "/")|lower %}{% set seg = path.split("/")[1] %}
 {% set on = "home" if path == "/" and not (q is defined and q) else "find" if (q is defined and q) or seg in ("items", "i")
-  else "more" if seg in ("more", "history", "projects", "p", "readers", "trash", "settings") or path.startswith("/boxes/sheet")
+  else "more" if seg in ("more", "chat", "history", "projects", "p", "readers", "trash", "settings") or path.startswith("/boxes/sheet")
   else "places" if seg in ("places", "boxes", "b") else "" %}
 {% macro ico(d, size=24, w="1.8") %}<svg width="{{ size }}" height="{{ size }}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="{{ w }}" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">{{ d|safe }}</svg>{% endmacro %}
 <nav class="bar" aria-label="Главное меню"><div>

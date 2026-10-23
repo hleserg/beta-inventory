@@ -955,7 +955,35 @@ def more_page(req: Request):  # №54: whatever the bar has no room for, the cou
         n = lambda sql: c.execute(sql).fetchone()[0]
         return page(req, "more.html", trash=trash, moves=c.execute(MOVES + " ORDER BY m.id DESC LIMIT 3").fetchall(),
                     readers=n("SELECT count(*) FROM readers WHERE accepted"), readers_new=n("SELECT count(*) FROM readers WHERE NOT accepted"),
-                    projects=n("SELECT count(*) FROM projects WHERE status='active'"), inbox=n("SELECT count(*) FROM projects WHERE status='inbox'"))
+                    projects=n("SELECT count(*) FROM projects WHERE status='active'"), inbox=n("SELECT count(*) FROM projects WHERE status='inbox'"),
+                    chat=n("SELECT count(*) FROM messages WHERE NOT by_agent AND done_at IS NULL"))
+
+
+@app.get("/chat")
+def chat_page(req: Request):
+    resp = page(req, "chat.html", msgs=core.chat())  # rendered with the unread replies outlined, then they count as seen
+    core.chat_seen()
+    return resp
+
+
+@app.post("/chat")
+async def chat_post(req: Request):
+    form = await req.form()
+    photos = [save_upload(u, photo=True) for u in form.getlist("photo") if getattr(u, "filename", "")]
+    core.chat_post(str(form.get("text", "")), photos, AUTHOR)
+    return go("/chat#end")
+
+
+@app.post("/chat/{message_id}/delete")
+def chat_delete(message_id: int):
+    core.chat_delete(message_id)
+    return go("/chat#end")
+
+
+@app.get("/chat/new")
+def chat_new():
+    """The cron's runner asks this before waking an agent: nothing waits — no agent run, no tokens."""
+    return {"new": core.chat_waiting()}
 
 
 @app.get("/stats")

@@ -7,6 +7,8 @@
 <div class="more"><h1>Ещё</h1>
 <div class="card lrows">
 {% for href, name, sub, d in [
+  ("/chat", "Агент", (chat ~ " ждут агента" if chat else "что пришло, что найти, о чём спросить"),
+   '<path d="M4 5h16v11H9l-5 4z"/>'),
   ("/items/new", "+ Новый предмет", "карточка вещи: фото, поля, куда положить", '<path d="M12 5v14M5 12h14"/>'),
   ("/settings", "Настройки", "этот телефон, наклейки, поиск, GitHub, агенты",
    '<path d="M4 6h9M17 6h3M4 12h3M11 12h9M4 18h11M19 18h1"/><circle cx="15" cy="6" r="2"/><circle cx="9" cy="12" r="2"/><circle cx="17" cy="18" r="2"/>'),
