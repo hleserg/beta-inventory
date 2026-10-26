@@ -417,8 +417,12 @@ def label_png(path, text, base, w=0, h=0, name=""):
     qr.make(fit=True)
     qr.box_size = max(1, H // (qr.modules_count + 2))
     code = qr.make_image().get_image().convert("1")
-    if abs(W - H) <= 0.1 * max(W, H):  # a square roll: round labels, the layout keeps inside the circle
-        return png(round_label(code, qr.modules_count + 2, min(W, H), name, text, dpi), dpi)
+    # near-square: round labels. The 32 mm round roll reports 32×26 (paperHeight = pitch − gap); 40×30 and 50×40 stay oblong
+    if abs(W - H) < 0.2 * max(W, H):
+        img = Image.new("1", (W, H), 1)  # the phone stretches the picture to W×H: the circle sits in the middle of it
+        circle = round_label(code, qr.modules_count + 2, min(W, H), name, text, dpi)
+        img.paste(circle, ((W - circle.width) // 2, (H - circle.height) // 2))
+        return png(img, dpi)
     img = Image.new("1", (W, H), 1)
     img.paste(code, (0, (H - code.height) // 2))
     d, room = ImageDraw.Draw(img), W - code.width

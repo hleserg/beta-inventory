@@ -754,6 +754,8 @@ def test_label_sheet():
     # round labels come on a square roll: the whole circle, and the white corners stay outside it
     im = Image.open(io.BytesIO(c.get(f"/b/{ids[0]}/label.png?w=20&h=20").content)).convert("L")
     assert im.size == (236, 236) and all(im.getpixel(p) == 255 for p in [(0, 0), (235, 0), (0, 235), (235, 235)])
+    im = Image.open(io.BytesIO(c.get(f"/b/{ids[0]}/label.png?w=32&h=26").content)).convert("L")  # what the round roll reports
+    assert im.size == (378, 307) and im.getpixel((20, 153)) == 255 and im.getpixel((357, 153)) == 255  # the circle, not the QR at the left edge
 
 
 def test_backup():
