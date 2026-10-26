@@ -77,6 +77,10 @@ def test_main_path():
     assert c.get(f"/i/{iid}/label.png").headers["content-type"] == "image/png"
     from inventory.app import label_png  # №70: the thing's name is on its label, the box label stays the ID alone
     assert c.get(f"/i/{iid}/label.png").content != label_png(f"I/{iid}", str(iid), "http://testserver")
+    for q in ("", "&w=32&h=26"):  # a black-and-red roll: the name pure red, the QR and the ID black, nothing in between
+        im = Image.open(io.BytesIO(c.get(f"/i/{iid}/label.png?red=1{q}").content))
+        assert {rgb for _, rgb in im.getcolors()} == {(0, 0, 0), (255, 0, 0), (255, 255, 255)}
+    assert Image.open(io.BytesIO(c.get(f"/i/{iid}/label.png").content)).mode == "1"
     assert "MP1584" in c.get("/?q=ПОНИЖАЙКА").text
     assert "10k" in c.get("/?q=резистор").text  # type label is searchable
     assert "10k" in c.get("/items?cat=electronics").text and "10k" not in c.get("/items?cat=tools").text
