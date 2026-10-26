@@ -77,6 +77,10 @@ def test_main_path():
     assert c.get(f"/i/{iid}/label.png").headers["content-type"] == "image/png"
     from inventory.app import label_png  # №70: the thing's name is on its label, the box label stays the ID alone
     assert c.get(f"/i/{iid}/label.png").content != label_png(f"I/{iid}", str(iid), "http://testserver")
+    for q in ("", "&w=32&h=26"):  # a black-and-red roll: the name pure red, the QR and the ID black, nothing in between
+        im = Image.open(io.BytesIO(c.get(f"/i/{iid}/label.png?red=1{q}").content))
+        assert {rgb for _, rgb in im.getcolors()} == {(0, 0, 0), (255, 0, 0), (255, 255, 255)}
+    assert Image.open(io.BytesIO(c.get(f"/i/{iid}/label.png").content)).mode == "1"
     assert "MP1584" in c.get("/?q=ПОНИЖАЙКА").text
     assert "10k" in c.get("/?q=резистор").text  # type label is searchable
     assert "10k" in c.get("/items?cat=electronics").text and "10k" not in c.get("/items?cat=tools").text
@@ -751,6 +755,11 @@ def test_label_sheet():
     assert 'data-print="/b/' + ids[0] + '/label.png"' in c.get(f"/b/{ids[0]}").text
     size = lambda q: Image.open(io.BytesIO(c.get(f"/b/{ids[0]}/label.png{q}").content)).size
     assert size("") == (295, 177) and size("?w=50&h=30") == (591, 354) and size("?w=500&h=30") == (295, 177)
+    # round labels come on a square roll: the whole circle, and the white corners stay outside it
+    im = Image.open(io.BytesIO(c.get(f"/b/{ids[0]}/label.png?w=20&h=20").content)).convert("L")
+    assert im.size == (236, 236) and all(im.getpixel(p) == 255 for p in [(0, 0), (235, 0), (0, 235), (235, 235)])
+    im = Image.open(io.BytesIO(c.get(f"/b/{ids[0]}/label.png?w=32&h=26").content)).convert("L")  # what the round roll reports
+    assert im.size == (378, 307) and im.getpixel((20, 153)) == 255 and im.getpixel((357, 153)) == 255  # the circle, not the QR at the left edge
 
 
 def test_backup():

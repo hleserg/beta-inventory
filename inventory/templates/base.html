@@ -856,30 +856,45 @@ addEventListener("click", async e => {  // «Печать» (_box.html print_btn
     await niim.fetchRfidInfo();  // the roll may have changed since connecting
     const r = niim.getRfidInfo(), p = r.paperInfo?.valid && r.paperInfo, m = niim.getModelMetadata();
     if (!m) throw new Error("эту модель принтера библиотека не знает");
+    const task = niim.getPrintTaskType() ?? "D110M_V4", roll = ["B1", "D110M_V4"].includes(task) && encodeURIComponent(r.labelRfidInfo?.barCode ?? "");  // printTasksCapabilities' SupportDoubleColor (not exported by the bundle)
+    const two = roll && rollTwo(roll);  // the printer doesn't say a roll is black-and-red: asked once per roll kind (its RFID barcode)
+    if (two == null) {
+      st.innerHTML = `Рулон чёрно-красный? <button type="button" class="ghost" data-roll="${roll}" data-two="1">Да</button> <button type="button" class="ghost" data-roll="${roll}" data-two="0">Нет</button>`;
+      return;
+    }
+    const pc = two ? L.PageColorType.DoubleColor : L.PageColorType.SingleColor;
     const [pw, ph] = p ? [p.paperWidth, p.paperHeight] : [PRN.w, PRN.h], dpm = m.dpi / 25.4, top = m.printDirection != "left";
     const W = Math.round(pw * dpm), H = Math.round(ph * dpm), turn = PRN.rot % 180;
     const c = document.createElement("canvas"), g = c.getContext("2d");
     c.width = top ? Math.min(W, m.printheadPixels) : W; c.height = top ? H : Math.min(H, m.printheadPixels);  // wider than the head: shrink to fit
     const k = Math.min(c.width / W, c.height / H), img = new Image();
-    img.src = b.dataset.print + (turn ? `?w=${ph}&h=${pw}` : `?w=${pw}&h=${ph}`);
+    img.src = b.dataset.print + (turn ? `?w=${ph}&h=${pw}` : `?w=${pw}&h=${ph}`) + (two ? "&red=1" : "");
     await img.decode();
     g.fillStyle = "#fff"; g.fillRect(0, 0, c.width, c.height); g.imageSmoothingEnabled = false;
     g.translate(c.width / 2 + PRN.dx * dpm, c.height / 2 + PRN.dy * dpm); g.rotate(PRN.rot * Math.PI / 180);
     const [dw, dh] = turn ? [H * k, W * k] : [W * k, H * k];
     g.drawImage(img, -dw / 2, -dh / 2, dw, dh);
-    const t = niim.protocol.newPrintTask(niim.getPrintTaskType() ?? "D110M_V4", {density: PRN.density, totalPages: 1,
-      labelType: r.labelRfidInfo?.consumablesType > 0 ? r.labelRfidInfo.consumablesType : L.LabelType.WithGaps, pageColor: L.PageColorType.SingleColor});
+    const t = niim.protocol.newPrintTask(task, {density: PRN.density, totalPages: 1,
+      labelType: r.labelRfidInfo?.consumablesType > 0 ? r.labelRfidInfo.consumablesType : L.LabelType.WithGaps, pageColor: pc});
     st.textContent = "Печатаю…";
     niim.stopHeartbeat();  // its polling shouldn't cut into the print's packets
     try {
-      await t.printInit(); await t.printPage(L.ImageEncoder.encodeCanvas(c, L.PageColorType.SingleColor, m.printDirection), 1); await t.waitForFinished();
+      await t.printInit(); await t.printPage(L.ImageEncoder.encodeCanvas(c, pc, m.printDirection), 1); await t.waitForFinished();
     } finally { await t.printEnd().catch(() => {}); niim.startHeartbeat(); }
     st.textContent = `Напечатано ✓ ${pw}×${ph} мм — ` + (p ? "размер сообщил принтер" : "размер из настроек, принтер его не сообщил");
+    if (roll) st.insertAdjacentHTML("beforeend", ` · ${two ? "в два цвета" : "в один цвет"} <button type="button" class="ghost" data-roll="${roll}" data-two="${two ? 0 : 1}">${two ? "Рулон одноцветный" : "Рулон чёрно-красный"}</button>`);
     if (!navigator.bluetooth.getDevices) st.insertAdjacentHTML("beforeend", `<br>Каждая страница заново спрашивает принтер? <a href="/settings#phone">Chrome можно научить его помнить</a>.`);
   } catch (x) {
     st.textContent = /negotiate/.test(x) ? "Принтер на связи, но молчит. Закройте приложение Niimbot или выключите и включите принтер, потом «Печать» ещё раз. (" + x.message + ")"
       : (niimPick ? "Принтер не ответил. Он включён? Нажмите «Печать» ещё раз — откроется список принтеров. " : "Не напечаталось: ") + (x.message || x);
   } finally { b.disabled = false; }
+});
+const rollTwo = k => { try { const v = localStorage["roll2:" + k]; return v == null ? null : v == "1"; } catch { return false; } };
+addEventListener("click", e => {  // the answer to «Рулон чёрно-красный?»: remembered for that roll kind, then the label prints
+  const b = e.target.closest("[data-roll]");
+  if (!b) return;
+  try { localStorage["roll2:" + b.dataset.roll] = b.dataset.two; } catch {}
+  b.closest("[data-prst]").previousElementSibling.querySelector("[data-print]").click();
 });
 // №69: Chrome connects to a remembered printer only once it has heard it since it started; not heard in 5 s — try anyway
 const heard = dev => !dev.watchAdvertisements ? null : new Promise(ok => {

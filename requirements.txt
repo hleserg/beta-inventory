@@ -6,6 +6,7 @@ pyyaml
 qrcode
 pillow
 markdown-it-py
-fastembed
+numpy
+fastembed; python_version < "3.15"  # shortcut: onnxruntime has no 3.15 wheels yet, there search goes by words only; drop the marker once it has
 mcp>=2.2,<3  # v2 API: MCPServer
 pyjwt[crypto]  # Cloudflare Access tokens for agents outside the LAN (gate.py)

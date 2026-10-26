@@ -406,8 +406,9 @@ def public_base(req):
     return (os.environ.get("PUBLIC_BASE_URL") or str(req.base_url)).rstrip("/")
 
 
-def label_png(path, text, base, w=0, h=0, name=""):
-    """w, h: the roll in the printer, mm (№61: «Печать» asks with the size the printer reported); 0 — from /settings."""
+def label_png(path, text, base, w=0, h=0, name="", red=False):
+    """w, h: the roll in the printer, mm (№61: «Печать» asks with the size the printer reported); 0 — from /settings.
+    red: a black-and-red roll, the name goes red."""
     w_mm, h_mm, dpi = core.LABEL
     if 5 <= w <= 200 and 5 <= h <= 200:
         w_mm, h_mm = w, h
@@ -417,9 +418,16 @@ def label_png(path, text, base, w=0, h=0, name=""):
     qr.make(fit=True)
     qr.box_size = max(1, H // (qr.modules_count + 2))
     code = qr.make_image().get_image().convert("1")
-    img = Image.new("1", (W, H), 1)
+    # near-square: round labels. The 32 mm round roll reports 32×26 (paperHeight = pitch − gap); 40×30 and 50×40 stay oblong
+    if abs(W - H) < 0.2 * max(W, H):
+        img = Image.new("L", (W, H), 255)  # the phone stretches the picture to W×H: the circle sits in the middle of it
+        circle = round_label(code, qr.modules_count + 2, min(W, H), name, text, dpi)
+        img.paste(circle, ((W - circle.width) // 2, (H - circle.height) // 2))
+        return png(img, dpi, red)
+    img = Image.new("L", (W, H), 255)
     img.paste(code, (0, (H - code.height) // 2))
     d, room = ImageDraw.Draw(img), W - code.width
+    d.fontmode = "1"  # no grey edges: every dot is black, red or white
     if name and room >= H * 0.4:  # №70: a thing's name goes on its label; a roll too narrow keeps the ID alone
         name_text(d, name, text, code.width, room, H)
     else:
@@ -429,9 +437,81 @@ def label_png(path, text, base, w=0, h=0, name=""):
             if r - l <= room * 0.9 and bt - t <= H * 0.6:
                 break
         d.text((code.width + (room - (r - l)) // 2 - l, (H - (bt - t)) // 2 - t), text, font=font, fill=0)
+    return png(img, dpi, red)
+
+
+RED = 128  # the name's ink while drawing; png() makes it red or black
+
+
+def png(img, dpi, red=False):
+    """img: L, 0 black, RED the name, 255 white. red: the name in pure #FF0000, the only red niimbluelib prints red."""
+    if red:
+        white = img.point(lambda v: 255 if v == 255 else 0)
+        img = Image.merge("RGB", (img.point(lambda v: 0 if v == 0 else 255), white, white))
+    else:
+        img = img.point(lambda v: 255 if v == 255 else 0).convert("1")
     buf = io.BytesIO()
     img.save(buf, "PNG", dpi=(dpi, dpi))
     return buf.getvalue()
+
+
+def round_label(code, n, D, name, text, dpi):
+    """QR at the top of the circle, under it the name over the chords, the ID last. The name is dropped
+    when it doesn't fit at ~1.6 mm (unreadable): then the QR grows and keeps the ID alone."""
+    mm = dpi / 25.4
+    if name:
+        img = round_fill(code, n, D, 0.5, name, text, 1.6 * mm, 1.3 * mm)
+        if img:
+            return img
+    return round_fill(code, n, D, 0.62, "", text, 0, 1.2 * mm) or round_fill(code, n, D, 0.62, "", "", 0, 0)
+
+
+def round_fill(code, n, D, q_frac, name, text, min_name, min_id):
+    R, m = D / 2, D * 0.04  # m: the cutter's slack at the edge
+    span = lambda y0, y1: 2 * min((max(0, (R - m) ** 2 - (y - R) ** 2)) ** 0.5 for y in (y0, y1)) * 0.94  # chord width over a line
+    q = int(D * q_frac) // n * n  # n: modules with the border, each a whole number of dots
+    code = code.resize((q, q), Image.NEAREST)
+    top = R - ((R - m) ** 2 - (q / 2) ** 2) ** 0.5  # the QR's top corners on the circle
+    img = Image.new("L", (D, D), 255)
+    img.paste(code, ((D - q) // 2, round(top)))
+    d, y = ImageDraw.Draw(img), top + q
+    d.fontmode = "1"
+    if name:
+        for size in range(round(D * 0.12), round(min_name) - 1, -1):
+            font, step = ImageFont.truetype(LABEL_FONT, size), round(size * 1.05)
+            lines, words, yy = [], name.split(), y
+            while words and yy + step <= D - m:  # greedy wrap, each line as wide as its chord
+                w, line = span(yy, yy + step), words[0]
+                if d.textlength(line, font=font) > w:
+                    break
+                words.pop(0)
+                while words and d.textlength(f"{line} {words[0]}", font=font) <= w:
+                    line += " " + words.pop(0)
+                lines.append((line, yy)); yy += step
+            if not words and lines and fits_id(d, text, yy, D, m, span, min_id):
+                break
+        else:
+            return None
+        for line, ly in lines:
+            d.text((R, ly), line, font=font, fill=RED, anchor="ma")
+        y = yy
+    if text:
+        size = fits_id(d, text, y, D, m, span, min_id)
+        if not size:
+            return None
+        d.text((R, y + (D - m - y) * 0.45), text, font=ImageFont.truetype(LABEL_FONT, size), fill=0, anchor="mm")
+    return img
+
+
+def fits_id(d, text, y, D, m, span, min_size):
+    """The largest ID size (px) that fits between y and the circle's bottom, 0 when below min_size."""
+    for size in range(round((D - m - y) * 0.9), max(round(min_size), 1) - 1, -1):
+        font = ImageFont.truetype(LABEL_FONT, size)
+        l, t, r, b = d.textbbox((0, 0), text, font=font)
+        mid = y + (D - m - y) * 0.45
+        if b - t <= D - m - y and r - l <= span(mid - (b - t) / 2, mid + (b - t) / 2):
+            return size
+    return 0
 
 
 LABEL_FONT = str(STATIC / "vendor/DejaVuSansCondensed-Bold.ttf")  # Pillow's own font has no Cyrillic
@@ -457,7 +537,7 @@ def name_text(d, name, text, x, room, H):
             lines[-1] = last.rstrip() + "…"
     y = pad + (top - len(lines) * step) / 2
     for i, line in enumerate(lines):
-        d.text((x + room / 2, y + i * step), line, font=font, fill=0, anchor="ma")
+        d.text((x + room / 2, y + i * step), line, font=font, fill=RED, anchor="ma")
 
 
 def wrap(d, s, font, width):
@@ -664,10 +744,10 @@ def item_need(item_id: int, project: int = Form(), qty: int = Form(0)):
 
 
 @app.get("/i/{item_id}/label.png")
-def item_label(req: Request, item_id: int, w: float = 0, h: float = 0):  # №22: a box of screws is a thing, not a box, and still gets a label
+def item_label(req: Request, item_id: int, w: float = 0, h: float = 0, red: bool = False):  # №22: a box of screws is a thing, not a box, and still gets a label
     with db() as c:
         name = get_item(c, item_id)["name"]
-    return Response(label_png(f"I/{item_id}", str(item_id), public_base(req), w, h, name), media_type="image/png")
+    return Response(label_png(f"I/{item_id}", str(item_id), public_base(req), w, h, name, red), media_type="image/png")
 
 
 @app.post("/i/{item_id}/delete")
