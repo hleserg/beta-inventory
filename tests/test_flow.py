@@ -751,6 +751,9 @@ def test_label_sheet():
     assert 'data-print="/b/' + ids[0] + '/label.png"' in c.get(f"/b/{ids[0]}").text
     size = lambda q: Image.open(io.BytesIO(c.get(f"/b/{ids[0]}/label.png{q}").content)).size
     assert size("") == (295, 177) and size("?w=50&h=30") == (591, 354) and size("?w=500&h=30") == (295, 177)
+    # round labels come on a square roll: the whole circle, and the white corners stay outside it
+    im = Image.open(io.BytesIO(c.get(f"/b/{ids[0]}/label.png?w=20&h=20").content)).convert("L")
+    assert im.size == (236, 236) and all(im.getpixel(p) == 255 for p in [(0, 0), (235, 0), (0, 235), (235, 235)])
 
 
 def test_backup():

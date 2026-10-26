@@ -417,6 +417,8 @@ def label_png(path, text, base, w=0, h=0, name=""):
     qr.make(fit=True)
     qr.box_size = max(1, H // (qr.modules_count + 2))
     code = qr.make_image().get_image().convert("1")
+    if abs(W - H) <= 0.1 * max(W, H):  # a square roll: round labels, the layout keeps inside the circle
+        return png(round_label(code, qr.modules_count + 2, min(W, H), name, text, dpi), dpi)
     img = Image.new("1", (W, H), 1)
     img.paste(code, (0, (H - code.height) // 2))
     d, room = ImageDraw.Draw(img), W - code.width
@@ -429,9 +431,71 @@ def label_png(path, text, base, w=0, h=0, name=""):
             if r - l <= room * 0.9 and bt - t <= H * 0.6:
                 break
         d.text((code.width + (room - (r - l)) // 2 - l, (H - (bt - t)) // 2 - t), text, font=font, fill=0)
+    return png(img, dpi)
+
+
+def png(img, dpi):
     buf = io.BytesIO()
     img.save(buf, "PNG", dpi=(dpi, dpi))
     return buf.getvalue()
+
+
+def round_label(code, n, D, name, text, dpi):
+    """QR at the top of the circle, under it the name over the chords, the ID last. The name is dropped
+    when it doesn't fit at ~1.6 mm (unreadable): then the QR grows and keeps the ID alone."""
+    mm = dpi / 25.4
+    if name:
+        img = round_fill(code, n, D, 0.5, name, text, 1.6 * mm, 1.3 * mm)
+        if img:
+            return img
+    return round_fill(code, n, D, 0.62, "", text, 0, 1.2 * mm) or round_fill(code, n, D, 0.62, "", "", 0, 0)
+
+
+def round_fill(code, n, D, q_frac, name, text, min_name, min_id):
+    R, m = D / 2, D * 0.04  # m: the cutter's slack at the edge
+    span = lambda y0, y1: 2 * min((max(0, (R - m) ** 2 - (y - R) ** 2)) ** 0.5 for y in (y0, y1)) * 0.94  # chord width over a line
+    q = int(D * q_frac) // n * n  # n: modules with the border, each a whole number of dots
+    code = code.resize((q, q), Image.NEAREST)
+    top = R - ((R - m) ** 2 - (q / 2) ** 2) ** 0.5  # the QR's top corners on the circle
+    img = Image.new("1", (D, D), 1)
+    img.paste(code, ((D - q) // 2, round(top)))
+    d, y = ImageDraw.Draw(img), top + q
+    if name:
+        for size in range(round(D * 0.12), round(min_name) - 1, -1):
+            font, step = ImageFont.truetype(LABEL_FONT, size), round(size * 1.05)
+            lines, words, yy = [], name.split(), y
+            while words and yy + step <= D - m:  # greedy wrap, each line as wide as its chord
+                w, line = span(yy, yy + step), words[0]
+                if d.textlength(line, font=font) > w:
+                    break
+                words.pop(0)
+                while words and d.textlength(f"{line} {words[0]}", font=font) <= w:
+                    line += " " + words.pop(0)
+                lines.append((line, yy)); yy += step
+            if not words and lines and fits_id(d, text, yy, D, m, span, min_id):
+                break
+        else:
+            return None
+        for line, ly in lines:
+            d.text((R, ly), line, font=font, fill=0, anchor="ma")
+        y = yy
+    if text:
+        size = fits_id(d, text, y, D, m, span, min_id)
+        if not size:
+            return None
+        d.text((R, y + (D - m - y) * 0.45), text, font=ImageFont.truetype(LABEL_FONT, size), fill=0, anchor="mm")
+    return img
+
+
+def fits_id(d, text, y, D, m, span, min_size):
+    """The largest ID size (px) that fits between y and the circle's bottom, 0 when below min_size."""
+    for size in range(round((D - m - y) * 0.9), max(round(min_size), 1) - 1, -1):
+        font = ImageFont.truetype(LABEL_FONT, size)
+        l, t, r, b = d.textbbox((0, 0), text, font=font)
+        mid = y + (D - m - y) * 0.45
+        if b - t <= D - m - y and r - l <= span(mid - (b - t) / 2, mid + (b - t) / 2):
+            return size
+    return 0
 
 
 LABEL_FONT = str(STATIC / "vendor/DejaVuSansCondensed-Bold.ttf")  # Pillow's own font has no Cyrillic
